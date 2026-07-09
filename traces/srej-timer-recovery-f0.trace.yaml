@@ -1,0 +1,72 @@
+# SREJ response F=0 during Timer Recovery — CLEAN-ROOM trace
+# (packet-net/ax25sdl#74): authored from the AX.25 v2.2 prose and direwolf
+# only, without reading the SDL tables or any pending SREJ fix. Transition
+# ids deliberately not asserted (table knowledge).
+#
+# Normative prose:
+#   §4.3.2.4: "if the P/F bit in the SREJ frame is set to '0', then the N(R)
+#   of the SREJ frame does not indicate acknowledgement of I frames" — so
+#   V(a) must NOT advance. And: retransmission of "the single I frame
+#   numbered N(R)"; "I frames transmitted following the I frame indicated by
+#   the SREJ frame are not retransmitted".
+#   §4.3.2.4 also authorises this arrival: "A receiving TNC may transmit one
+#   or more SREJ frames, each containing a different N(R) with the P bit set
+#   to '0', before one or more earlier SREJ exception conditions have been
+#   cleared."
+#   §6.4.11: "If ... the TNC correctly receives a supervisory response frame
+#   with the F bit not set ... the TNC does not restart timer T1" — T1 simply
+#   keeps running; the poll (F=1 reply) is still outstanding, so the machine
+#   stays in Timer Recovery (§4.4.5.1: the condition clears only on
+#   acknowledgement of the sent frames or link reset).
+#
+# NOTE (recorded ambiguity): §6.4.11's generic text says an F=0 supervisory
+# response's N(R) is used "as an indication of acknowledgement of transmitted
+# I frames up to and including I frame numbered N(R)-1". For SREJ that
+# directly contradicts §4.3.2.4's SREJ-specific rule that an F=0 SREJ's N(R)
+# "does not indicate acknowledgement". The SREJ-specific rule is applied here
+# (specific over generic — the SREJ N(R) designates the frame to retransmit,
+# not an ack level). Independent evidence agrees: direwolf srej_frame() only
+# does SET_VA(nr) when f is set (src/ax25_link.c:4128-4138, @eda1383f).
+#
+# Retransmission asserted as re-queueing per docs/golden-traces.md.
+scenario: srej-timer-recovery-f0
+description: >
+  Timer Recovery with I(ns=0..2) outstanding (V(s)=3, V(a)=0, RC=1, T1
+  running after the §6.4.11 poll): SREJ response F=0 nr=1 arrives.
+  No acknowledgement advance (V(a) stays 0, §4.3.2.4); exactly the single
+  I frame ns=1 is re-queued (§4.3.2.4/§4.4.4/§6.4.8); T1 is not restarted
+  and keeps running (§6.4.11); the machine remains in Timer Recovery
+  (§4.4.5.1).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.2.4 (Selective Reject (SREJ) Response)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.4 (Selective Reject (SREJ) Recovery)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.8 (Receiving an SREJ)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
+  - "direwolf@eda1383f src/ax25_link.c:4103-4196 (srej_frame, state 4) and :4216-4276 (resend_for_srej)"
+initial:
+  state: TimerRecovery
+  # Mid-recovery snapshot: three I frames outstanding, one RR(P=1) poll
+  # already sent (§6.4.11 first paragraph → RC=1, T1 restarted). SREJ link:
+  # v2.2 + selective reject negotiated (§4.3.2.4, §6.3.2).
+  variables: { modulo: 8, k: 4, vs: 3, va: 0, vr: 0, rc: 1, srej_enabled: true, version_2_2: true }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: SREJ response F=0 nr=1 — single re-queue, no acknowledgement
+    inject: { event: SREJ_received, command: false, pf: false, nr: 1 }
+    expect:
+      # §4.3.2.4/§4.4.4/§6.4.8: single-frame selective retransmission →
+      # exactly one re-queue effect for I(ns=1); I(ns=2) stays put.
+      effects:
+        - { internal: "Push Old I Frame N(r) on Queue", detail: "I(ns=1)" }
+      # §4.3.2.4: F=0 → N(R) is not an acknowledgement → V(a) unchanged.
+      # V(s) unrewound (§4.3.2.4 — following frames not retransmitted);
+      # direwolf resend_for_srej leaves V(s) alone (ax25_link.c:4216-4234).
+      variables: { va: 0, vs: 3 }
+      queue: ["I(ns=1)"]
+      # §6.4.11: F=0 → "does not restart timer T1"; it was running (we are
+      # mid-poll) and stays running. T3 stays stopped (§4.4.5.2).
+      timers: { t1: running, t3: stopped }
+      # The F=1 poll reply is still outstanding and frames remain
+      # unacknowledged → still in Timer Recovery (§4.4.5.1, §6.4.11).
+      state: TimerRecovery

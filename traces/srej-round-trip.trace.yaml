@@ -1,0 +1,155 @@
+# SREJ round trip, transmitting side — CLEAN-ROOM trace (packet-net/ax25sdl#74).
+#
+# Authored from the AX.25 v2.2 prose and independent implementation evidence
+# (direwolf) ONLY, without reading the SDL tables or any pending SREJ fix.
+# Transition ids are deliberately NOT asserted — they are table knowledge.
+#
+# Normative prose:
+#   §4.3.2.4: "The selective reject frame is used by the receiving TNC to
+#   request retransmission of the single I frame numbered N(R). If the P/F
+#   bit in the SREJ frame is set to '1', then I frames numbered up to N(R)-1
+#   inclusive are considered as acknowledged." ... "I frames transmitted
+#   following the I frame indicated by the SREJ frame are not retransmitted
+#   as the result of receiving a SREJ frame." ... "The SREJ frame is only
+#   sent as a response."
+#   §6.4.8: "After receiving a SREJ frame, the transmitting TNC retransmits
+#   the individual I frame indicated by the N(R) contained in the SREJ at
+#   the next available opportunity. ... If the P bit was set, then all
+#   frames up to N(R)-1 are acknowledged."
+#   §4.4.4: "a TNC receiving one or more SREJ frames initiates retransmission
+#   of the individual I frames indicated by the N(R) contained in each SREJ
+#   frame."
+#   §6.4.11: a supervisory response frame with the F bit set and an in-range
+#   N(R) restarts timer T1.
+#   §4.4.5.1: the timeout condition "is cleared by the reception of an
+#   acknowledgement for the sent frame(s), or by the link being reset" —
+#   I(ns=1) and I(ns=2) remain unacknowledged after this SREJ, so the
+#   machine remains in Timer Recovery.
+#
+# Independent implementation evidence — direwolf (github.com/wb2osz/direwolf
+# @ eda1383f, src/ax25_link.c), whose srej_frame() state-4 path implements
+# the sender side of SREJ:
+#   - ax25_link.c:4130-4132 — "f=1 means ack up thru previous sequence" →
+#     SET_VA(nr); F=0 leaves V(a) alone.
+#   - ax25_link.c:4161-4167 — original-spec behaviour: "Resend I frame with
+#     N(S) equal to the N(R) in the SREJ" via resend_for_srej(), i.e. the
+#     single frame.
+#   - ax25_link.c:4181-4186 — the 2006 figure's Invoke Retransmission on
+#     this path is flagged as an erratum: "We should resend only the single
+#     requested I frame. I think there was a cut-n-paste from the REJ flow
+#     chart."
+#   - ax25_link.c:4157-4187 — no state change on the resend path: the
+#     machine stays in timer recovery.
+#   - ax25_link.c:4216-4234 — resend_for_srej() retransmits exactly the
+#     I frame with N(S) = N(R) and does not touch V(s).
+#
+# Retransmission is asserted as *re-queueing* per docs/golden-traces.md: the
+# tables cannot express "retransmit with the original N(s)" end-to-end, so
+# this trace asserts that exactly ONE old frame — I(ns=1) — re-enters the
+# queue, and that V(s) is left unrewound (§4.3.2.4 forbids retransmission of
+# the frames following N(R), so a REJ-style V(s) rewind would be wrong).
+scenario: srej-round-trip
+description: >
+  Connected, SREJ negotiated: three I frames go out (ns=0,1,2); T1 expires,
+  the machine polls with RR(P=1) and enters Timer Recovery (§6.4.11); the
+  peer answers SREJ response F=1 nr=1 — I(ns=0) is acknowledged
+  (V(a):=N(R)=1, §4.3.2.4/§6.4.8), exactly the single I frame ns=1 is
+  re-queued for retransmission (§4.3.2.4/§4.4.4/§6.4.8), I(ns=2) is NOT
+  retransmitted (§4.3.2.4), T1 restarts (§6.4.11) and the machine stays in
+  Timer Recovery (§4.4.5.1 — frames remain unacknowledged).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.2.4 (Selective Reject (SREJ) Response)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.4 (Selective Reject (SREJ) Recovery)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.8 (Receiving an SREJ)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.1 (Sending I Frames)"
+  - "direwolf@eda1383f src/ax25_link.c:4103-4196 (srej_frame, state 4) and :4216-4276 (resend_for_srej)"
+initial:
+  state: Connected
+  # A link actually using SREJ has negotiated v2.2 + selective reject
+  # (§4.3.2.4, §6.3.2); modelled true-to-life.
+  variables: { modulo: 8, k: 4, srej_enabled: true, version_2_2: true }
+  timers: { t3: running }
+steps:
+  - name: layer 3 queues three payloads
+    inject: { event: DL_DATA_request, data: d0 }
+    expect:
+      effects:
+        - { internal: "Push on I Frame Queue (note: word order?)", detail: d0 }
+      queue: [d0]
+
+  - inject: { event: DL_DATA_request, data: d1 }
+    expect:
+      queue: [d0, d1]
+
+  - inject: { event: DL_DATA_request, data: d2 }
+    expect:
+      queue: [d0, d1, d2]
+
+  # §6.4.1: each pop emits I with N(S)=V(s), increments V(s); T1 starts.
+  - name: first frame out — I(ns=0), T1 starts
+    inject: { event: I_frame_pops_off_queue, data: d0 }
+    expect:
+      effects:
+        - { frame: I, command: true, ns: 0, nr: 0, pf: false }
+      variables: { vs: 1 }
+      timers: { t1: running, t3: stopped }
+
+  - name: second frame out — I(ns=1)
+    inject: { event: I_frame_pops_off_queue, data: d1 }
+    expect:
+      effects:
+        - { frame: I, command: true, ns: 1, nr: 0, pf: false }
+      variables: { vs: 2 }
+
+  - name: third frame out — I(ns=2)
+    inject: { event: I_frame_pops_off_queue, data: d2 }
+    expect:
+      effects:
+        - { frame: I, command: true, ns: 2, nr: 0, pf: false }
+      variables: { vs: 3 }
+      queue: []
+
+  # §6.4.11: "If the originating TNC's timer T1 expires while awaiting the
+  # distant TNC's acknowledgement of an I frame transmitted, the originating
+  # TNC restarts timer T1 and transmits an appropriate supervisory command
+  # frame (RR or RNR) with the P bit set." §4.4.5.1: enters timer recovery.
+  - name: T1 expires — poll the peer, enter Timer Recovery
+    inject: { event: T1_expiry }
+    expect:
+      state: TimerRecovery
+      effects:
+        - { frame: RR, command: true, pf: true, nr: 0 }
+      variables: { rc: 1 }
+      timers: { t1: running }
+
+  # The peer got I(ns=0) and I(ns=2) but lost I(ns=1); its poll reply is
+  # SREJ response F=1 nr=1 (§4.4.4: the F=1 SREJ carries the N(R) of the
+  # oldest unresolved SREJ condition).
+  - name: SREJ response F=1 nr=1 — ack through ns=0, re-queue ONLY I(ns=1)
+    inject: { event: SREJ_received, command: false, pf: true, nr: 1 }
+    expect:
+      # §4.3.2.4 / §6.4.8: F(=P/F)=1 → frames up to N(R)-1 acknowledged.
+      # direwolf ax25_link.c:4130-4132: SET_VA(nr) when f.
+      # §4.3.2.4: retransmit the SINGLE I frame N(R); frames following it
+      # are NOT retransmitted → exactly one re-queue effect, no more.
+      # direwolf ax25_link.c:4161-4186 (single resend; the 2006 figure's
+      # Invoke Retransmission here is a documented REJ cut-n-paste erratum).
+      effects:
+        - { internal: "Push Old I Frame N(r) on Queue", detail: "I(ns=1)" }
+      # V(s) unrewound: a wholesale V(s):=N(R) would renumber-retransmit
+      # everything from N(R), which §4.3.2.4 forbids for SREJ (that is REJ
+      # behaviour, §6.4.7). direwolf resend_for_srej leaves V(s) alone
+      # (ax25_link.c:4216-4234).
+      variables: { va: 1, vs: 3 }
+      queue: ["I(ns=1)"]
+      # §6.4.11: supervisory response F=1, in-range N(R) → restart T1.
+      # T3 stays stopped: §4.4.5.2 — T3 runs only "when T1 is not running"
+      # (I frames still outstanding).
+      timers: { t1: running, t3: stopped }
+      # §4.4.5.1: the timeout condition clears only on acknowledgement of
+      # the sent frame(s) (I(ns=1)/I(ns=2) are still unacknowledged) or on
+      # link reset → remain in Timer Recovery. direwolf: no state change on
+      # this path (ax25_link.c:4157-4187).
+      state: TimerRecovery
