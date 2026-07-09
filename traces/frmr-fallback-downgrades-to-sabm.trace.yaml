@@ -1,0 +1,36 @@
+# FRMR fallback from a v2.2 connect attempt: a peer that answers SABME with
+# FRMR is speaking an older protocol version — the fallback re-establishment
+# must use SABM (v2.0), not another SABME.
+#
+# §6.5: "A TNC initiates a reset procedure … after receipt of a FRMR frame
+# from a TNC using an older version of the protocol."
+# §4.3.3.9: FRMR is retained for compatibility with older versions.
+#
+# EXPECTED FAILURE — in figc4.6's FRMR transition the "Establish Data Link"
+# call precedes "Set Version 2.0", so the mod_128 decision inside
+# Establish_Data_Link still sees the extended configuration and re-sends
+# SABME. Catalogued upstream as packethacking/ax25spec#45.
+scenario: frmr-fallback-downgrades-to-sabm
+description: >
+  AwaitingV22Connection (SABME outstanding, mod 128): FRMR received should
+  re-establish with SABM P=1 as a v2.0 link; the table's action ordering
+  (figc4.6 t14) emits SABME instead.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.5 (Resetting Procedure)"
+  - "ax.25.2.2.4_Oct_25.md §4.3.3.9 (FRMR Response Frame)"
+  - "figc4.6 t14"
+expected_failure: https://github.com/packethacking/ax25spec/issues/45
+initial:
+  state: AwaitingV22Connection
+  variables: { modulo: 128, k: 32, version_2_2: true, rc: 1, layer_3_initiated: true }
+  timers: { t1: running }
+steps:
+  - name: peer FRMRs our SABME — fall back to v2.0
+    inject: { event: FRMR_received, pf: false }
+    expect:
+      transition: t14_frmr_received
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+      variables: { version_2_2: false }
+      timers: { t1: running }

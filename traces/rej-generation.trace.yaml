@@ -1,0 +1,51 @@
+# REJ round trip, receiving side: an out-of-sequence I frame draws a single
+# REJ (nr = V(r)); the retransmitted in-sequence frame clears the reject
+# exception and is delivered upward.
+#
+# §6.4.4.1: "When an I frame is received with a correct FCS, but its send
+# sequence number N(S) does not match the current receiver's receive state
+# variable, the frame is discarded. A REJ frame is sent with a receive
+# sequence number equal to one higher than the last correctly received
+# I frame if an uncleared N(S) sequence error condition has not been
+# previously established."
+scenario: rej-generation
+description: >
+  Connected (SREJ disabled, mod 8): I(ns=1) arrives while V(r)=0 — the frame
+  is discarded, the reject exception is set and REJ nr=0 goes out
+  (figc4.4 t26 …no_no_no_no); the retransmitted I(ns=0) is in sequence, so
+  it is delivered upward, V(r) advances and the reject exception clears
+  (figc4.4 t26 in-sequence path).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.4.1 (Implicit Reject (REJ) Recovery)"
+  - "figc4.4 t26"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, srej_enabled: false }
+  timers: { t3: running }
+steps:
+  - name: out-of-sequence I(ns=1) draws REJ nr=0
+    inject: { event: I_received, command: true, pf: false, ns: 1, nr: 0 }
+    expect:
+      transition: t26_i_received_yes_yes_yes_no_no_no_no
+      state: Connected
+      effects:
+        - { frame: REJ, command: false, nr: 0, pf: false }
+      variables: { vr: 0, reject_exception: true, ack_pending: false }
+
+  - name: while the exception stands, further out-of-sequence frames are dropped silently
+    inject: { event: I_received, command: true, pf: false, ns: 2, nr: 0 }
+    expect:
+      transition: t26_i_received_yes_yes_yes_no_no_yes_no
+      state: Connected
+      effects: []
+      variables: { vr: 0, reject_exception: true }
+
+  - name: the retransmitted I(ns=0) lands — deliver and clear the exception
+    inject: { event: I_received, command: true, pf: false, ns: 0, nr: 0 }
+    expect:
+      transition: t26_i_received_yes_yes_yes_no_yes_no_no
+      state: Connected
+      effects:
+        - { dl: DL_DATA_indication }
+        - { lm: LM_seize_request }
+      variables: { vr: 1, reject_exception: false, ack_pending: true }

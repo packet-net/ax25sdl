@@ -155,6 +155,22 @@ jobs:
             exit 1
           fi
 
+  # ─── Semantic validation: golden traces vs the regenerated JSON
+  #     tables. The reference interpreter (Packet.Sdl.Interpreter)
+  #     executes spec/json directly; traces/*.trace.yaml assert the
+  #     prose-derived behaviour, with expected_failure entries running
+  #     as strict xfails against catalogued upstream figure defects. ───
+  semantic-traces:
+    name: semantic validation — golden traces
+    runs-on: [self-hosted, Linux, X64]
+    needs: csharp
+    steps:
+      - uses: actions/checkout@v6
+      - name: regenerate JSON
+        run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
+      - name: run golden-trace suite against the regenerated tables
+        run: dotnet test codegen/tests/Packet.Sdl.Interpreter.Tests --nologo
+
   rust-drift:
     name: codegen drift — Rust + cargo build/test/fmt
     runs-on: [self-hosted, Linux, X64]

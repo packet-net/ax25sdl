@@ -1,0 +1,43 @@
+# Waiting acknowledgement: T1 expires with an I frame outstanding → the
+# machine polls with RR(P=1) in Timer Recovery; the RR(F=1) response with
+# N(R) covering the outstanding frame completes recovery back to Connected.
+#
+# §6.4.11: "If the originating TNC's timer T1 expires while awaiting the
+# distant TNC's acknowledgement of an I frame transmitted, the originating
+# TNC restarts timer T1 and transmits an appropriate supervisory command
+# frame (RR or RNR) with the P bit set."
+# §4.4.5.1: T1 timeout recovery enters the timer-recovery condition.
+scenario: t1-timer-recovery
+description: >
+  Connected with I(ns=0) outstanding (V(s)=1, V(a)=0, T1 running): T1 expiry
+  sends RR command P=1 nr=0 via Transmit Enquiry and enters Timer Recovery
+  with RC=1 (figc4.4 t12, figc4.7 Transmit_Enquiry); the peer's RR response
+  F=1 nr=1 acknowledges everything (V(s)=N(R)), so the machine restores
+  Connected, starts T3 and zeroes RC (figc4.5 t18 yes/yes/yes).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
+  - "figc4.4 t12, figc4.7 Transmit_Enquiry, figc4.5 t18"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, vs: 1, va: 0, vr: 0 }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: T1 expires — poll the peer
+    inject: { event: T1_expiry }
+    expect:
+      transition: t12_t1_expiry
+      state: TimerRecovery
+      effects:
+        - { frame: RR, command: true, pf: true, nr: 0 }
+      variables: { rc: 1, ack_pending: false }
+      timers: { t1: running }
+
+  - name: peer answers RR F=1 acknowledging the outstanding frame
+    inject: { event: RR_received, command: false, pf: true, nr: 1 }
+    expect:
+      transition: t18_rr_received_yes_yes_yes
+      state: Connected
+      effects: []
+      variables: { va: 1, rc: 0, peer_receiver_busy: false }
+      timers: { t1: stopped, t3: running }

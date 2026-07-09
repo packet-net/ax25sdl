@@ -1,0 +1,34 @@
+# Initiator-side v2.2 connect: a DL-CONNECT on a mod-128-configured machine
+# sends SABME — and should await the reply in the Awaiting V2.2 Connection
+# state (figc4.6), which owns the SABME retry and the FRMR/v2.0 fallback.
+#
+# §6.3.1 (link establishment); figc4.6 exists precisely to supervise a
+# pending SABME.
+#
+# EXPECTED FAILURE — figc4.1's DL-CONNECT path has no modulo branch: it
+# always enters Awaiting Connection (figc4.2), even when Establish_Data_Link
+# just sent a SABME. From figc4.2 the T1 retry then re-sends *SABM* and the
+# FRMR fallback is unreachable — the initiator's v2.2 connect degrades.
+# Catalogued upstream as packethacking/ax25spec#44.
+scenario: dl-connect-v22-awaits-v22
+description: >
+  Disconnected, configured mod 128: DL_CONNECT_request emits SABME P=1 (the
+  mod_128 branch of figc4.7 Establish_Data_Link) but the figc4.1 transition
+  unconditionally targets Awaiting Connection; per the figure set's own
+  structure (figc4.6) the machine should await in AwaitingV22Connection.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "figc4.1 t03, figc4.7 Establish_Data_Link, figc4.6"
+expected_failure: https://github.com/packethacking/ax25spec/issues/44
+initial:
+  state: Disconnected
+  variables: { modulo: 128, k: 32 }
+steps:
+  - name: layer 3 connects on a mod-128 machine
+    inject: { event: DL_CONNECT_request }
+    expect:
+      effects:
+        - { frame: SABME, command: true, pf: true }
+      state: AwaitingV22Connection
+      variables: { rc: 1, layer_3_initiated: true }
+      timers: { t1: running }

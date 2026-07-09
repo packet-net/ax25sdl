@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Packet.Sdl.Interpreter</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Description>Reference interpreter for the emitted SDL JSON tables (spec/json). Executes a Data Link machine instance over the tables — events in, abstract effects out — for in-repo semantic validation via golden traces (traces/*.trace.yaml). Deliberately depends only on the JSON output plus Packet.Sdl.IR guard parsing; never on any backend's generated source, so it can later serve as the cross-backend oracle.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- GuardExpression: the interpreter parses composed guard strings with
+         the exact same conjunction-of-optionally-negated-atoms semantics the
+         typed backends use. Reused, not reimplemented. -->
+    <ProjectReference Include="..\Packet.Sdl.IR\Packet.Sdl.IR.csproj" />
+    <!-- Golden traces are YAML. -->
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+</Project>

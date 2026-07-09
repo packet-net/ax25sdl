@@ -1,0 +1,72 @@
+# REJ round trip, transmitting side: two I frames go out; the peer REJects
+# from nr=0; the machine rewinds V(s) and re-queues the unacknowledged
+# window in order.
+#
+# §6.4.7: "After receiving a REJ frame, the transmitting TNC sets its send
+# state variable to the same value as the REJ frame's received sequence
+# number in the control field. The TNC then retransmits any I frame(s)
+# outstanding at the next available opportunity."
+#
+# Note the tables express retransmission as *re-queueing* (figc4.7
+# Invoke_Retransmission pushes the old frames back onto the I-frame queue
+# and restores V(s) to its pre-rewind value X); the actual re-emission
+# happens on subsequent queue pops. This trace asserts the re-queue —
+# see docs/golden-traces.md "Retransmission modelling" for why the pops
+# are not asserted here.
+scenario: rej-round-trip
+description: >
+  Connected: I(ns=0) and I(ns=1) transmitted (figc4.4 t03); REJ nr=0 with
+  V(a)≤N(R)≤V(s) triggers V(a):=N(R), T1 restart, T3 stop and
+  Invoke Retransmission, which re-queues I(ns=0), I(ns=1) head-first in
+  ascending order (figc4.4 t25 yes, figc4.7 Invoke_Retransmission).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.7 (Receiving REJ)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.4.1 (Implicit Reject Recovery)"
+  - "figc4.4 t25, figc4.7 Invoke_Retransmission"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4 }
+  timers: { t3: running }
+steps:
+  - name: queue two payloads
+    inject: { event: DL_DATA_request, data: d0 }
+    expect:
+      transition: t02_dl_data_request
+      effects:
+        - { internal: "Push on I Frame Queue (note: word order?)", detail: d0 }
+
+  - inject: { event: DL_DATA_request, data: d1 }
+    expect:
+      effects:
+        - { internal: "Push on I Frame Queue (note: word order?)", detail: d1 }
+      queue: [d0, d1]
+
+  - name: first frame out — I(ns=0), T1 starts
+    inject: { event: I_frame_pops_off_queue, data: d0 }
+    expect:
+      transition: t03_i_frame_pops_off_queue_no_no_no
+      effects:
+        - { frame: I, command: true, ns: 0, nr: 0, pf: false }
+      variables: { vs: 1 }
+      timers: { t1: running, t3: stopped }
+
+  - name: second frame out — I(ns=1), T1 already running
+    inject: { event: I_frame_pops_off_queue, data: d1 }
+    expect:
+      transition: t03_i_frame_pops_off_queue_no_no_yes
+      effects:
+        - { frame: I, command: true, ns: 1, nr: 0, pf: false }
+      variables: { vs: 2 }
+      timers: { t1: running }
+
+  - name: peer rejects from nr=0 — rewind and re-queue the window
+    inject: { event: REJ_received, command: false, pf: false, nr: 0 }
+    expect:
+      transition: t25_rej_received_yes
+      state: Connected
+      effects:
+        - { internal: "Push Old I Frame onto Queue", detail: "I(ns=0)" }
+        - { internal: "Push Old I Frame onto Queue", detail: "I(ns=1)" }
+      variables: { va: 0, vs: 2, ack_pending: false }
+      timers: { t1: running, t3: stopped }
+      queue: ["I(ns=0)", "I(ns=1)"]

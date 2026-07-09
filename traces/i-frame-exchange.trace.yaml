@@ -1,0 +1,75 @@
+# Clean bidirectional I-frame exchange with RR acknowledgements, mod 8.
+#
+# §6.4.1: "Whenever a TNC has an I frame to transmit, it sends the I frame
+# with the N(S) of the control field equal to its current send state
+# variable V(S). After the I frame is sent, the send state variable is
+# incremented by one. If timer T1 is not running, it is started."
+# §6.4.2.1: "If there are no outstanding I frames, the receiving TNC sends
+# an RR frame with N(R) equal to V(R)."
+# §6.4.6: "The T1 timer is canceled if the received frame actually
+# acknowledges previously unacknowledged frames."
+scenario: i-frame-exchange
+description: >
+  Connected: DL_DATA queues an I frame; the queue pop emits I(ns=0,nr=0,P=0)
+  and increments V(s) (figc4.4 t02/t03); the peer's RR nr=1 acknowledges it,
+  stopping T1 and restarting T3 (figc4.4 t21 + Check_I_Frame_Acknowledged);
+  an inbound I(ns=0) is delivered upward and acknowledged with RR nr=1 via
+  the LM seize / priority-acknowledge path (figc4.4 t26, t23; §6.4.3).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.1 (Sending I Frames)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.2.1 (Receiving I Frames, Not Busy)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.3 (Priority Acknowledge)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.6 (Receiving Acknowledgement)"
+  - "figc4.4 t02, t03, t21, t23, t26"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4 }
+  timers: { t3: running }
+steps:
+  - name: layer 3 hands us data
+    inject: { event: DL_DATA_request, data: hello }
+    expect:
+      transition: t02_dl_data_request
+      state: Connected
+      effects:
+        - { internal: "Push on I Frame Queue (note: word order?)", detail: hello }
+      queue: [hello]
+
+  - name: the queued frame pops and goes out as I(ns=0)
+    inject: { event: I_frame_pops_off_queue, data: hello }
+    expect:
+      transition: t03_i_frame_pops_off_queue_no_no_no
+      state: Connected
+      effects:
+        - { frame: I, command: true, ns: 0, nr: 0, pf: false }
+      variables: { vs: 1 }
+      timers: { t1: running, t3: stopped }
+
+  - name: peer acknowledges with RR nr=1
+    inject: { event: RR_received, command: false, pf: false, nr: 1 }
+    expect:
+      transition: t21_rr_received_yes
+      state: Connected
+      effects: []
+      variables: { va: 1 }
+      timers: { t1: stopped, t3: running }
+
+  - name: peer sends its own I(ns=0); we deliver it upward
+    inject: { event: I_received, command: true, pf: false, ns: 0, nr: 1 }
+    expect:
+      transition: t26_i_received_yes_yes_yes_no_yes_no_no
+      state: Connected
+      effects:
+        - { dl: DL_DATA_indication }
+        - { lm: LM_seize_request }
+      variables: { vr: 1, ack_pending: true }
+
+  - name: channel seized — the pending acknowledgement goes out as RR nr=1
+    inject: { event: LM_SEIZE_confirm }
+    expect:
+      transition: t23_lm_seize_confirm_yes
+      state: Connected
+      effects:
+        - { frame: RR, command: false, nr: 1, pf: false }
+        - { lm: LM_release_request }
+      variables: { ack_pending: false }

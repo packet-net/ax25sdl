@@ -1,0 +1,37 @@
+# Link reset with unacknowledged data outstanding: SABM received while
+# Connected and V(s) != V(a) — the reset additionally discards the I-frame
+# queue and re-indicates the connection to layer 3.
+#
+# §6.5 (resetting procedure), §6.3.3, C4.3 error code F — as in
+# sabm-reset-in-connected.trace.yaml. The vs != va branch of figc4.4 t14
+# adds "discard I frame queue" + DL_CONNECT_indication.
+# (The data-loss consequence of that discard is under upstream discussion
+# as packethacking/ax25spec#50; the figure itself is unambiguous, so this
+# trace follows it and passes.)
+scenario: sabm-reset-in-connected-unacked
+description: >
+  Connected with V(s)=3, V(a)=1 (two I frames unacknowledged): SABM P=1
+  draws UA F=1, DL-ERROR Indication (F), discards the I-frame queue,
+  re-indicates DL-CONNECT upward and zeroes the state variables
+  (figc4.4 t14 no — vs != va).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.5 (Resetting Procedure)"
+  - "ax.25.2.2.4_Oct_25.md Appendix C4.3 (error code F)"
+  - "figc4.4 t14"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, vs: 3, va: 1, vr: 0 }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: reset with data outstanding
+    inject: { event: SABM_received, pf: true }
+    expect:
+      transition: t14_sabm_received_no
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: "DL-ERROR Indication (F)" }
+        - { dl: DL_CONNECT_indication }
+      variables: { vs: 0, va: 0, vr: 0, rc: 0 }
+      timers: { t1: stopped, t3: running }
+      queue: []

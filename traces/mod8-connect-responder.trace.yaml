@@ -1,0 +1,43 @@
+# Mod-8 link establishment, responder side: SABM(P=1) received while
+# Disconnected → UA(F=1), state variables reset, DL-CONNECT indication.
+#
+# §6.3.1: "If the distant TNC exists and accepts the connect request, it
+# responds with a UA response frame and resets all of its internal state
+# variables (V(S), V(A) and V(R))."
+# §6.2: "The next response frame returned … to a SABM(E) or DISC command
+# with the P bit set to 1 is a UA or DM response with the F bit set to 1."
+scenario: mod8-connect-responder
+description: >
+  Disconnected → SABM received (able to establish) answers UA F=1, zeroes
+  V(s)/V(a)/V(r), indicates DL-CONNECT upward, starts T3 (figc4.1 t13 yes).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "ax.25.2.2.4_Oct_25.md §6.2 (Poll/Final bit procedures)"
+  - "figc4.1 t13"
+initial:
+  state: Disconnected
+  variables: { modulo: 8, k: 4 }
+steps:
+  - name: SABM arrives and we accept
+    inject:
+      event: SABM_received
+      pf: true
+      atoms: { able_to_establish: true }
+    expect:
+      transition: t13_sabm_received_yes
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: DL_CONNECT_indication }
+      variables: { vs: 0, va: 0, vr: 0, rc: 0, version_2_2: false }
+      timers: { t3: running }
+
+  - name: a DISC arriving later tears the link down with UA
+    inject: { event: DISC_received, pf: true }
+    expect:
+      transition: t19_disc_received
+      state: Disconnected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: DL_DISCONNECT_indication }
+      timers: { t3: stopped, t1: running }

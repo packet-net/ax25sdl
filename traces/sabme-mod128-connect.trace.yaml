@@ -1,0 +1,61 @@
+# Mod-128 link establishment, responder side: SABME(P=1) received while
+# Disconnected → UA(F=1), version 2.2 selected, then a clean mod-128
+# I-frame delivery with an RR acknowledgement.
+#
+# §4.3.3.2: "The SABME command places two TNCs … in the asynchronous
+# balanced mode (extended) connected state. In this mode … the modulus is
+# 128."
+# §6.3.1 / §6.2 as for the mod-8 connect.
+#
+# Note: the tables never assign Modulo/k themselves (the figc4.7
+# Set_Version_2_2 subroutine that would is never invoked — see
+# packethacking/ax25spec#54 and the companion xfail trace
+# sabme-connect-applies-mod128.trace.yaml), so this trace supplies
+# modulo 128 / k 32 as initial environment configuration.
+scenario: sabme-mod128-connect
+description: >
+  Disconnected (configured mod 128, k 32): SABME accepted with UA F=1 and
+  "Set Version 2.2" (figc4.1 t14 yes); an inbound I(ns=0) is delivered
+  upward and acknowledged RR nr=1 through the LM seize path, exercising the
+  same figc4.4 paths as mod 8 but under the extended modulus.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.3.2 (SABME Command)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.1, §6.2"
+  - "figc4.1 t14, figc4.4 t26, t23"
+initial:
+  state: Disconnected
+  variables: { modulo: 128, k: 32 }
+steps:
+  - name: SABME arrives and we accept as v2.2
+    inject:
+      event: SABME_received
+      pf: true
+      atoms: { able_to_establish: true }
+    expect:
+      transition: t14_sabme_received_yes
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: DL_CONNECT_indication }
+      variables: { vs: 0, va: 0, vr: 0, rc: 0, version_2_2: true, modulo: 128 }
+      timers: { t3: running }
+
+  - name: inbound I(ns=0) delivered under mod 128
+    inject: { event: I_received, command: true, pf: false, ns: 0, nr: 0 }
+    expect:
+      transition: t26_i_received_yes_yes_yes_no_yes_no_no
+      state: Connected
+      effects:
+        - { dl: DL_DATA_indication }
+        - { lm: LM_seize_request }
+      variables: { vr: 1, ack_pending: true }
+
+  - name: acknowledgement goes out as RR nr=1
+    inject: { event: LM_SEIZE_confirm }
+    expect:
+      transition: t23_lm_seize_confirm_yes
+      state: Connected
+      effects:
+        - { frame: RR, command: false, nr: 1, pf: false }
+        - { lm: LM_release_request }
+      variables: { ack_pending: false }

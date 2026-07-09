@@ -1,0 +1,43 @@
+# Link reset: SABM received while Connected (everything acknowledged) — the
+# resetting procedure of §6.5.
+#
+# §6.5: "After receiving a SABM(E) frame from the previously connected TNC,
+# the receiver sends a UA frame back at the earliest opportunity, sets its
+# send and receive state variables V(S) and V(R) to 0 … Any busy condition
+# that previously existed is also cleared."
+# §6.3.3: "If the TNC receives a SABM(E) command while in the
+# information-transfer state, it follows the resetting procedure."
+# C4.3 error code F: "Data link reset; i.e., SABM received in state 3, 4 or 5."
+scenario: sabm-reset-in-connected
+description: >
+  Connected with V(s)=V(a)=2, V(r)=3 (nothing outstanding): SABM P=1 draws
+  UA F=1, DL-ERROR Indication (F), clears the exception conditions and
+  zeroes V(s)/V(a)/V(r) without disturbing layer 3 (figc4.4 t14 yes —
+  vs==va, so no queue discard and no DL_CONNECT_indication).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.5 (Resetting Procedure)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.3 (Information-Transfer Phase)"
+  - "ax.25.2.2.4_Oct_25.md Appendix C4.3 (error code F)"
+  - "figc4.4 t14"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, vs: 2, va: 2, vr: 3, peer_receiver_busy: true }
+  timers: { t3: running }
+steps:
+  - name: peer resets the link with SABM
+    inject: { event: SABM_received, pf: true }
+    expect:
+      transition: t14_sabm_received_yes
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: "DL-ERROR Indication (F)" }
+      variables:
+        vs: 0
+        va: 0
+        vr: 0
+        rc: 0
+        peer_receiver_busy: false
+        reject_exception: false
+        ack_pending: false
+      timers: { t1: stopped, t3: running }

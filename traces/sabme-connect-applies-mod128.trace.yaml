@@ -1,0 +1,35 @@
+# Accepting a SABME should put the link into mod-128 operation.
+#
+# §4.3.3.2: "The SABME command places two TNCs … in the asynchronous
+# balanced mode (extended) connected state. In this mode … the modulus is
+# 128."
+#
+# EXPECTED FAILURE — the tables record "Set Version 2.2" as a version flag
+# only; the figc4.7 Set_Version_2_2 subroutine (Modulo := 128, k := 32,
+# N1 := 2048, …) is defined but never invoked from any state page, so the
+# modulus and window parameters never actually change. Catalogued upstream
+# as packethacking/ax25spec#54.
+scenario: sabme-connect-applies-mod128
+description: >
+  Disconnected with default mod-8 configuration: accepting a SABME should
+  leave the machine operating mod 128 (prose §4.3.3.2); the tables never
+  assign Modulo, so it stays 8.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.3.2 (SABME Command)"
+  - "figc4.1 t14, figc4.7 Set_Version_2_2"
+expected_failure: https://github.com/packethacking/ax25spec/issues/54
+initial:
+  state: Disconnected
+  variables: { modulo: 8, k: 4 }
+steps:
+  - name: accept SABME — the modulus should become 128
+    inject:
+      event: SABME_received
+      pf: true
+      atoms: { able_to_establish: true }
+    expect:
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: DL_CONNECT_indication }
+      variables: { version_2_2: true, modulo: 128, k: 32 }
