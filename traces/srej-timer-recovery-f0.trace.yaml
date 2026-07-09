@@ -44,6 +44,15 @@ citations:
   - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
   - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
   - "direwolf@eda1383f src/ax25_link.c:4103-4196 (srej_frame, state 4) and :4216-4276 (resend_for_srej)"
+# XFAIL against the CURRENT (main) tables: the Timer Recovery (figc4.5)
+# SREJ_received paths perform REJ-style multi-frame retransmission —
+# observed divergence: queue expected [I(ns=1)], actual
+# [frame, I(ns=1), I(ns=2)] — the upstream figure defect tracked at
+# packethacking/ax25spec#38, and exactly the "cut-n-paste from the REJ flow
+# chart" erratum direwolf documents (src/ax25_link.c:4181-4186).
+# REMOVE this marker when the table fix (packet-net/ax25sdl PR #69) merges:
+# this trace then passes outright (verified against the PR-69 tables).
+expected_failure: https://github.com/packethacking/ax25spec/issues/38
 initial:
   state: TimerRecovery
   # Mid-recovery snapshot: three I frames outstanding, one RR(P=1) poll
