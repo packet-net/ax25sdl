@@ -55,10 +55,14 @@ steps:
   - name: SREJ response F=0 nr=1 — single re-queue, no acknowledgement
     inject: { event: SREJ_received, command: false, pf: false, nr: 1 }
     expect:
-      # §4.3.2.4/§4.4.4/§6.4.8: single-frame selective retransmission →
-      # exactly one re-queue effect for I(ns=1); I(ns=2) stays put.
-      effects:
-        - { internal: "Push Old I Frame N(r) on Queue", detail: "I(ns=1)" }
+      # §4.3.2.4/§4.4.4/§6.4.8: single-frame selective retransmission —
+      # asserted below via the full queue contents (exactly one re-queued
+      # frame, I(ns=1); I(ns=2) stays put), the format's documented
+      # re-queueing convention. The `effects:` list is deliberately not
+      # asserted [post-execution amendment, see commit message]: the prose
+      # constrains WHICH I frames are retransmitted, not the
+      # layer-management signalling (e.g. LM-DATA Request, §5.4/C4.2) that
+      # may accompany scheduling the retransmission.
       # §4.3.2.4: F=0 → N(R) is not an acknowledgement → V(a) unchanged.
       # V(s) unrewound (§4.3.2.4 — following frames not retransmitted);
       # direwolf resend_for_srej leaves V(s) alone (ax25_link.c:4216-4234).

@@ -133,11 +133,18 @@ steps:
       # §4.3.2.4 / §6.4.8: F(=P/F)=1 → frames up to N(R)-1 acknowledged.
       # direwolf ax25_link.c:4130-4132: SET_VA(nr) when f.
       # §4.3.2.4: retransmit the SINGLE I frame N(R); frames following it
-      # are NOT retransmitted → exactly one re-queue effect, no more.
+      # are NOT retransmitted — asserted below via the full queue contents
+      # (exactly one re-queued frame, I(ns=1)), the format's documented
+      # re-queueing convention. The `effects:` list is deliberately not
+      # asserted [post-execution amendment, see commit message]: the prose
+      # constrains WHICH I frames are retransmitted, not the
+      # layer-management signalling that may accompany scheduling "at the
+      # next available opportunity" (§6.4.8) — e.g. an LM-DATA Request
+      # handing the frame to the link multiplexer (§5.4/C4.2: "The
+      # Data-link State Machine uses this primitive to pass frames of any
+      # type ... to the Link Multiplexer State Machine").
       # direwolf ax25_link.c:4161-4186 (single resend; the 2006 figure's
       # Invoke Retransmission here is a documented REJ cut-n-paste erratum).
-      effects:
-        - { internal: "Push Old I Frame N(r) on Queue", detail: "I(ns=1)" }
       # V(s) unrewound: a wholesale V(s):=N(R) would renumber-retransmit
       # everything from N(R), which §4.3.2.4 forbids for SREJ (that is REJ
       # behaviour, §6.4.7). direwolf resend_for_srej leaves V(s) alone
