@@ -1,0 +1,80 @@
+# SREJ response F=1 in Connected — CLEAN-ROOM trace (packet-net/ax25sdl#74):
+# authored from the AX.25 v2.2 prose and direwolf only, without reading the
+# SDL tables or any pending SREJ fix. Transition ids deliberately not
+# asserted (table knowledge).
+#
+# Normative prose:
+#   §6.4.8 (state-independent): "After receiving a SREJ frame, the
+#   transmitting TNC retransmits the individual I frame indicated by the
+#   N(R) contained in the SREJ at the next available opportunity. ... If the
+#   P bit was set, then all frames up to N(R)-1 are acknowledged."
+#   §4.3.2.4: single I frame N(R); frames following it are NOT retransmitted;
+#   P/F=1 → frames up to N(R)-1 inclusive acknowledged.
+#   §6.4.6: acknowledgement of previously unacknowledged frames cancels T1;
+#   "If the T1 timer is canceled and there are still some frames that have
+#   been sent that are not acknowledged, T1 is started again" → T1 running.
+#   §4.4.5.2: T3 runs only "when T1 is not running" → T3 stays stopped.
+#
+# Independent implementation evidence — direwolf @eda1383f,
+# src/ax25_link.c srej_frame() state 3 (Connected):
+#   - :4069-4073 — good N(R): SET_VA(nr) only when f (F=1 acks, F=0 not);
+#   - :4079 — resend_for_srej() → the single requested frame;
+#   - :4090-4094 — after resending, T1 running / T3 stopped, "keep same
+#     state" (remains Connected).
+#
+# NOTE (recorded ambiguity): an F=1 response arriving in Connected has no
+# poll outstanding, and the appendix error vocabulary defines code A ("F=1
+# received but P=1 not outstanding"). §6.4.8's retransmission duty is
+# unconditional, and §4.4.4 expects the F=1 SREJ (checkpoint reply) case, but
+# the prose does not say whether a DL-ERROR indication accompanies it in this
+# state — direwolf deliberately suppresses error A for SREJ because "SREJ can
+# only be a response" (src/ax25_link.c:4061-4067). This step therefore omits
+# the exhaustive `effects:` list and asserts the observable protocol outcome
+# via `queue:`/variables/timers/state instead, so an optional error
+# indication cannot mask the SREJ semantics under test.
+#
+# Retransmission asserted as re-queueing per docs/golden-traces.md.
+scenario: srej-connected-selective-retransmit
+description: >
+  Connected with I(ns=0..2) outstanding (V(s)=3, V(a)=0, T1 running): SREJ
+  response F=1 nr=1 arrives. I(ns=0) is acknowledged (V(a):=1,
+  §4.3.2.4/§6.4.8); exactly the single I frame ns=1 is re-queued for
+  retransmission and I(ns=2) is not (§4.3.2.4/§4.4.4/§6.4.8); T1 keeps
+  running (§6.4.6 — frames still unacknowledged), T3 stays stopped
+  (§4.4.5.2); the machine remains Connected.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.2.4 (Selective Reject (SREJ) Response)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.4 (Selective Reject (SREJ) Recovery)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.8 (Receiving an SREJ)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.6 (Receiving Acknowledgement)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.2 (Timer T3 Recovery)"
+  - "direwolf@eda1383f src/ax25_link.c:4057-4101 (srej_frame, state 3) and :4216-4276 (resend_for_srej)"
+initial:
+  state: Connected
+  # Three I frames outstanding, none acknowledged; T1 running per §6.4.1.
+  # SREJ link: v2.2 + selective reject negotiated (§4.3.2.4, §6.3.2).
+  variables: { modulo: 8, k: 4, vs: 3, va: 0, vr: 0, srej_enabled: true, version_2_2: true }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: SREJ response F=1 nr=1 — ack through ns=0, re-queue ONLY I(ns=1)
+    inject: { event: SREJ_received, command: false, pf: true, nr: 1 }
+    expect:
+      # (effects deliberately unasserted — see the ambiguity note above; the
+      # single-frame re-queue is asserted through `queue:` instead.)
+      #
+      # §4.3.2.4/§6.4.8: F(=P/F)=1 → frames up to N(R)-1 acknowledged →
+      # V(a):=1. direwolf ax25_link.c:4071-4073.
+      # V(s) unrewound: §4.3.2.4 forbids retransmitting the frames following
+      # N(R) (V(s):=N(R) is REJ behaviour, §6.4.7); direwolf resend_for_srej
+      # leaves V(s) alone (ax25_link.c:4216-4234).
+      variables: { va: 1, vs: 3 }
+      # §4.3.2.4/§4.4.4/§6.4.8: exactly the single I frame N(R)=1 is
+      # re-queued; I(ns=2) is NOT retransmitted.
+      queue: ["I(ns=1)"]
+      # §6.4.6: the ack cancels T1, and with I(ns=1)/I(ns=2) still
+      # unacknowledged "T1 is started again" → running; §4.4.5.2 → T3
+      # stopped. direwolf ax25_link.c:4090-4092.
+      timers: { t1: running, t3: stopped }
+      # §6.4.8 gives no cause to leave the information-transfer state;
+      # direwolf: "keep same state" (ax25_link.c:4094).
+      state: Connected
