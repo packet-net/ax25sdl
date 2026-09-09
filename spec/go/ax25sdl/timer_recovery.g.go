@@ -947,10 +947,10 @@ var DataLinkTimerRecovery = StatePage{
 			},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_yes_yes",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_yes_yes",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and P_eq_1",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and P_eq_1",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Discard Contents of I Frame", Kind: Processing},
@@ -965,10 +965,10 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_yes_no",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_yes_no",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and not P_eq_1",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and not P_eq_1",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Discard Contents of I Frame", Kind: Processing},
@@ -979,10 +979,10 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_no_no",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_no_no",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and not SREJ_enabled",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and not SREJ_enabled",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Discard Contents of I Frame", Kind: Processing},
@@ -998,10 +998,10 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_no_yes_no_yes",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Save Contents of I Frame", Kind: Processing},
@@ -1018,10 +1018,10 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_no_yes_no_no",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Save Contents of I Frame", Kind: Processing},
@@ -1036,10 +1036,10 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 		{
-			ID:    "t22_i_received_yes_yes_yes_no_no_no_yes_yes",
+			ID:    "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
 			From:  "TimerRecovery",
 			On:    "I_received",
-			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
 			Actions: []ActionStep{
 				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
 				{Verb: "Save Contents of I Frame", Kind: Processing},
@@ -1047,6 +1047,38 @@ var DataLinkTimerRecovery = StatePage{
 				{Verb: "F := 0", Kind: Processing},
 				{Verb: "Sreject := Sreject + 1", Kind: Processing},
 				{Verb: "SREJ", Kind: SignalLower},
+			},
+			Next:       "TimerRecovery",
+			Notes:      "",
+			References: []ImplementationReference{},
+			Loops:      []LoopRange{},
+		},
+		{
+			ID:    "t22_i_received_yes_yes_yes_no_no_no_yes",
+			From:  "TimerRecovery",
+			On:    "I_received",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and P_eq_1",
+			Actions: []ActionStep{
+				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
+				{Verb: "Discard Contents of I Frame", Kind: Processing},
+				{Verb: "F := 1", Kind: Processing},
+				{Verb: "N(r) := V(r)", Kind: Processing},
+				{Verb: "RR", Kind: SignalLower},
+				{Verb: "Clear Acknowledge Pending", Kind: Processing},
+			},
+			Next:       "TimerRecovery",
+			Notes:      "",
+			References: []ImplementationReference{},
+			Loops:      []LoopRange{},
+		},
+		{
+			ID:    "t22_i_received_yes_yes_yes_no_no_no_no",
+			From:  "TimerRecovery",
+			On:    "I_received",
+			Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and not P_eq_1",
+			Actions: []ActionStep{
+				{Verb: "Check_I_Frame_Acknowledged", Kind: Subroutine},
+				{Verb: "Discard Contents of I Frame", Kind: Processing},
 			},
 			Next:       "TimerRecovery",
 			Notes:      "",
