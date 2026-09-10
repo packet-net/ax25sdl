@@ -180,6 +180,10 @@ jobs:
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
       - name: run golden-trace suite against the regenerated tables
         run: dotnet test codegen/tests/Packet.Sdl.Interpreter.Tests --nologo
+        env:
+          # Same as the csharp job: lets the figure-defect register's online
+          # check run instead of skipping for want of a token.
+          GH_TOKEN: ${{ github.token }}
 
   rust-drift:
     name: codegen drift — Rust + cargo build/test/fmt
