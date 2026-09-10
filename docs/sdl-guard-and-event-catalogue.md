@@ -84,6 +84,30 @@ C#, TS, **and Rust** get the typed closed set + tightened field types
 [ADR-0003](adr/0003-rust-typed-closed-sets-and-no-std.md) for an embedded
 (`no_std`) consumer. Go/C/Python/JSON keep the canonical guard string.
 
+#### The TS closed sets also ship as runtime arrays
+
+A C# consumer enumerates a closed set with `Enum.GetValues<Ax25Guard>()`, which
+is how packet.net's `Binding_Table_Is_Exhaustive_Over_Ax25Guard` proves its
+table covers every atom. Rust gets the same from its enum. A TypeScript
+string-literal union is erased at compile time, so a TS consumer given only the
+union has no way to walk the members and no way to write that test.
+
+Each of the three generated TS closed sets therefore emits a runtime array
+alongside the union, with the union derived from the array so the two cannot
+drift:
+
+```ts
+export const AX25_GUARDS = ["F_eq_1", /* ... */] as const;
+export type Ax25Guard = (typeof AX25_GUARDS)[number];
+```
+
+`ax25-action-verb.g.ts` and `ax25-event.g.ts` carry `AX25_ACTION_VERBS` and
+`AX25_EVENTS` the same way. All three are re-exported as values from the
+hand-written `types.ts`, so `import { AX25_GUARDS } from "ax25sdl"` works. The
+derived type is identical in shape to the literal union it replaced; the
+emitted `.d.ts` still spells out every member, so nothing changes for existing
+consumers of the type.
+
 The composed guard string is parsed back into terms by `GuardExpression` (in
 `Packet.Sdl.IR`). It accepts only a conjunction of optionally-negated atoms and
 **throws on a top-level `or`** — that's the trigger to extend `GuardTerm` to a

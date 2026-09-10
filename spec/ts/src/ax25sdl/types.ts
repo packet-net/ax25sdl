@@ -4,6 +4,10 @@
 // Exception: the closed action-verb union lives in the generated
 // ax25-action-verb.g.ts (data-driven, one member per canonical verb);
 // it is imported + re-exported here so ActionStep.verb is strongly typed.
+// Each generated closed set also ships a runtime array (AX25_ACTION_VERBS,
+// AX25_GUARDS, AX25_EVENTS) that the union is derived from, since a
+// string-literal union is erased at runtime and a consumer otherwise has no
+// way to enumerate the set. Those are re-exported here as values, not types.
 //
 // Empty-string and zero-int conventions stand in for nullable fields
 // throughout, to keep generated object literals readable. A guard of
@@ -25,14 +29,17 @@ export type ActionKind =
 
 // The closed set of canonical action verbs (generated from spec-sdl/actions.yaml).
 export type { Ax25ActionVerb } from "./ax25-action-verb.g.js";
+export { AX25_ACTION_VERBS } from "./ax25-action-verb.g.js";
 import type { Ax25ActionVerb } from "./ax25-action-verb.g.js";
 
 // The closed set of canonical guard atoms (generated from spec-sdl/predicates.yaml).
 export type { Ax25Guard } from "./ax25-guard.g.js";
+export { AX25_GUARDS } from "./ax25-guard.g.js";
 import type { Ax25Guard } from "./ax25-guard.g.js";
 
 // The closed set of AX.25 SDL events (generated from spec-sdl/events.yaml).
 export type { Ax25Event } from "./ax25-event.g.js";
+export { AX25_EVENTS } from "./ax25-event.g.js";
 import type { Ax25Event } from "./ax25-event.g.js";
 
 /**
