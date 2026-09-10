@@ -62,11 +62,14 @@ public class GoldenTraceTests
     {
         var assemblyDir = Path.GetDirectoryName(typeof(GoldenTraceTests).Assembly.Location)!;
         var d = new DirectoryInfo(assemblyDir);
-        while (d is not null && !Directory.Exists(Path.Combine(d.FullName, "spec-sdl")))
+        // The suite consumes spec/json/ (and traces/) only, so find the root by
+        // those rather than by spec-sdl, which is a symlink into the ax25spec
+        // submodule and dangles until `git submodule update --init` has run.
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "spec", "json", "index.json")))
             d = d.Parent!;
         if (d is null)
             throw new InvalidOperationException(
-                $"can't locate repo root walking up from {assemblyDir} — no spec-sdl/ directory in any ancestor.");
+                $"can't locate repo root walking up from {assemblyDir}: no spec/json/index.json in any ancestor.");
         return d.FullName;
     }
 }

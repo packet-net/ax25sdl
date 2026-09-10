@@ -59,9 +59,7 @@ suite demands the marker's removal). How to add a trace, the file format,
 and the interpreter's execution policies are documented in
 [`docs/golden-traces.md`](docs/golden-traces.md).
 
-The SREJ round-trip scenario is deliberately absent: it is reserved for
-clean-room authoring from the prose alone, as an independence control — see
-[`traces/srej-round-trip.RESERVED.md`](traces/srej-round-trip.RESERVED.md).
+The SREJ sender-side scenarios (`traces/srej-*.trace.yaml`) were authored clean-room from the prose and direwolf alone and committed before they were ever executed, as an independence control on the SREJ table fix; the protocol and its outcome are recorded in [packet-net/ax25sdl#76](https://github.com/packet-net/ax25sdl/pull/76).
 
 ## Provenance
 

@@ -161,6 +161,13 @@ raise it rather than encoding around it:
   V(s) — the tables cannot express "retransmit with the original N(s)"
   end-to-end. Assert the re-queue effects/queue contents, not the re-emitted
   frames (see `rej-round-trip.trace.yaml`).
+- **Receive-window atom.** `vr_lt_ns_lt_vr_plus_k` (the
+  packethacking/ax25spec#40 out-of-window duplicate guard on the Connected
+  and TimerRecovery `I_received` arms) is evaluated as the open interval
+  V(r) < N(s) < V(r)+k in modular arithmetic, with k = the machine's `k`
+  variable, unclamped. A runtime may grant a narrower window (packet.net
+  clamps SREJ links to half the modulus); a trace that depends on that
+  should seed `k` accordingly.
 - **Subroutine binding.** Call-site verbs bind to subroutine tables via an
   explicit alias map in `Machine.cs` (`"N(r) Recovery"` →
   `N_r_Error_Recovery`, `"Select_T1_Value"` → `Select_T1`, `"Transmit
@@ -185,8 +192,6 @@ raise it rather than encoding around it:
      `expected_failure: <issue-url>`. Do **not** bend the expectations to
      match the tables.
 
-## Reserved scenarios
+## Clean-room scenarios
 
-`traces/srej-round-trip.RESERVED.md` — the SREJ round trip is reserved for
-clean-room authoring as an independence control; see the file and
-packet-net/ax25sdl#74.
+The SREJ sender-side traces (`traces/srej-round-trip.trace.yaml`, `traces/srej-timer-recovery-f0.trace.yaml`, `traces/srej-connected-selective-retransmit.trace.yaml`) were written from the prose and direwolf only, without sight of the tables, and committed before their first execution; packet-net/ax25sdl#74 and #76 record the protocol. Two of them were carried as strict xfails against the pre-fix figc4.5 tables (packethacking/ax25spec#38) until the figure fix (packethacking/ax25spec#65, regenerated here in #78) landed.
