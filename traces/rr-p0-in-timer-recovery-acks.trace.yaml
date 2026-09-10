@@ -1,0 +1,43 @@
+# RR command with P=0 received in Timer Recovery: its N(R) is used as an
+# acknowledgement, T1 is not restarted and the machine stays put.
+#
+# §6.4.11: "If, on the other hand, the TNC correctly receives a supervisory
+# response frame with the F bit not set, or an I frame or supervisory
+# command frame, and with an N(R) within the range from the last N(R)
+# received to the last N(S) sent plus one, the TNC does not restart timer
+# T1; it uses the received N(R) as an indication of acknowledgement of
+# transmitted I frames up to and including I frame numbered N(R)-1."
+# §6.2: only a command with P=1 solicits a response; a P=0 command does not.
+# §4.4.5.1: I(ns=2) remains unacknowledged, so the timer-recovery condition
+# is not cleared.
+#
+# This is the case figc4.5 draws as an "UNDEFINED ON DIAGRAM" terminus
+# (packethacking/ax25spec#12). The transcription carries the §6.4.11
+# resolution proposed on that issue (figc4.5 t18 no/no: an in-window N(R)
+# acknowledges and stays; out-of-window runs N(r) recovery), which is why
+# traces/figure-defects.yaml registers #12 as not expressible as an xfail:
+# this trace passes and pins the resolution instead.
+scenario: rr-p0-in-timer-recovery-acks
+description: >
+  Timer Recovery with I(ns=0..2) outstanding (V(s)=3, V(a)=0, RC=1, T1
+  running after the poll): an RR command with P=0 and nr=2 acknowledges
+  ns=0..1 (V(a)=2), draws no response, leaves T1 running and RC as it was,
+  and the machine stays in Timer Recovery.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
+  - "ax.25.2.2.4_Oct_25.md §6.2 (Poll/Final (P/F) Bit Procedures)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
+  - "figc4.5 t18 (RR_received, neither response F=1 nor command P=1, N(R) in window)"
+initial:
+  state: TimerRecovery
+  variables: { modulo: 8, k: 4, vs: 3, va: 0, vr: 0, rc: 1 }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: RR command P=0 nr=2 acknowledges two frames, draws no reply, no T1 restart
+    inject: { event: RR_received, command: true, pf: false, nr: 2 }
+    expect:
+      transition: t18_rr_received_no_no_yes
+      state: TimerRecovery
+      effects: []
+      variables: { va: 2, vs: 3, rc: 1 }
+      timers: { t1: running, t3: stopped }

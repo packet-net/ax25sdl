@@ -36,6 +36,12 @@ jobs:
         run: dotnet build codegen/ax25sdl.slnx --nologo
       - name: test
         run: dotnet test codegen/ax25sdl.slnx --nologo --no-build
+        env:
+          # The figure-defect register's online check
+          # (FigureDefectRegisterTests) reads packethacking/ax25spec's open
+          # issues; without a token it skips, which would leave the
+          # register's freshness unchecked in CI.
+          GH_TOKEN: ${{ github.token }}
 
   # ─── Codegen drift: regen each backend, error if the committed
   #     generated files don't match the freshly-generated output. ───

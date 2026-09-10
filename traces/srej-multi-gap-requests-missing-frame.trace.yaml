@@ -1,0 +1,57 @@
+# SREJ receiver side in Connected: a second gap opening while a SREJ
+# exception is already outstanding must be requested by the number of the
+# MISSING frame, not the frame just received.
+#
+# Prose-derived expectations, written before figc4.4's out-of-sequence
+# I_received arms were read:
+#   §6.4.4.2: "the frame is retained. SREJ frames are sent with a receive
+#   sequence number equal to the value N(R) of the missing frame, and P=1
+#   if an uncleared SREJ condition has not been previously established. If
+#   an SREJ condition is already pending, an SREJ will be sent with P=0."
+#   §4.3.2.4: the SREJ "is used by the receiving TNC to request
+#   retransmission of the single I frame numbered N(R)"; "A receiving TNC
+#   may transmit one or more SREJ frames, each containing a different N(R)
+#   with the P bit set to 0, before one or more earlier SREJ exception
+#   conditions have been cleared"; it "is only sent as a response".
+#   direwolf@eda1383f src/ax25_link.c i_frame_continued(): "Erratum: The
+#   SDL says ask for N(S) which is clearly wrong because that's what we
+#   just received. Instead we want to ask for any missing frames up to but
+#   not including N(S)."
+#
+# EXPECTED FAILURE: figc4.4's out-of-sequence arm with a SREJ exception
+# already outstanding does N(r) := N(s) before sending the SREJ, so it asks
+# for the frame it has just retained and never re-requests the gap; with
+# more than one frame in flight selective recovery livelocks until T1/N2
+# intervene. Catalogued upstream as packethacking/ax25spec#42.
+scenario: srej-multi-gap-requests-missing-frame
+description: >
+  Connected on an SREJ link, V(r)=0: I(ns=1) arrives (frame 0 lost) and
+  draws SREJ F=1 nr=0; I(ns=3) then arrives (frame 2 lost as well) and must
+  draw SREJ F=0 nr=2, the missing frame, not nr=3. V(r) stays 0 throughout.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.4.2 (Selective Reject (SREJ))"
+  - "ax.25.2.2.4_Oct_25.md §4.3.2.4 (Selective Reject (SREJ) Response)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.4 (Selective Reject (SREJ) Recovery)"
+  - "direwolf@eda1383f src/ax25_link.c (i_frame_continued, the N(S) erratum note)"
+  - "figc4.4 t26 (I_received, out of sequence, SREJ exception outstanding)"
+expected_failure: https://github.com/packethacking/ax25spec/issues/42
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, vs: 0, va: 0, vr: 0, srej_enabled: true, version_2_2: true }
+  timers: { t3: running }
+steps:
+  - name: I(ns=1) with frame 0 missing, the first SREJ names the gap with F=1
+    inject: { event: I_received, command: true, pf: false, ns: 1, nr: 0, data: d1 }
+    expect:
+      state: Connected
+      effects:
+        - { frame: SREJ, command: false, pf: true, nr: 0 }
+      variables: { vr: 0 }
+
+  - name: I(ns=3) with frame 2 missing as well, the second SREJ names the new gap with F=0
+    inject: { event: I_received, command: true, pf: false, ns: 3, nr: 0, data: d3 }
+    expect:
+      state: Connected
+      effects:
+        - { frame: SREJ, command: false, pf: false, nr: 2 }
+      variables: { vr: 0 }

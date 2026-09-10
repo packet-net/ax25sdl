@@ -58,7 +58,7 @@ public class GoldenTraceTests
         }
     }
 
-    private static string FindRepoRoot()
+    internal static string FindRepoRoot()
     {
         var assemblyDir = Path.GetDirectoryName(typeof(GoldenTraceTests).Assembly.Location)!;
         var d = new DirectoryInfo(assemblyDir);
