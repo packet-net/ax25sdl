@@ -10,9 +10,10 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    # Manual trigger lets you validate the workflow shape from a branch
-    # without actually publishing — the `if: env.<TOKEN> != ''` guards
-    # on the publish steps will skip the upload if the secret is unset.
+    # Manual trigger lets you validate the workflow shape from a branch.
+    # NOTE that npm now publishes via trusted publishing, which has no secret
+    # to leave unset, so a dispatch run WILL attempt a real npm upload. The
+    # NuGet leg still skips when NUGET_API_KEY is absent.
     inputs:
       override_version:
         description: 'Override version (only used for workflow_dispatch; tag wins for push events)'
@@ -57,16 +58,30 @@ jobs:
     name: publish ax25sdl to npmjs.com
     needs: resolve-version
     runs-on: [self-hosted, Linux, X64]
+    # Trusted publishing (OIDC), configured at the npmjs end against
+    # packet-net/ax25sdl + this workflow file. The runner mints a short-lived
+    # id-token instead of presenting a long-lived NPM_TOKEN, so there is no
+    # npm secret to expire; `id-token: write` is what lets it do that, and it
+    # is also what makes npm attach a provenance attestation to the release.
+    permissions:
+      contents: read
+      id-token: write
     env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       VERSION: ${{ needs.resolve-version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org/'
+
+      - name: ensure an npm that speaks trusted publishing
+        # Trusted publishing needs npm >= 11.5.1. Whatever npm ships with the
+        # node above, pin the CLI forward explicitly rather than inheriting it.
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: spec/ts — pin version from tag
         working-directory: spec/ts
@@ -85,16 +100,8 @@ jobs:
         run: npm pack --dry-run
 
       - name: spec/ts — publish
-        if: env.NPM_TOKEN != ''
         working-directory: spec/ts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
-
-      - name: warn if NPM_TOKEN missing
-        if: env.NPM_TOKEN == ''
-        run: |
-          echo "::warning::NPM_TOKEN secret is not set — npm publish was skipped."
 
   # ─── NuGet: Packet.Ax25.Sdl ─────────────────────────────────────────
   publish-nuget:
