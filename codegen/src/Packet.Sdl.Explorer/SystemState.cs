@@ -47,7 +47,24 @@ public sealed record SystemState
 
     public int AckedB { get; init; }
 
+    /// <summary>Station A's layer 3 has issued DL_FLOW_OFF_request and not yet DL_FLOW_ON_request.</summary>
+    public bool FlowOffA { get; init; }
+
+    public bool FlowOffB { get; init; }
+
+    /// <summary>Completed FLOW_OFF/FLOW_ON rounds at station A (bounded by the scenario).</summary>
+    public int FlowRoundsA { get; init; }
+
+    public int FlowRoundsB { get; init; }
+
+    /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
+    public V20Peer? StubPeer { get; init; }
+
     public DataLinkMachine Machine(Station s) => s == Station.A ? A : B;
+
+    public bool FlowOff(Station s) => s == Station.A ? FlowOffA : FlowOffB;
+
+    public int FlowRounds(Station s) => s == Station.A ? FlowRoundsA : FlowRoundsB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -77,7 +94,9 @@ public sealed record SystemState
         sb.Append("|o").Append(SeizeOwedA ? '1' : '0').Append(SeizeOwedB ? '1' : '0')
           .Append("|b").Append(Inv(Budget))
           .Append("|d").Append(Inv(DeliveredAtA)).Append(',').Append(Inv(DeliveredAtB))
-          .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB));
+          .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB))
+          .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB));
+        if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }
 

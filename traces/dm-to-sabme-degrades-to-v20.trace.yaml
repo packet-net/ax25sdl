@@ -1,0 +1,49 @@
+# DM fallback from a v2.2 connect attempt: a peer that answers our SABME
+# with DM does not know SABME. A pre-v2.2 station in the disconnected mode
+# answers any command other than SABM or UI with a DM whose P/F bit is 1
+# (AX.25 v2.0, October 1984, section 2.3.4.3.5 and 2.4.3.4.3), so a DM to a
+# SABME is the same "the peer speaks an older version" signal as the FRMR
+# of frmr-fallback-downgrades-to-sabm, and it must have the same outcome:
+# drop to v2.0 and re-establish with SABM, not tear the connection down.
+#
+# Section 6.3.2: "Implementations of AX.25 prior to version 2.2 respond to
+# an XID command frame with a FRMR response frame. The TNC receiving the
+# FRMR uses a default set of parameters compatible with previous versions
+# of AX.25 and a version 2.0 connection is made."
+# Section 4.3.3.5: the DM "indicates that the called station cannot accept
+# a connection at that time" and "While a TNC is in the disconnected mode,
+# it responds to any command other than a SABM(E) or UI frame with a DM
+# response with the P/F bit set to 1"; for a station that predates SABME,
+# the SABME is exactly such a command.
+#
+# EXPECTED FAILURE: figc4.6's "DM received" column tears the attempt down
+# on F=1 (Disconnected, DL-DISCONNECT indication) and passively drops it on
+# F=0 (Awaiting Connection with nothing sent); neither branch sets version
+# 2.0 or calls Establish Data Link. Catalogued upstream as
+# packethacking/ax25spec#48 (the DM-column sibling of #45).
+scenario: dm-to-sabme-degrades-to-v20
+description: >
+  AwaitingV22Connection (SABME P=1 outstanding, mod 128): DM F=1 received,
+  the well-behaved pre-v2.2 answer to a polled SABME (F echoing P), should
+  degrade the link to v2.0 and re-establish with SABM P=1, landing in
+  AwaitingConnection with T1 running; the table's DM column (figc4.6, F=1
+  branch) disconnects instead.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.3.2 (Parameter Negotiation Phase)"
+  - "ax.25.2.2.4_Oct_25.md §4.3.3.5 (Disconnected Mode (DM) Response)"
+  - "ax25 v2.0 Oct 1984 §2.3.4.3.5 (Disconnected Mode (DM) Response), §2.4.3.4.3"
+  - "figc4.6 DM received column (F=1 branch)"
+expected_failure: https://github.com/packethacking/ax25spec/issues/48
+initial:
+  state: AwaitingV22Connection
+  variables: { modulo: 128, k: 32, version_2_2: true, rc: 1, layer_3_initiated: true }
+  timers: { t1: running }
+steps:
+  - name: peer DMs our SABME, fall back to v2.0
+    inject: { event: DM_received, pf: true }
+    expect:
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+      variables: { version_2_2: false }
+      timers: { t1: running }
