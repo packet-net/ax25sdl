@@ -166,6 +166,10 @@ jobs:
     needs: csharp
     steps:
       - uses: actions/checkout@v6
+        with:
+          # spec-sdl is a symlink into the packethacking/ax25spec
+          # submodule; the regenerate step reads the SDL sources.
+          submodules: true
       - name: regenerate JSON
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
       - name: run golden-trace suite against the regenerated tables

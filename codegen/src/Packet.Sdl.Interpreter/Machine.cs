@@ -335,6 +335,10 @@ public sealed class DataLinkMachine
             "nr_eq_vs" => RequireNr(atom) == Vs,
             "ns_eq_vr" => RequireNs(atom) == Vr,
             "ns_gt_vr_plus_1" => Distance(Vr, RequireNs(atom)) > 1,
+            // packethacking/ax25spec#40: V(r) < N(s) < V(r)+k, the open
+            // interval in modular arithmetic (X.25 2.4.6.4(b)). k is this
+            // receiver's own window; the interpreter has a single K.
+            "vr_lt_ns_lt_vr_plus_k" => NsInReceiveWindow(RequireNs(atom)),
             "va_le_nr_le_vs" => Distance(Va, RequireNr(atom)) <= Distance(Va, Vs),
             "vs_eq_nr" => Vs == RequireNr(atom), // Resolver stale-read substitution: V(s) == the received N(r)
             "vs_eq_va" => Vs == Va,
@@ -372,6 +376,13 @@ public sealed class DataLinkMachine
 
     /// <summary>Forward distance from <paramref name="from"/> to <paramref name="to"/> around the sequence-number circle.</summary>
     private int Distance(int from, int to) => ((to - from) % Modulo + Modulo) % Modulo;
+
+    /// <summary>V(r) &lt; N(s) &lt; V(r)+k as a forward distance: strictly inside the window this receiver granted.</summary>
+    private bool NsInReceiveWindow(int ns)
+    {
+        var offset = Distance(Vr, ns);
+        return offset > 0 && offset < K;
+    }
 
     private bool RequirePf(string atom) =>
         _event.Pf ?? throw new InvalidOperationException($"guard atom `{atom}` consulted, but the step does not set `pf` for event {_event.Event}");

@@ -161,6 +161,13 @@ raise it rather than encoding around it:
   V(s) — the tables cannot express "retransmit with the original N(s)"
   end-to-end. Assert the re-queue effects/queue contents, not the re-emitted
   frames (see `rej-round-trip.trace.yaml`).
+- **Receive-window atom.** `vr_lt_ns_lt_vr_plus_k` (the
+  packethacking/ax25spec#40 out-of-window duplicate guard on the Connected
+  and TimerRecovery `I_received` arms) is evaluated as the open interval
+  V(r) < N(s) < V(r)+k in modular arithmetic, with k = the machine's `k`
+  variable, unclamped. A runtime may grant a narrower window (packet.net
+  clamps SREJ links to half the modulus); a trace that depends on that
+  should seed `k` accordingly.
 - **Subroutine binding.** Call-site verbs bind to subroutine tables via an
   explicit alias map in `Machine.cs` (`"N(r) Recovery"` →
   `N_r_Error_Recovery`, `"Select_T1_Value"` → `Select_T1`, `"Transmit
