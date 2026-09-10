@@ -1,0 +1,60 @@
+# SREJ receiver side in Timer Recovery: draining a retained out-of-sequence
+# frame must advance V(r), not walk it back.
+#
+# Prose-derived expectations, written before figc4.5's I_received drain loop
+# was read:
+#   §6.4.4.2: an out-of-sequence I frame "is retained".
+#   §4.4.4: "When the SREJ mechanism is used, the receiving station retains
+#   correctly received I frames and delivers them to the higher layer in
+#   sequence number order."
+#   §4.2.2.4: V(r) "contains the sequence number of the next expected
+#   received I frame" and is updated on reception of an in-sequence frame;
+#   §6.4.2.1: the receiver "accepts the received I frame, increments its
+#   receive state variable". Delivering the retained ns=1 behind the
+#   retransmitted ns=0 therefore leaves V(r) = 2.
+#   §4.4.5.1: our own I(ns=0) and I(ns=1) remain unacknowledged (the peer's
+#   N(R)=0 makes no progress), so the machine stays in Timer Recovery with
+#   T1 running.
+#
+# EXPECTED FAILURE: figc4.5's stored-frame drain loop ("V(r) I Frame
+# Stored?" then Retrieve Stored V(r) I Frame, DL-DATA Indication) does
+# V(r) := V(r) - 1 where figc4.4's identical loop does + 1, so after draining
+# one retained frame V(r) points back at an already delivered sequence
+# number and the peer's next retransmission is delivered to layer 3 again.
+# Catalogued upstream as packethacking/ax25spec#47.
+scenario: srej-drain-in-timer-recovery-advances-vr
+description: >
+  Timer Recovery on an SREJ link with our I(ns=0..1) outstanding (V(s)=2,
+  V(a)=0, RC=1, T1 running) and V(r)=0: the peer's I(ns=1) arrives first
+  (retained, V(r) still 0); the retransmitted I(ns=0) then fills the gap,
+  both frames are delivered in order and V(r) advances to 2. The machine
+  stays in Timer Recovery because nothing of ours was acknowledged.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.4.2 (Selective Reject (SREJ))"
+  - "ax.25.2.2.4_Oct_25.md §4.4.4 (Selective Reject (SREJ) Recovery)"
+  - "ax.25.2.2.4_Oct_25.md §4.2.2.4 (Receive State Variable V(R))"
+  - "ax.25.2.2.4_Oct_25.md §6.4.2.1 (Receiving I Frames, Not Busy)"
+  - "ax.25.2.2.4_Oct_25.md §4.4.5.1 (T1 Timer Recovery)"
+  - "figc4.5 t22 (I_received) drain loop against figc4.4 t26"
+expected_failure: https://github.com/packethacking/ax25spec/issues/47
+initial:
+  state: TimerRecovery
+  variables: { modulo: 8, k: 4, vs: 2, va: 0, vr: 0, rc: 1, srej_enabled: true, version_2_2: true }
+  timers: { t1: running, t3: stopped }
+steps:
+  - name: out-of-sequence I(ns=1) is retained, V(r) unchanged
+    inject: { event: I_received, command: true, pf: false, ns: 1, nr: 0, data: d1 }
+    expect:
+      # Effects deliberately unasserted: §4.4.4 lets a station hold its
+      # SREJ back while an outstanding checkpoint (our poll) may still bring
+      # a retransmission, so the prose does not pin what goes out here. The
+      # retention is what the drain step below depends on.
+      state: TimerRecovery
+      variables: { vr: 0 }
+
+  - name: retransmitted I(ns=0) fills the gap, both are delivered and V(r) moves past the retained frame
+    inject: { event: I_received, command: true, pf: false, ns: 0, nr: 0, data: d0 }
+    expect:
+      state: TimerRecovery
+      variables: { vr: 2 }
+      timers: { t1: running }

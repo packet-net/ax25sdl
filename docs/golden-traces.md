@@ -129,6 +129,45 @@ fix lands in the figures/tables, the now-passing trace **fails the suite**
 until the marker is removed. The xfail list is therefore a live index of
 known figure defects, and it can never go stale silently.
 
+## The figure-defect register: the xfail set equals the open defect set
+
+`traces/figure-defects.yaml` lists every open `figure-defect` issue in
+packethacking/ax25spec, with the issue URL, a one-line title and
+`trace_expressible: true|false` (plus a `reason:` when false: numeric
+timing, cross-station, no data-link wire effect, already resolved in the
+transcription, and so on). It is hand-maintained, and two tests in
+`codegen/tests/Packet.Sdl.Interpreter.Tests/FigureDefectRegisterTests.cs`
+keep it honest (packethacking/ax25spec#102):
+
+- **Offline.** Every `expected_failure:` URL in `traces/` names a register
+  entry; every entry with `trace_expressible: true` has at least one trace
+  carrying it as `expected_failure:`; no entry with
+  `trace_expressible: false` has one.
+- **Online.** The register's entries are exactly the open issues upstream
+  that carry the label. Needs a GitHub token (`GH_TOKEN`, `GITHUB_TOKEN`,
+  or a logged-in `gh`; CI passes `github.token`) and skips with the reason
+  printed when there is none or GitHub is unreachable. A closed issue still
+  in the register, or a new figure-defect issue not yet in it, fails this
+  test.
+
+Together with the strict-xfail runner above this gives the completeness
+statement CI can check: a trace may only xfail against a registered open
+defect, every registered defect a single-machine trace can express is
+pinned by one, and the register cannot drift from the tracker.
+
+**Closing rule.** When an upstream figure fix lands: the strict-xfail runner
+fails the now-passing trace; the marker comes off the trace, the issue is
+closed upstream, and the entry comes off the register, all in the pin-bump
+PR that regenerates the tables. The issue therefore stays open between the
+figure fix merging upstream and the pin bump landing here; a fix PR whose
+`fixes #n` keyword closes it early trips the online test (which says so,
+naming the trace that still carries the marker) until the issue is
+reopened or the pin bump lands. A new figure-defect issue upstream is
+entered in the register with a prose-derived xfail trace (write the
+expectations from the prose sections the issue cites before reading the
+table path) or, if no single-machine trace can fail because of it, with
+`trace_expressible: false` and an honest reason.
+
 ## Interpretation policies (read before writing subtle traces)
 
 The JSON tables leave a few execution details unstated. The interpreter

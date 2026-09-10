@@ -1,0 +1,92 @@
+# Register of the open figure-defect issues in packethacking/ax25spec, and
+# whether each can be expressed as a strict-xfail golden trace (a
+# `expected_failure:` marker) in this directory.
+#
+# Hand-maintained. Two tests keep it honest
+# (codegen/tests/Packet.Sdl.Interpreter.Tests/FigureDefectRegisterTests.cs):
+#
+#   offline   every `expected_failure:` URL in traces/*.trace.yaml names an
+#             entry here; every entry with `trace_expressible: true` has at
+#             least one such trace; no entry with `trace_expressible: false`
+#             has one.
+#   online    (needs a GitHub token, else skipped with the reason printed)
+#             every entry is an open issue carrying the label below, and
+#             every open issue carrying the label is an entry here.
+#
+# Closing rule: when an upstream fix lands, the strict-xfail runner fails
+# the now-passing trace; the marker comes off the trace, the issue is
+# closed upstream, and the entry comes off this list, all in the pin-bump
+# PR. A new figure-defect issue upstream fails the online test until it is
+# entered here, with a trace or an honest reason. See docs/golden-traces.md.
+#
+# `trace_expressible: false` needs a `reason:` (numeric timing, cross-station,
+# no data-link wire effect, already resolved in the transcription, and so on).
+repository: packethacking/ax25spec
+label: figure-defect
+defects:
+  - issue: https://github.com/packethacking/ax25spec/issues/91
+    title: "figc4.5 Timer Recovery: no exit when the clearing acknowledgement arrives on an I frame, and no T3 arm"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/54
+    title: "Set_Version_2.0 / Set_Version_2.2 are defined but never invoked, so the modulo/k/N1/T2/N2 defaults never take effect"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/53
+    title: "figc4.5b SABM/SABME received in Timer Recovery stops T3 and does not reset RC, unlike the Connected reset arm"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/48
+    title: "figc4.6 DM received: a DM to our SABME tears down instead of degrading to v2.0"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/47
+    title: "figc4.5 Timer Recovery: the stored-I-frame drain loop decrements V(r) where figc4.4 increments it"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/45
+    title: "figc4.6 t14 FRMR fallback: Establish Data Link precedes Set Version 2.0, so the v2.0 fallback re-establishes with SABME"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/44
+    title: "figc4.1 DL-CONNECT has no modulo branch: a v2.2 (SABME) connect enters figc4.2 Awaiting Connection, never figc4.6"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/43
+    title: "figc4.4 DL-FLOW-OFF: Set Own Receiver Busy / RNR on the wrong branch, so a not-busy station can never enter busy"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/42
+    title: "figc4.4 out-of-sequence I_received with a SREJ exception outstanding requests N(s), the frame just received, instead of the gap"
+    trace_expressible: true
+
+  - issue: https://github.com/packethacking/ax25spec/issues/41
+    title: "figc4.7 Select_T1_Value lacks the Karn guard, so the SRT estimator diverges on the retransmit path"
+    trace_expressible: false
+    reason: >
+      Numeric timing. SRT and T1V are only ever assigned formulas in the
+      tables and the interpreter carries them symbolically (they are not
+      assertable, see the variable vocabulary in docs/golden-traces.md), so
+      no trace can observe the estimator growing. V4, the numeric-timer
+      model (packethacking/ax25spec#97), is the route to this one.
+
+  - issue: https://github.com/packethacking/ax25spec/issues/39
+    title: "Annex C SDL figures: provenance and meaning of the red/green annotations"
+    trace_expressible: false
+    reason: >
+      No data-link wire effect of its own. This is a provenance question
+      about the figures as documents (who drew the red/green elements and
+      what they mean); the behavioural defects those elements contain are
+      filed and traced individually.
+
+  - issue: https://github.com/packethacking/ax25spec/issues/12
+    title: "figc4.5 Timer Recovery: UNDEFINED ON DIAGRAM terminus in the RR-received column"
+    trace_expressible: false
+    reason: >
+      Already resolved in the transcription. The drawn terminus is undefined,
+      but the tables carry the section 6.4.11 resolution proposed on the
+      issue (figc4.5 t18 no/no: an in-window N(r) acknowledges and stays in
+      Timer Recovery; out-of-window runs N(r) recovery), so a prose-true
+      trace passes rather than fails and cannot be an xfail.
+      rr-p0-in-timer-recovery-acks.trace.yaml pins that resolution. The
+      issue stays open until the drawing itself is corrected upstream.
