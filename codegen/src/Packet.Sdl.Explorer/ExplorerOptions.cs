@@ -102,9 +102,18 @@ public enum Invariants
     FlowOffDelivery = 512,
     /// <summary>After DL_FLOW_OFF_request the station's own-receiver-busy condition is set, and after DL_FLOW_ON_request it is clear (§6.4.10).</summary>
     BusyTracksFlow = 1024,
+    /// <summary>
+    /// A busy station announces busy with RNR carrying N(r) = V(r): every RNR
+    /// emitted carries the emitter's V(r), and a station whose own receiver
+    /// is busy emits no RR, REJ or SREJ (which would clear the peer's busy
+    /// condition, §4.3.2.2, and invite I frames it will discard; §6.4.10).
+    /// </summary>
+    BusyRnr = 2048,
+    /// <summary>While the station's peer-receiver-busy condition is set, no I frame (fresh or retransmitted) is sent; only polls and responses go out (§6.4.9).</summary>
+    PeerBusyHolds = 4096,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | BusyRnr | PeerBusyHolds,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>
@@ -166,6 +175,25 @@ public sealed record ExplorerOptions
 
     /// <summary>Frames a station must have delivered upward before its FLOW_OFF is enabled.</summary>
     public int FlowOffAfterDelivered { get; init; } = 1;
+
+    /// <summary>
+    /// Triage aid: the most T1 expiries a station may have while its peer's
+    /// layer 3 has flow off, i.e. how many T1 polls a busy period may absorb
+    /// before layer 3 must turn flow back on. Unbounded by default, which
+    /// lets the explorer reach the figure's N2 teardown of a link whose peer
+    /// stays busy with data outstanding (docs/explorer.md, hypothesis H4);
+    /// a small value looks past it to whatever else the busy family holds.
+    /// </summary>
+    public int BusyPolls { get; init; } = int.MaxValue;
+
+    /// <summary>
+    /// Enable the T3_expiry move: at a station whose T3 is running, under
+    /// the quiescent-timeout rule, and only on a page that has a T3 arm
+    /// (Connected; figc4.5 has none, which is hypothesis H1 / ax25spec#91).
+    /// Off by default. In the busy family T3 is the designed recovery from
+    /// a lost busy-clearing RR (§6.4.9), so the busy grid turns it on.
+    /// </summary>
+    public bool T3 { get; init; }
 
     public Invariants Invariants { get; init; } = Invariants.Default;
 

@@ -22,8 +22,12 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --flow-control A|B|both   let that station's layer 3 issue DL_FLOW_OFF_request then DL_FLOW_ON_request
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
+  --busy-polls N         triage aid: at most N T1 expiries at a station while its peer's layer 3 has flow off
+                         (default unbounded, which reaches the N2 teardown of hypothesis H4)
+  --t3                   enable the T3_expiry move (quiescent-timeout rule, only on a page with a T3 arm: Connected)
   --disable LIST         comma list of invariants to switch off: defined-state, sequence, delivery,
-                         reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow
+                         reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow,
+                         busy-rnr, peer-busy-holds
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
@@ -35,8 +39,8 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 """;
 
 string tables = "spec/json";
-int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
-bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
+int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1, busyPolls = int.MaxValue;
+bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false, trQuiescent = false, t3 = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
@@ -63,6 +67,8 @@ try
             case "--max-states": maxStates = Int(Next(args, ref i)); break;
             case "--flow-rounds": flowRounds = Int(Next(args, ref i)); break;
             case "--flow-off-after": flowOffAfter = Int(Next(args, ref i)); break;
+            case "--busy-polls": busyPolls = Int(Next(args, ref i)); break;
+            case "--t3": t3 = true; break;
             case "--flow-control":
                 flowControl = Next(args, ref i) switch
                 {
@@ -132,6 +138,8 @@ try
                         "deadlock" => Invariants.Deadlock,
                         "flow-off-delivery" => Invariants.FlowOffDelivery,
                         "busy-tracks-flow" => Invariants.BusyTracksFlow,
+                        "busy-rnr" => Invariants.BusyRnr,
+                        "peer-busy-holds" => Invariants.PeerBusyHolds,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }
@@ -160,6 +168,8 @@ try
         FlowControl = flowControl,
         FlowRounds = flowRounds,
         FlowOffAfterDelivered = flowOffAfter,
+        BusyPolls = busyPolls,
+        T3 = t3,
         Invariants = invariants,
         RejMayEqualVs = rejMayEqualVs,
         TimerRecoveryIsQuiescent = trQuiescent,

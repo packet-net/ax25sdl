@@ -21,6 +21,8 @@ public enum MoveKind
     SeizeConfirm,
     /// <summary>T1_expiry at the station (quiescent-timeout abstraction; see docs/explorer.md).</summary>
     T1Expiry,
+    /// <summary>T3_expiry at the station (opt-in, <c>--t3</c>; same quiescent-timeout rule, only on a page with a T3 arm).</summary>
+    T3Expiry,
     /// <summary>DL_FLOW_OFF_request from the station's layer 3 (scenario-enabled; see docs/explorer.md).</summary>
     FlowOff,
     /// <summary>DL_FLOW_ON_request from the station's layer 3, lifting an earlier FlowOff.</summary>
@@ -31,6 +33,9 @@ public enum MoveKind
 public readonly record struct Move(MoveKind Kind, Station Station)
 {
     public bool IsFault => Kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder;
+
+    /// <summary>A timer expiry (T1 or T3): the edges the timer-free progress check ignores.</summary>
+    public bool IsTimer => Kind is MoveKind.T1Expiry or MoveKind.T3Expiry;
 
     public override string ToString() => $"{Kind}@{Station}";
 }
@@ -102,6 +107,8 @@ public sealed class Stepper
             throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
             throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
+        if (_o.BusyPolls < 0)
+            throw new ArgumentException("the busy-polls bound must be non-negative", nameof(options));
         foreach (var (state, page) in tables.States)
             _eventsByState[state] = new HashSet<string>(page.Transitions.Select(t => t.On), StringComparer.Ordinal);
         _submittedA = Enumerable.Range(0, _o.FramesAb).Select(i => "a" + Inv(i)).ToArray();
@@ -278,8 +285,15 @@ public sealed class Stepper
         {
             foreach (var station in new[] { Station.A, Station.B })
             {
-                if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry"))
+                var m = s.Machine(station);
+                // --busy-polls: while the peer's layer 3 has flow off, only so
+                // many T1 polls may go into the busy peer before layer 3 must
+                // turn flow back on (a bound on the busy period, not a fault).
+                var busyBound = s.FlowOff(SystemState.Peer(station)) && s.PollsIntoBusy(station) >= _o.BusyPolls;
+                if (m.T1 == TimerStatus.Running && Handles(m, "T1_expiry") && !busyBound)
                     moves.Add(new Move(MoveKind.T1Expiry, station));
+                if (_o.T3 && m.T3 == TimerStatus.Running && Handles(m, "T3_expiry"))
+                    moves.Add(new Move(MoveKind.T3Expiry, station));
             }
         }
 
@@ -407,6 +421,8 @@ public sealed class Stepper
             }
             case MoveKind.T1Expiry:
                 return Inject(s, station, new EventInput("T1_expiry"), "T1 expiry (quiescent timeout: nothing in flight)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.T3Expiry:
+                return Inject(s, station, new EventInput("T3_expiry"), "T3 expiry (quiescent timeout: nothing in flight)", incoming, s.Budget, clearOwed: false, number);
             default:
                 throw new ArgumentOutOfRangeException(nameof(move));
         }
@@ -519,6 +535,13 @@ public sealed class Stepper
                         outgoing.Add(frame);
                         if (violation is null && frame.IsReject && On(Invariants.RejectCoherence))
                             violation = EmitterRejectCheck(station, m, frame);
+                        if (violation is null && On(Invariants.BusyRnr))
+                            violation = BusyAnnouncementCheck(station, pre, m, frame);
+                        if (violation is null && On(Invariants.PeerBusyHolds) && frame.Type == "I" && pre.PeerReceiverBusy && m.PeerReceiverBusy)
+                        {
+                            violation = new Violation(Invariants.PeerBusyHolds, station,
+                                $"station {station} sent {frame.Render()} while its peer-receiver-busy condition is set (before and after this step): a station that has received RNR stops transmitting I frames until the busy condition is cleared (§6.4.9); only polls and responses may go out");
+                        }
                         break;
                     }
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
@@ -563,6 +586,8 @@ public sealed class Stepper
         // and the figure's own DL-FLOW-ON arm only acts when busy is set).
         var flowOff = s.FlowOff(station);
         var flowRounds = s.FlowRounds(station);
+        var pollsIntoBusy = s.PollsIntoBusy(station);
+        var peerPollsIntoBusy = s.PollsIntoBusy(peer);
         if (result is not null && input!.Event == "DL_FLOW_OFF_request")
         {
             flowOff = true;
@@ -574,9 +599,14 @@ public sealed class Stepper
         {
             flowOff = false;
             flowRounds++;
+            peerPollsIntoBusy = 0; // the busy period is over: the peer's poll budget starts afresh
             if (violation is null && On(Invariants.BusyTracksFlow) && m.OwnReceiverBusy)
                 violation = new Violation(Invariants.BusyTracksFlow, station,
                     $"station {station} took {result.TransitionId} on DL_FLOW_ON_request but its own-receiver-busy condition is still set");
+        }
+        else if (result is not null && input!.Event == "T1_expiry" && s.FlowOff(peer))
+        {
+            pollsIntoBusy++;
         }
 
         if (violation is null && On(Invariants.DefinedState) && !KnownStates.Contains(m.State))
@@ -608,6 +638,8 @@ public sealed class Stepper
             FlowOffB = station == Station.B ? flowOff : s.FlowOffB,
             FlowRoundsA = station == Station.A ? flowRounds : s.FlowRoundsA,
             FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
+            PollsIntoBusyA = station == Station.A ? pollsIntoBusy : peerPollsIntoBusy,
+            PollsIntoBusyB = station == Station.B ? pollsIntoBusy : peerPollsIntoBusy,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
@@ -638,6 +670,30 @@ public sealed class Stepper
         if (m.SrejectException > m.K)
             return new Violation(Invariants.SequenceSanity, station,
                 $"station {station}: SREJ exception count {Inv(m.SrejectException)} exceeds the window k={Inv(m.K)}: more selective rejects outstanding than there can be gaps (state {m.State})");
+        return null;
+    }
+
+    /// <summary>
+    /// The busy announcement: an RNR carries N(r) = V(r) (it acknowledges up
+    /// to N(r)-1, §4.3.2.2, and the busy arms are the one place the figures
+    /// draw no staging box, hypothesis H3), and a station whose own receiver
+    /// is busy before and after the step sends no RR, REJ or SREJ, because any
+    /// of those clears the peer's busy condition (§4.3.2.2) and invites I
+    /// frames the busy station will discard; §6.4.10 says the indication is
+    /// RNR, and RNR F=1 to a poll.
+    /// </summary>
+    private static Violation? BusyAnnouncementCheck(Station station, DataLinkMachine pre, DataLinkMachine m, Frame frame)
+    {
+        if (frame.Type == "RNR" && frame.Nr != m.Vr)
+        {
+            return new Violation(Invariants.BusyRnr, station,
+                $"station {station} sent {frame.Render()} but its V(r) is {Inv(m.Vr)}: an RNR acknowledges everything below N(r) (§4.3.2.2), so a busy station's RNR must carry N(r) = V(r)");
+        }
+        if (frame.Type is "RR" or "REJ" or "SREJ" && pre.OwnReceiverBusy && m.OwnReceiverBusy)
+        {
+            return new Violation(Invariants.BusyRnr, station,
+                $"station {station} sent {frame.Render()} while its own receiver is busy: a busy station indicates the condition with RNR (§6.4.10), and this frame instead clears the peer's busy condition (§4.3.2.2), inviting I frames the station will discard");
+        }
         return null;
     }
 

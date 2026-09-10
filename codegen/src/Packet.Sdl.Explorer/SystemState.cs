@@ -57,6 +57,11 @@ public sealed record SystemState
 
     public int FlowRoundsB { get; init; }
 
+    /// <summary>T1 expiries at station A since B's layer 3 turned flow off (reset when B turns it back on; bounded by <c>--busy-polls</c>).</summary>
+    public int PollsIntoBusyA { get; init; }
+
+    public int PollsIntoBusyB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -65,6 +70,8 @@ public sealed record SystemState
     public bool FlowOff(Station s) => s == Station.A ? FlowOffA : FlowOffB;
 
     public int FlowRounds(Station s) => s == Station.A ? FlowRoundsA : FlowRoundsB;
+
+    public int PollsIntoBusy(Station s) => s == Station.A ? PollsIntoBusyA : PollsIntoBusyB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -95,7 +102,8 @@ public sealed record SystemState
           .Append("|b").Append(Inv(Budget))
           .Append("|d").Append(Inv(DeliveredAtA)).Append(',').Append(Inv(DeliveredAtB))
           .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB))
-          .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB));
+          .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
+          .Append("|w").Append(Inv(PollsIntoBusyA)).Append(',').Append(Inv(PollsIntoBusyB));
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

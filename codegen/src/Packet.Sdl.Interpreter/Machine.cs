@@ -116,6 +116,9 @@ public sealed class DataLinkMachine
     /// <summary>Transition id reported for the pinned old-frame re-emission path (see <see cref="RetransmitOldFrame"/>).</summary>
     public const string RetransmitTransitionId = "pinned:retransmit_old_i_frame";
 
+    /// <summary>Transition id reported when a re-queued old frame pops while the peer is busy and is pushed back unsent (see <see cref="HoldOldFrame"/>).</summary>
+    public const string HoldTransitionId = "pinned:retransmit_old_i_frame_held_peer_busy";
+
     /// <summary>The I-frame queue, head first, as trace-visible labels (payload labels for fresh data, <c>I(ns=n)</c> for re-queued frames).</summary>
     public IReadOnlyList<string> Queue => _queue.Select(e => e.Label).ToList();
 
@@ -296,9 +299,11 @@ public sealed class DataLinkMachine
         // Pinned delegated semantics (docs/explorer.md): a re-queued old
         // frame popping in an information-transfer state is re-emitted with
         // its original N(s) rather than run through the table's fresh-frame
-        // pop path, which would renumber it from V(s).
+        // pop path, which would renumber it from V(s). The pop path's first
+        // decision ("peer receiver busy? yes: push I frame on I queue") still
+        // applies to it, exactly as drawn: a busy peer holds old frames too.
         if (_poppedEntry is { OldNs: not null } && State is "Connected" or "TimerRecovery")
-            return RetransmitOldFrame(_poppedEntry);
+            return PeerReceiverBusy ? HoldOldFrame(_poppedEntry) : RetransmitOldFrame(_poppedEntry);
 
         var page = _tables.States[State];
         var candidates = page.Transitions.Where(t => string.Equals(t.On, input.Event, StringComparison.Ordinal)).ToList();
@@ -341,10 +346,11 @@ public sealed class DataLinkMachine
     /// ax25_link.c resend_for_srej / the retransmission loop; prose §6.4.7
     /// and §6.4.8 "retransmits the I frames"). So: the retained copy goes
     /// out with its original N(s), the current V(r) as N(r) and P=0; V(s) is
-    /// untouched; the peer-busy and window-full pop checks do not apply (the
-    /// frame is already inside the window); the frame carries an
-    /// acknowledgement, so Acknowledge Pending clears and, mirroring the
-    /// fresh-frame pop, T1 starts (stopping T3) if it is not already running.
+    /// untouched; the window-full pop check does not apply (the frame is
+    /// already inside the window) but the peer-busy one does (see
+    /// <see cref="HoldOldFrame"/>); the frame carries an acknowledgement, so
+    /// Acknowledge Pending clears and, mirroring the fresh-frame pop, T1
+    /// starts (stopping T3) if it is not already running.
     /// </summary>
     private DispatchResult RetransmitOldFrame(QueueEntry entry)
     {
@@ -363,6 +369,22 @@ public sealed class DataLinkMachine
         }
         PruneRetained();
         return new DispatchResult(RetransmitTransitionId, State, _effects);
+    }
+
+    /// <summary>
+    /// The peer-busy half of the pop path applied to a re-queued old frame:
+    /// figc4.4 and figc4.5 draw "peer receiver busy? yes: push I frame on I
+    /// queue" as the first decision of every pop, and Invoke_Retransmission's
+    /// frames pop through that same path. The frame goes back to the head
+    /// unsent, nothing else changes (§6.4.9: a station that has received RNR
+    /// "stops transmitting I frames until the busy condition is cleared").
+    /// </summary>
+    private DispatchResult HoldOldFrame(QueueEntry entry)
+    {
+        QueueInsert(entry);
+        _effects.Add(new InternalEffect("Push on I Frame Queue", entry.Label));
+        PruneRetained();
+        return new DispatchResult(HoldTransitionId, State, _effects);
     }
 
     /// <summary>Keep only the retained frames still outstanding, i.e. with N(s) in [V(a), V(s)).</summary>
