@@ -943,10 +943,10 @@ export const DataLinkConnected: StatePage = {
       ],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_yes_yes",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_yes_yes",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: false }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: false }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Discard Contents of I Frame", kind: "processing" },
@@ -961,10 +961,10 @@ export const DataLinkConnected: StatePage = {
       loops: [],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_yes_no",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_yes_no",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: true }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: true }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Discard Contents of I Frame", kind: "processing" },
@@ -975,10 +975,10 @@ export const DataLinkConnected: StatePage = {
       loops: [],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_no_no",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_no_no",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Discard Contents of I Frame", kind: "processing" },
@@ -994,10 +994,10 @@ export const DataLinkConnected: StatePage = {
       loops: [],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_no_yes_yes",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Save Contents of I Frame", kind: "processing" },
@@ -1012,10 +1012,10 @@ export const DataLinkConnected: StatePage = {
       loops: [],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_no_yes_no_yes",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: false }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: false }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Save Contents of I Frame", kind: "processing" },
@@ -1032,10 +1032,10 @@ export const DataLinkConnected: StatePage = {
       loops: [],
     },
     {
-      id: "t26_i_received_yes_yes_yes_no_no_no_yes_no_no",
+      id: "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
       from: "Connected",
       on: "I_received",
-      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: true }],
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: true }],
       actions: [
         { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
         { verb: "Save Contents of I Frame", kind: "processing" },
@@ -1043,6 +1043,38 @@ export const DataLinkConnected: StatePage = {
         { verb: "F := 1", kind: "processing" },
         { verb: "Increment Sreject Exception", kind: "processing" },
         { verb: "SREJ", kind: "signal_lower" },
+      ],
+      next: "Connected",
+      notes: "",
+      references: [],
+      loops: [],
+    },
+    {
+      id: "t26_i_received_yes_yes_yes_no_no_no_yes",
+      from: "Connected",
+      on: "I_received",
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: true }, { atom: "P_eq_1", negate: false }],
+      actions: [
+        { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
+        { verb: "Discard Contents of I Frame", kind: "processing" },
+        { verb: "F := 1", kind: "processing" },
+        { verb: "N(r) := V(r)", kind: "processing" },
+        { verb: "RR", kind: "signal_lower" },
+        { verb: "Clear Acknowledge Pending", kind: "processing" },
+      ],
+      next: "Connected",
+      notes: "",
+      references: [],
+      loops: [],
+    },
+    {
+      id: "t26_i_received_yes_yes_yes_no_no_no_no",
+      from: "Connected",
+      on: "I_received",
+      guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: true }, { atom: "P_eq_1", negate: true }],
+      actions: [
+        { verb: "Check_I_Frame_Acknowledged", kind: "subroutine" },
+        { verb: "Discard Contents of I Frame", kind: "processing" },
       ],
       next: "Connected",
       notes: "",

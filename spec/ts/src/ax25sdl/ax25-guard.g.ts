@@ -34,6 +34,7 @@ export type Ax25Guard =
   | "va_le_nr_le_vs"
   | "version_2_2"
   | "vr_I_frame_stored"
+  | "vr_lt_ns_lt_vr_plus_k"
   | "vs_eq_X"
   | "vs_eq_nr"
   | "vs_eq_va"

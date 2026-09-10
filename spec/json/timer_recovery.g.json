@@ -1669,10 +1669,10 @@
       ]
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_yes_yes",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_yes_yes",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and P_eq_1",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and P_eq_1",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1705,10 +1705,10 @@
       "loops": []
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_yes_no",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_yes_no",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and not P_eq_1",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and not P_eq_1",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1725,10 +1725,10 @@
       "loops": []
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_no_no",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_no_no",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and not SREJ_enabled",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and not SREJ_enabled",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1765,10 +1765,10 @@
       "loops": []
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_no_yes_no_yes",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1809,10 +1809,10 @@
       "loops": []
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_no_yes_no_no",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1845,10 +1845,10 @@
       "loops": []
     },
     {
-      "id": "t22_i_received_yes_yes_yes_no_no_no_yes_yes",
+      "id": "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
       "from": "TimerRecovery",
       "on": "I_received",
-      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
       "actions": [
         {
           "verb": "Check_I_Frame_Acknowledged",
@@ -1873,6 +1873,62 @@
         {
           "verb": "SREJ",
           "kind": "signal_lower"
+        }
+      ],
+      "next": "TimerRecovery",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t22_i_received_yes_yes_yes_no_no_no_yes",
+      "from": "TimerRecovery",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "TimerRecovery",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t22_i_received_yes_yes_yes_no_no_no_no",
+      "from": "TimerRecovery",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and not P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
         }
       ],
       "next": "TimerRecovery",

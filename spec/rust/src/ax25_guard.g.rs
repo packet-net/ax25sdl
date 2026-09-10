@@ -73,6 +73,8 @@ pub enum Ax25Guard {
     Version22,
     /// `vr_I_frame_stored`
     VrIFrameStored,
+    /// `vr_lt_ns_lt_vr_plus_k`
+    VrLtNsLtVrPlusK,
     /// `vs_eq_X`
     VsEqX,
     /// `vs_eq_nr`

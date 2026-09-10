@@ -956,10 +956,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             ),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_yes_yes",
+            id="t22_i_received_yes_yes_yes_no_no_yes_yes_yes",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and P_eq_1",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and P_eq_1",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Discard Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -974,10 +974,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             loops=(),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_yes_no",
+            id="t22_i_received_yes_yes_yes_no_no_yes_yes_no",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and reject_exception and not P_eq_1",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and not P_eq_1",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Discard Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -988,10 +988,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             loops=(),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_no_no",
+            id="t22_i_received_yes_yes_yes_no_no_yes_no_no",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and not SREJ_enabled",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and not SREJ_enabled",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Discard Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -1007,10 +1007,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             loops=(),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_no_yes_no_yes",
+            id="t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Save Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -1027,10 +1027,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             loops=(),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_no_yes_no_no",
+            id="t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Save Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -1045,10 +1045,10 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
             loops=(),
         ),
         TransitionSpec(
-            id="t22_i_received_yes_yes_yes_no_no_no_yes_yes",
+            id="t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
             from_="TimerRecovery",
             on="I_received",
-            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
             actions=(
                 ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
                 ActionStep(verb="Save Contents of I Frame", kind=ActionKind.PROCESSING),
@@ -1056,6 +1056,38 @@ DATA_LINK_TIMER_RECOVERY = StatePage(
                 ActionStep(verb="F := 0", kind=ActionKind.PROCESSING),
                 ActionStep(verb="Sreject := Sreject + 1", kind=ActionKind.PROCESSING),
                 ActionStep(verb="SREJ", kind=ActionKind.SIGNAL_LOWER),
+            ),
+            next="TimerRecovery",
+            notes="",
+            references=(),
+            loops=(),
+        ),
+        TransitionSpec(
+            id="t22_i_received_yes_yes_yes_no_no_no_yes",
+            from_="TimerRecovery",
+            on="I_received",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and P_eq_1",
+            actions=(
+                ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
+                ActionStep(verb="Discard Contents of I Frame", kind=ActionKind.PROCESSING),
+                ActionStep(verb="F := 1", kind=ActionKind.PROCESSING),
+                ActionStep(verb="N(r) := V(r)", kind=ActionKind.PROCESSING),
+                ActionStep(verb="RR", kind=ActionKind.SIGNAL_LOWER),
+                ActionStep(verb="Clear Acknowledge Pending", kind=ActionKind.PROCESSING),
+            ),
+            next="TimerRecovery",
+            notes="",
+            references=(),
+            loops=(),
+        ),
+        TransitionSpec(
+            id="t22_i_received_yes_yes_yes_no_no_no_no",
+            from_="TimerRecovery",
+            on="I_received",
+            guard="command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and not P_eq_1",
+            actions=(
+                ActionStep(verb="Check_I_Frame_Acknowledged", kind=ActionKind.SUBROUTINE),
+                ActionStep(verb="Discard Contents of I Frame", kind=ActionKind.PROCESSING),
             ),
             next="TimerRecovery",
             notes="",

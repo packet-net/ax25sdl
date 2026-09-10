@@ -2190,7 +2190,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             }],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_yes_yes",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_yes_yes",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2213,6 +2213,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2255,7 +2259,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_yes_no",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_yes_no",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2278,6 +2282,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2304,7 +2312,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_no_no",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_no_no",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2327,6 +2335,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2373,7 +2385,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_no_yes_no_yes",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2396,6 +2408,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2454,7 +2470,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_no_yes_no_no",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2477,6 +2493,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2527,7 +2547,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t22_i_received_yes_yes_yes_no_no_no_yes_yes",
+            id: "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
             from: "TimerRecovery",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2550,6 +2570,10 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -2588,6 +2612,120 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
                 ActionStep {
                     verb: Ax25ActionVerb::SREJ,
                     kind: ActionKind::SignalLower,
+                },
+            ],
+            next: "TimerRecovery",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t22_i_received_yes_yes_yes_no_no_no_yes",
+            from: "TimerRecovery",
+            on: Ax25Event::IReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: false,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::FAssign1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRAssignVR,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::RR,
+                    kind: ActionKind::SignalLower,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearAcknowledgePending,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "TimerRecovery",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t22_i_received_yes_yes_yes_no_no_no_no",
+            from: "TimerRecovery",
+            on: Ax25Event::IReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: true,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
+                    kind: ActionKind::Processing,
                 },
             ],
             next: "TimerRecovery",
@@ -3733,7 +3871,7 @@ mod tests {
 
     #[test]
     fn transitions_are_present() {
-        assert_eq!(DATA_LINK_TIMER_RECOVERY.transitions.len(), 90);
+        assert_eq!(DATA_LINK_TIMER_RECOVERY.transitions.len(), 92);
     }
 
     #[test]
@@ -5629,12 +5767,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_yes_yes() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_yes_yes() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_yes")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_yes not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_yes_yes")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_yes_yes not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5659,6 +5797,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5686,12 +5828,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_yes_no() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_yes_no() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_no")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_no not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_yes_no")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_yes_no not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5716,6 +5858,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5735,12 +5881,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_no_no() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_no_no() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_no")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_no_no not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_no_no")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_no_no not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5765,6 +5911,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5794,12 +5944,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_no_yes_no_yes() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_yes_no_yes")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_no_yes_no_yes not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5824,6 +5974,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5863,12 +6017,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_no_yes_no_no() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_yes_no_no")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_no_yes_no_no not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_no not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5893,6 +6047,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5931,12 +6089,12 @@ mod tests {
     }
 
     #[test]
-    fn t22_i_received_yes_yes_yes_no_no_no_yes_yes() {
+    fn t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes() {
         let tx = DATA_LINK_TIMER_RECOVERY
             .transitions
             .iter()
-            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_yes_yes")
-            .expect("transition t22_i_received_yes_yes_yes_no_no_no_yes_yes not found");
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "TimerRecovery");
         assert_eq!(
@@ -5961,6 +6119,10 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::NsEqVr,
                     negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::RejectException,
@@ -5992,6 +6154,112 @@ mod tests {
         assert_eq!(tx.actions[4].kind, ActionKind::Processing);
         assert_eq!(tx.actions[5].verb, Ax25ActionVerb::SREJ);
         assert_eq!(tx.actions[5].kind, ActionKind::SignalLower);
+    }
+
+    #[test]
+    fn t22_i_received_yes_yes_yes_no_no_no_yes() {
+        let tx = DATA_LINK_TIMER_RECOVERY
+            .transitions
+            .iter()
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_yes")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "TimerRecovery");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 6);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::FAssign1);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::NRAssignVR);
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::RR);
+        assert_eq!(tx.actions[4].kind, ActionKind::SignalLower);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
+        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t22_i_received_yes_yes_yes_no_no_no_no() {
+        let tx = DATA_LINK_TIMER_RECOVERY
+            .transitions
+            .iter()
+            .find(|x| x.id == "t22_i_received_yes_yes_yes_no_no_no_no")
+            .expect("transition t22_i_received_yes_yes_yes_no_no_no_no not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "TimerRecovery");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: true
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 2);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
     }
 
     #[test]

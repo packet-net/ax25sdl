@@ -10,7 +10,7 @@ describe("DataLinkConnected", () => {
   });
 
   it("transitions are present", () => {
-    expect(DataLinkConnected.transitions).toHaveLength(66);
+    expect(DataLinkConnected.transitions).toHaveLength(68);
   });
 
   it("t01_dl_disconnect_request", () => {
@@ -1061,13 +1061,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[11].kind).toBe("processing");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_yes_yes", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_yes");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_yes not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_yes_yes", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_yes_yes");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_yes_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: false }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: false }]);
     expect(t.actions).toHaveLength(6);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1083,13 +1083,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[5].kind).toBe("processing");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_yes_no", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_no");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_no not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_yes_no", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_yes_no");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_yes_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: true }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: false }, { atom: "P_eq_1", negate: true }]);
     expect(t.actions).toHaveLength(2);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1097,13 +1097,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[1].kind).toBe("processing");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_no_no", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_no");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_no not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_no_no", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_no_no");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_no_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }]);
     expect(t.actions).toHaveLength(7);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1121,13 +1121,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[6].kind).toBe("processing");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_no_yes_yes", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_yes_yes");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_yes_yes not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }]);
     expect(t.actions).toHaveLength(6);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1143,13 +1143,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[5].kind).toBe("signal_lower");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_no_yes_no_yes", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_yes_no_yes");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_yes_no_yes not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: false }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: false }]);
     expect(t.actions).toHaveLength(8);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1169,13 +1169,13 @@ describe("DataLinkConnected", () => {
     expect(t.actions[7].kind).toBe("processing");
   });
 
-  it("t26_i_received_yes_yes_yes_no_no_no_yes_no_no", () => {
-    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_yes_no_no");
-    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_yes_no_no not found").toBeDefined();
+  it("t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_no", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_no");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: true }]);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: true }, { atom: "ns_gt_vr_plus_1", negate: true }]);
     expect(t.actions).toHaveLength(6);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
@@ -1189,6 +1189,42 @@ describe("DataLinkConnected", () => {
     expect(t.actions[4].kind).toBe("processing");
     expect(t.actions[5].verb).toBe("SREJ");
     expect(t.actions[5].kind).toBe("signal_lower");
+  });
+
+  it("t26_i_received_yes_yes_yes_no_no_no_yes", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_yes");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: true }, { atom: "P_eq_1", negate: false }]);
+    expect(t.actions).toHaveLength(6);
+    expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("Discard Contents of I Frame");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("F := 1");
+    expect(t.actions[2].kind).toBe("processing");
+    expect(t.actions[3].verb).toBe("N(r) := V(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("RR");
+    expect(t.actions[4].kind).toBe("signal_lower");
+    expect(t.actions[5].verb).toBe("Clear Acknowledge Pending");
+    expect(t.actions[5].kind).toBe("processing");
+  });
+
+  it("t26_i_received_yes_yes_yes_no_no_no_no", () => {
+    const t = DataLinkConnected.transitions.find((x) => x.id === "t26_i_received_yes_yes_yes_no_no_no_no");
+    expect(t, "transition t26_i_received_yes_yes_yes_no_no_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: true }, { atom: "P_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("Discard Contents of I Frame");
+    expect(t.actions[1].kind).toBe("processing");
   });
 
   it("t26_i_received_yes_yes_yes_yes_yes", () => {
