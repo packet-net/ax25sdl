@@ -59,6 +59,8 @@ suite demands the marker's removal). How to add a trace, the file format,
 and the interpreter's execution policies are documented in
 [`docs/golden-traces.md`](docs/golden-traces.md).
 
+Beyond single-machine traces, the two-station explorer (`codegen/src/Packet.Sdl.Explorer`) composes two interpreter instances over a modelled lossy channel and searches every interleaving for cross-station invariant violations (delivery safety, reject coherence, acknowledgement coherence, quiescence). Its calibration suite must rediscover the catalogued figure defects on pre-fix table fixtures before any novel finding is believed; see [`docs/explorer.md`](docs/explorer.md).
+
 The SREJ sender-side scenarios (`traces/srej-*.trace.yaml`) were authored clean-room from the prose and direwolf alone and committed before they were ever executed, as an independence control on the SREJ table fix; the protocol and its outcome are recorded in [packet-net/ax25sdl#76](https://github.com/packet-net/ax25sdl/pull/76).
 
 ## Provenance

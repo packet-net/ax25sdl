@@ -20,6 +20,7 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          reject-coherence, ack-coherence, quiescence, deadlock
   --selective-progress   enable the selective-recovery progress check (off by default)
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
+  --quiescence-accepts-timer-recovery   triage aid: a station in TimerRecovery counts as quiescent
   --max-depth N          depth bound (default 80)
   --max-states N         visited-state bound (default 400000)
 
@@ -28,7 +29,7 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 
 string tables = "spec/json";
 int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000;
-bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false;
+bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
@@ -56,6 +57,7 @@ try
             case "--mod128": mod128 = true; break;
             case "--selective-progress": selective = true; break;
             case "--rej-may-equal-vs": rejMayEqualVs = true; break;
+            case "--quiescence-accepts-timer-recovery": trQuiescent = true; break;
             case "--faults":
                 faults = FaultKinds.None;
                 foreach (var f in Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -123,6 +125,7 @@ try
         Modulo128A = mod128,
         Invariants = invariants,
         RejMayEqualVs = rejMayEqualVs,
+        TimerRecoveryIsQuiescent = trQuiescent,
         MaxDepth = maxDepth,
         MaxStates = maxStates,
     };

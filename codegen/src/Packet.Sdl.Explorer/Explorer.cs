@@ -55,8 +55,13 @@ public sealed record ExplorationResult(
         if (Note is not null) sb.Append('\n').Append(Note);
         if (Trace.Count > 0)
         {
-            sb.Append("\ncounterexample (").Append(Trace.Count.ToString(CultureInfo.InvariantCulture)).Append(" steps):");
-            foreach (var step in Trace) sb.Append('\n').Append(step.Render());
+            const int witnessTail = 12;
+            var skip = Outcome == Outcome.BoundHit && Trace.Count > witnessTail ? Trace.Count - witnessTail : 0;
+            sb.Append(Outcome == Outcome.BoundHit ? "\nwitness path (" : "\ncounterexample (")
+              .Append(Trace.Count.ToString(CultureInfo.InvariantCulture)).Append(" steps");
+            if (skip > 0) sb.Append(", first ").Append(skip.ToString(CultureInfo.InvariantCulture)).Append(" omitted");
+            sb.Append("):");
+            foreach (var step in Trace.Skip(skip)) sb.Append('\n').Append(step.Render());
         }
         return sb.ToString();
     }
@@ -166,9 +171,17 @@ public static class Explorer
 
         if (depthBoundHit || stateBoundHit)
         {
-            return new ExplorationResult(Outcome.BoundHit, null, Array.Empty<StepRecord>(), nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit,
+            // Witness: the path to the first state at the depth bound, so a
+            // runaway (a chain that never repeats a state) can be read off.
+            IReadOnlyList<StepRecord> witness = Array.Empty<StepRecord>();
+            if (depthBoundHit)
+            {
+                var at = nodes.FindIndex(n => n.Depth >= options.MaxDepth);
+                if (at >= 0) witness = Replay(stepper, PathTo(nodes, at)).Trace;
+            }
+            return new ExplorationResult(Outcome.BoundHit, null, witness, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit,
                 depthBoundHit
-                    ? "some states at the depth bound were not expanded; raise --max-depth or shrink the scenario"
+                    ? "some states at the depth bound were not expanded; raise --max-depth or shrink the scenario (the trace below is a witness path to one such state)"
                     : "the visited-state cap was reached; raise --max-states or shrink the scenario");
         }
 

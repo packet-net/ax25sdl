@@ -156,13 +156,16 @@ public sealed class Stepper
     public bool IsQuiescent(SystemState s)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return s.A.State == "Connected" && s.B.State == "Connected"
+        return QuiescentState(s.A.State) && QuiescentState(s.B.State)
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && s.A.QueueEntries.Count == 0 && s.B.QueueEntries.Count == 0
             && s.A.Vs == s.A.Va && s.B.Vs == s.B.Va
             && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
             && !s.SeizeOwedA && !s.SeizeOwedB;
     }
+
+    private bool QuiescentState(string state) =>
+        state == "Connected" || (_o.TimerRecoveryIsQuiescent && state == "TimerRecovery");
 
     // ─── Enabled moves ────────────────────────────────────────────────
 
@@ -219,7 +222,7 @@ public sealed class Stepper
         if (_o.DropScope == DropScope.Any) return true;
         if (head.Type != "I" || head.Data is null) return false;
         var submitted = Submitted(SystemState.Peer(into));
-        return submitted.Count > 0 && !string.Equals(head.Data, submitted[^1], StringComparison.Ordinal);
+        return submitted.Length > 0 && !string.Equals(head.Data, submitted[^1], StringComparison.Ordinal);
     }
 
     private bool Handles(DataLinkMachine m, string eventName) =>
@@ -411,7 +414,7 @@ public sealed class Stepper
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
                     {
                         var submitted = Submitted(peer);
-                        var expected = delivered < submitted.Count ? submitted[delivered] : null;
+                        var expected = delivered < submitted.Length ? submitted[delivered] : null;
                         if (expected is not null && string.Equals(ue.Detail, expected, StringComparison.Ordinal))
                         {
                             delivered++;
@@ -419,7 +422,7 @@ public sealed class Stepper
                         else if (violation is null && On(Invariants.Delivery))
                         {
                             violation = new Violation(Invariants.Delivery, station, expected is null
-                                ? $"station {station} delivered `{ue.Detail}` upward but {peer} submitted only {Inv(submitted.Count)} frame(s), all already delivered: duplicate or spurious delivery"
+                                ? $"station {station} delivered `{ue.Detail}` upward but {peer} submitted only {Inv(submitted.Length)} frame(s), all already delivered: duplicate or spurious delivery"
                                 : $"station {station} delivered `{ue.Detail}` upward where {peer}'s submission #{Inv(delivered)} is `{expected}`: out-of-order, duplicate or gapped delivery");
                         }
                         break;
@@ -488,6 +491,13 @@ public sealed class Stepper
         if (outstanding > m.K)
             return new Violation(Invariants.SequenceSanity, station,
                 $"station {station}: window exceeded, V(s)={Inv(m.Vs)} V(a)={Inv(m.Va)} gives {Inv(outstanding)} outstanding > k={Inv(m.K)} (state {m.State})");
+        // Each outstanding SREJ condition names a distinct missing frame inside
+        // the receive window, so a coherent receiver never has more than k-1 of
+        // them; a count above k means the station keeps raising selective
+        // rejects for frames it does not need (the #42 runaway).
+        if (m.SrejectException > m.K)
+            return new Violation(Invariants.SequenceSanity, station,
+                $"station {station}: SREJ exception count {Inv(m.SrejectException)} exceeds the window k={Inv(m.K)}: more selective rejects outstanding than there can be gaps (state {m.State})");
         return null;
     }
 

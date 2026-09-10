@@ -338,3 +338,21 @@ jobs:
             echo "::error::*.sdl.yaml in the ax25spec submodule are out of sync with what this walker produces from their *.graphml sources. Either the walker changed behaviour (fix it or regenerate in packethacking/ax25spec and bump the submodule pin) or the pin points at an internally-inconsistent ax25spec commit (its own transcribe-drift CI should be red)."
             exit 1
           fi
+
+  # ─── Semantic validation: the two-station explorer's calibration
+  #     suite. Composes two reference-interpreter machines over a modelled
+  #     lossy channel and must rediscover the catalogued figure defects on
+  #     the pre-fix fixture tables (and stay silent where the fix landed).
+  #     See docs/explorer.md. ───
+  semantic-explorer:
+    name: semantic validation - two-station explorer
+    runs-on: [self-hosted, Linux, X64]
+    needs: csharp
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # spec-sdl is a symlink into the packethacking/ax25spec
+          # submodule; the suite locates the repo root through it.
+          submodules: true
+      - name: run the explorer calibration suite
+        run: dotnet test codegen/tests/Packet.Sdl.Explorer.Tests --nologo

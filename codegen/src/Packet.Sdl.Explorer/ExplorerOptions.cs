@@ -103,6 +103,14 @@ public sealed record ExplorerOptions
     public Invariants Invariants { get; init; } = Invariants.Default;
 
     /// <summary>
+    /// Triage aid only: count a station in TimerRecovery as quiescent (when
+    /// everything else is quiet). Lets a grid run look past the known
+    /// "stuck in TimerRecovery after a lost poll" finding (docs/explorer.md,
+    /// hypothesis H1) to whatever lies behind it. Off by default.
+    /// </summary>
+    public bool TimerRecoveryIsQuiescent { get; init; }
+
+    /// <summary>
     /// Receiver-side reject coherence: also accept a REJ whose N(r) equals the
     /// receiver's V(s) (a pure acknowledgement). Off by default: on a FIFO
     /// channel such a REJ can only come from a reject raised on a stale
