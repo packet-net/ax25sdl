@@ -192,8 +192,6 @@ raise it rather than encoding around it:
      `expected_failure: <issue-url>`. Do **not** bend the expectations to
      match the tables.
 
-## Reserved scenarios
+## Clean-room scenarios
 
-`traces/srej-round-trip.RESERVED.md` — the SREJ round trip is reserved for
-clean-room authoring as an independence control; see the file and
-packet-net/ax25sdl#74.
+The SREJ sender-side traces (`traces/srej-round-trip.trace.yaml`, `traces/srej-timer-recovery-f0.trace.yaml`, `traces/srej-connected-selective-retransmit.trace.yaml`) were written from the prose and direwolf only, without sight of the tables, and committed before their first execution; packet-net/ax25sdl#74 and #76 record the protocol. Two of them were carried as strict xfails against the pre-fix figc4.5 tables (packethacking/ax25spec#38) until the figure fix (packethacking/ax25spec#65, regenerated here in #78) landed.
