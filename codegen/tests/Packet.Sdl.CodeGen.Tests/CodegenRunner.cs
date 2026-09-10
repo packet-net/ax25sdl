@@ -67,6 +67,24 @@ internal sealed class CodegenRunner : IDisposable
     public void WritePredicatesCatalog(string yaml)
         => File.WriteAllText(Path.Combine(SpecDir, "predicates.yaml"), yaml);
 
+    /// <summary>
+    /// Path of the totality-lint allow-list for this sandbox, or null when
+    /// no test wrote one. When set, every run passes it as
+    /// <c>--known-findings</c>; otherwise the codegen's default
+    /// (<c>codegen/lint-known-findings.yaml</c> under the sandbox root, which
+    /// does not exist) applies and the list is empty.
+    /// </summary>
+    public string? KnownFindingsPath { get; private set; }
+
+    /// <summary>Drop a totality-lint allow-list (docs/lint-totality.md) into the sandbox and pass it on every run.</summary>
+    public void WriteKnownFindings(string yaml)
+    {
+        KnownFindingsPath = Path.Combine(RootDir, "lint-known-findings.yaml");
+        File.WriteAllText(KnownFindingsPath, yaml);
+    }
+
+    private string KnownFindingsArg => KnownFindingsPath is null ? "" : $" --known-findings \"{KnownFindingsPath}\"";
+
     public sealed record RunResult(int ExitCode, string Stdout, string Stderr);
 
     /// <summary>Run the codegen tool and capture exit + stdout + stderr.</summary>
@@ -84,7 +102,7 @@ internal sealed class CodegenRunner : IDisposable
         // --csharp-tests; the CLI's opt-in-by-presence semantics treat
         // setting either path as an explicit selection of the C#
         // backend, with all others off.
-        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --csharp --csharp-out \"{OutDir}\" --csharp-tests \"{TestsDir}\"")
+        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --csharp --csharp-out \"{OutDir}\" --csharp-tests \"{TestsDir}\"{KnownFindingsArg}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
@@ -107,7 +125,7 @@ internal sealed class CodegenRunner : IDisposable
     public RunResult RunJson()
     {
         var dll = LocateCodegenDll();
-        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --json --json-out \"{JsonOutDir}\"")
+        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --json --json-out \"{JsonOutDir}\"{KnownFindingsArg}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
@@ -128,7 +146,7 @@ internal sealed class CodegenRunner : IDisposable
     public RunResult RunRust()
     {
         var dll = LocateCodegenDll();
-        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --rust --rust-out \"{RustOutDir}\"")
+        var psi = new ProcessStartInfo("dotnet", $"\"{dll}\" --in \"{SpecDir}\" --rust --rust-out \"{RustOutDir}\"{KnownFindingsArg}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError  = true,
