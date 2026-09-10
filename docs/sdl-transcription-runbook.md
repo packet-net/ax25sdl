@@ -18,7 +18,9 @@ These are baked into the repo and don't repeat per figure:
 - Lossless YAML schema (`spec-sdl/schema/sdl-machine.schema.json`) with
   `pinned_refs`, `decisions`, `path`, `references` fields.
 - Codegen tool `codegen/src/Packet.Sdl.CodeGen` with lints (decision-branch
-  completeness, guard overlap, references shape) and Roslyn parse-back.
+  completeness, guard overlap, references shape, and the semantic totality /
+  determinism check over the guard-atom domain model, see
+  [`lint-totality.md`](lint-totality.md)) and Roslyn parse-back.
 - "Trust the figure" + "Read `d5`, not the shape direction" hard rules in
   [`CLAUDE.md`](../CLAUDE.md) and the agent's memory.
 - Four reference codebases cloned locally (see Stage 4 below).
@@ -220,9 +222,13 @@ Same CI watch + squash-merge on green.
 
 ## Pattern observations from figc4.1 + figc4.2
 
-- The codegen lints (`decision_branch_completeness`, `guard_overlap`) catch
-  the kinds of transcription errors that used to take a build cycle to
-  surface. Trust them.
+- The codegen lints (`decision_branch_completeness`, `guard_overlap`, and
+  the totality / determinism lint of [`lint-totality.md`](lint-totality.md),
+  which checks the semantic space the first two only approximate) catch the
+  kinds of transcription errors that used to take a build cycle to surface.
+  Trust them. A totality finding on a real figure goes in
+  `codegen/lint-known-findings.yaml` with an ax25spec issue URL, never in a
+  "fixed" branch label.
 - Subagent parallelism for implementation refs is **strongly preferred** —
   each codebase has its own structure that takes context to learn, and the
   agents run independently with no synthesis dependency until merge.

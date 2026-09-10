@@ -36,6 +36,7 @@ The transcription rules and how to add a new figure live in:
 - [`docs/sdl-primer.md`](docs/sdl-primer.md) — SDL shape reference
 - [`docs/sdl-transcription-runbook.md`](docs/sdl-transcription-runbook.md) — end-to-end per-figure workflow
 - [`docs/sdl-verb-catalogue.md`](docs/sdl-verb-catalogue.md) — action-verb normalisation
+- [`docs/lint-totality.md`](docs/lint-totality.md) - the totality / determinism lint: every (state, event) arm and subroutine must decide every feasible guard-atom valuation exactly once, and the allow-list contract for known figure findings
 - [`docs/adr/0001-sdl-dsl.md`](docs/adr/0001-sdl-dsl.md) — why YAML + codegen rather than hand-written tables
 
 ## Semantic validation — golden traces

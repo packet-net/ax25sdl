@@ -1,0 +1,30 @@
+# Known findings of the totality / determinism lint on the real figures
+# (docs/lint-totality.md). Each entry downgrades exactly one finding to a
+# printed warning so a filed-but-unfixed figure defect does not turn every
+# CI job red until the ax25spec fix lands and the submodule pin is bumped.
+#
+# The contract is strict:
+#   - every entry needs an `issue:` URL (the upstream ax25spec issue);
+#   - an entry must match exactly one current finding: `kind`, `machine`,
+#     `state` + `event` (or `subroutine`), the `when:` cube exactly as the
+#     lint reports it, and for nondeterminism the `transitions:` set;
+#   - an entry that matches nothing FAILS the run (the figure was fixed, the
+#     arm changed, or the entry is wrong): remove or correct it.
+# Same discipline as the golden-trace suite's `expected_failure`.
+#
+# Shape:
+#   findings:
+#     - kind: hole                    # hole | nondeterminism
+#       machine: data_link
+#       state: Connected              # or: subroutine: Enquiry_Response
+#       event: I_received             # state pages only
+#       when:                         # the fixed atoms of the reported cube
+#         ns_eq_vr: false
+#         vr_lt_ns_lt_vr_plus_k: false
+#       transitions: [a, b]           # nondeterminism only
+#       issue: https://github.com/packethacking/ax25spec/issues/NN
+#       note: optional free text
+#
+# As of the ax25spec pin at the time of writing the real figures have no
+# findings, so the list is empty.
+findings: []
