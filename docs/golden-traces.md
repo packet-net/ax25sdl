@@ -158,7 +158,11 @@ pinned by one, and the register cannot drift from the tracker.
 **Closing rule.** When an upstream figure fix lands: the strict-xfail runner
 fails the now-passing trace; the marker comes off the trace, the issue is
 closed upstream, and the entry comes off the register, all in the pin-bump
-PR that regenerates the tables. A new figure-defect issue upstream is
+PR that regenerates the tables. The issue therefore stays open between the
+figure fix merging upstream and the pin bump landing here; a fix PR whose
+`fixes #n` keyword closes it early trips the online test (which says so,
+naming the trace that still carries the marker) until the issue is
+reopened or the pin bump lands. A new figure-defect issue upstream is
 entered in the register with a prose-derived xfail trace (write the
 expectations from the prose sections the issue cites before reading the
 table path) or, if no single-machine trace can fail because of it, with

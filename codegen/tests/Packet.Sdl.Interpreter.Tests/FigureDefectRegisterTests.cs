@@ -104,6 +104,7 @@ public class FigureDefectRegisterTests
         }
 
         var problems = new List<string>();
+        var markers = XfailMarkers();
 
         foreach (var entry in register.Defects)
         {
@@ -111,8 +112,12 @@ public class FigureDefectRegisterTests
             if (open.ContainsKey(number))
                 continue;
             var why = await DescribeIssue(http, register.Repository, number);
-            problems.Add($"{entry.Issue} is registered but is not an open `{register.Label}` issue upstream ({why}); " +
-                         "if it was fixed, drop the entry and the expected_failure: marker(s) together in the pin-bump PR");
+            var carriers = markers.Where(m => string.Equals(m.Issue, entry.Issue, StringComparison.Ordinal)).Select(m => m.File).ToList();
+            problems.Add(carriers.Count == 0
+                ? $"{entry.Issue} is registered but is not an open `{register.Label}` issue upstream ({why}) and no trace carries it; drop the entry"
+                : $"{entry.Issue} is registered but is not an open `{register.Label}` issue upstream ({why}), yet {string.Join(", ", carriers)} still " +
+                  "carries it as expected_failure:, so the fix has not been pinned here. Per the closing rule the issue stays open until the pin bump " +
+                  "flips the evidence: either reopen it upstream until then, or land the pin bump (which removes the marker and this entry together)");
         }
 
         foreach (var (number, title) in open.OrderBy(kv => kv.Key))
