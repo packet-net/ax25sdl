@@ -58,6 +58,57 @@ catalog is **authoritative**:
 3. **Malformed catalog.** Duplicate canonical, alias claimed by two canonicals,
    empty alias.
 
+### Where the binding gate lives
+
+The codegen checks that every predicate atom is **catalogued**. It does not
+check that any consumer **binds** it. That split is deliberate, and it is a
+change: until 2026-09 the codegen also tried to cross-reference each consumer's
+binding table, dispatcher and subroutine registry through
+`spec-sdl/lint-targets.yaml`. That mechanism has been removed, and the file with
+it.
+
+It was removed because it could not work, and was quietly not working. Every
+path it named (`src/Packet.Ax25/Session/Ax25SessionBindings.cs`,
+`.../ActionDispatcher.cs`, `.../SubroutineRegistry.cs`,
+`web/ax25/src/sdl/session-bindings.ts`, `.../action-dispatcher.ts`) lives in a
+different repository that this repo's CI never checks out, and a missing file
+silently skipped the lint rather than failing it, so all five runtime-specific
+lints (predicate bindings, dispatcher coverage, subroutine coverage, DL-ERROR
+letters, dispatcher orphans) always passed by doing nothing. The regexes had
+gone stale on top of that: the SP-010 typed-closed-set work replaced string
+dispatch with typed enum arms, so the C# bindings pattern matched 0 entries in
+the real `Ax25SessionBindings.cs` and the dispatcher pattern matched 0 in the
+real `ActionDispatcher.cs`; the TypeScript paths predate `ax25-ts` becoming its
+own repo and exist nowhere at all. Fail-open cross-repo assurance is worse than
+none, because it reads as a gate in the codegen output. Same shape as the
+codegen-input-directory hole closed in #80.
+
+The real gates now sit in the repos that break when they are violated, and each
+is the consumer's own compiler:
+
+- **C#** (`packet-net/packet.net`): `Ax25SessionBindings` / `ActionDispatcher`
+  `switch` over the closed `Ax25Guard` / `Ax25ActionVerb` enum. A missing named
+  member is CS8509, which is a build error under the repo-wide
+  `TreatWarningsAsErrors`. The `#pragma warning disable CS8524` in both files
+  exists precisely so nobody "fixes" the out-of-range-cast warning by adding a
+  wildcard arm, which would kill CS8509 along with it. The runtime counterpart
+  is `Binding_Table_Is_Exhaustive_Over_Ax25Guard`, which enumerates
+  `Enum.GetValues<Ax25Guard>()`.
+- **Rust** (`m0lte/pico-node`): `eval_atom` in
+  `crates/ax25-node-core/src/sdl/guard.rs` is a catch-all-free `match` on
+  `Ax25Guard`, so a new atom is a non-exhaustive-match compile error.
+- **TypeScript** (`packet-net/ax25-ts`): `src/sdl/session-bindings.ts` types its
+  table as `Record<SessionBoundGuard, () => boolean>`, added 2026-09-10. That
+  leg is the one that previously had no gate at all, which is why the dead lint
+  looked load-bearing.
+
+Cross-repo drift between the C# reference and the TypeScript port is covered by
+`scripts/parity-check.mjs` in `ax25-ts`, which runs from both sides: `ax25-ts`
+CI clones `packet.net` and runs it, and `packet.net`'s `interop.yml` runs it
+against its `ax25-ts` checkout. That is the shape a cross-repo guard has to
+take, running from a repo that has both trees on disk, rather than from the one
+that has neither.
+
 ### The closed set is gathered from the resolved IR, not the raw YAML
 
 `Ax25Guard.g.cs` / `ax25-guard.g.ts` enumerate every atom that actually appears
