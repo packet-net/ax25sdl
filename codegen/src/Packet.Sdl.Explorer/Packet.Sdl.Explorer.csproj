@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Packet.Sdl.Explorer</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Description>Two-station bounded explorer over the AX.25 SDL JSON tables: composes two reference-interpreter Data Link machines over a modelled lossy/duplicating channel, explores every interleaving breadth-first from a seeded state, and checks cross-station invariants (delivery safety, reject coherence, acknowledgement coherence, quiescence under a fair channel) after every step. See docs/explorer.md.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Packet.Sdl.Interpreter\Packet.Sdl.Interpreter.csproj" />
+  </ItemGroup>
+
+</Project>

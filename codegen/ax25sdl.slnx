@@ -11,6 +11,7 @@
     <Project Path="src/Packet.Sdl.CodeGen.Python/Packet.Sdl.CodeGen.Python.csproj" />
     <Project Path="src/Packet.Sdl.CodeGen.Rust/Packet.Sdl.CodeGen.Rust.csproj" />
     <Project Path="src/Packet.Sdl.CodeGen.Ts/Packet.Sdl.CodeGen.Ts.csproj" />
+    <Project Path="src/Packet.Sdl.Explorer/Packet.Sdl.Explorer.csproj" />
     <Project Path="src/Packet.Sdl.IR/Packet.Sdl.IR.csproj" />
     <Project Path="src/Packet.Sdl.Interpreter/Packet.Sdl.Interpreter.csproj" />
     <Project Path="src/Packet.Sdl.Lint/Packet.Sdl.Lint.csproj" />
@@ -18,6 +19,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Packet.Sdl.CodeGen.Tests/Packet.Sdl.CodeGen.Tests.csproj" />
+    <Project Path="tests/Packet.Sdl.Explorer.Tests/Packet.Sdl.Explorer.Tests.csproj" />
     <Project Path="tests/Packet.Sdl.Interpreter.Tests/Packet.Sdl.Interpreter.Tests.csproj" />
     <Project Path="../spec/csharp/tests/Packet.Ax25.Sdl.Conformance.Tests.csproj" />
   </Folder>

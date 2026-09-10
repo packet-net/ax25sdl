@@ -24,7 +24,8 @@ public abstract record Effect
 /// <param name="Nr">N(R) for frame types that carry one (I / RR / RNR / REJ / SREJ).</param>
 /// <param name="Ns">N(S) for I frames.</param>
 /// <param name="Expedited">True for the figures' "Expedited" TX-priority variants.</param>
-public sealed record FrameEffect(string Frame, bool Command, bool Pf, int? Nr, int? Ns, bool Expedited) : Effect
+/// <param name="Data">Payload label carried by an I frame (null for other frame types); lets a two-station model observe delivery order.</param>
+public sealed record FrameEffect(string Frame, bool Command, bool Pf, int? Nr, int? Ns, bool Expedited, string? Data = null) : Effect
 {
     public override string Render()
     {
@@ -34,14 +35,17 @@ public sealed record FrameEffect(string Frame, bool Command, bool Pf, int? Nr, i
         if (Ns is not null) sb.Append(" ns=").Append(Ns.Value.ToString(CultureInfo.InvariantCulture));
         if (Nr is not null) sb.Append(" nr=").Append(Nr.Value.ToString(CultureInfo.InvariantCulture));
         if (Expedited) sb.Append(" expedited");
+        if (Data is not null) sb.Append(" data=").Append(Data);
         return sb.ToString();
     }
 }
 
 /// <summary>A primitive handed to the upper layer (DL-* indication/confirm, DL-ERROR Indication (X), …). Verbatim canonical verb.</summary>
-public sealed record UpperEffect(string Primitive) : Effect
+/// <param name="Primitive">The canonical verb.</param>
+/// <param name="Detail">For <c>DL_DATA_indication</c>, the delivered payload label; null otherwise.</param>
+public sealed record UpperEffect(string Primitive, string? Detail = null) : Effect
 {
-    public override string Render() => $"dl {Primitive}";
+    public override string Render() => Detail is null ? $"dl {Primitive}" : $"dl {Primitive} [{Detail}]";
 }
 
 /// <summary>A Link Multiplexer primitive (LM_seize_request / LM_release_request / LM_data_request).</summary>
