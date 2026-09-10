@@ -37,6 +37,19 @@ public sealed record EventInput(
 public sealed record DispatchResult(string TransitionId, string NextState, IReadOnlyList<Effect> Effects);
 
 /// <summary>
+/// One I-frame queue entry. A fresh frame from layer 3 carries its payload
+/// label and no <see cref="OldNs"/>; a frame re-queued for retransmission
+/// ("Push Old I Frame onto Queue" / "Push Old I Frame N(r) on Queue")
+/// carries the N(s) it was originally sent with and the retained payload
+/// (null when the station holds no copy, i.e. the frame was never sent or
+/// has already been acknowledged).
+/// </summary>
+/// <param name="Label">Trace-visible label: the payload label for fresh data, <c>I(ns=n)</c> for a re-queued frame.</param>
+/// <param name="OldNs">Original N(s) of a re-queued frame; null for fresh data.</param>
+/// <param name="Data">Payload label carried on the wire (the retained copy for re-queued frames).</param>
+public sealed record QueueEntry(string Label, int? OldNs, string? Data);
+
+/// <summary>
 /// Reference interpreter for one Data Link machine instance over the JSON
 /// tables. Consumes an event + guard-atom valuations, selects the unique
 /// matching transition, executes its actions (including subroutine calls
@@ -95,12 +108,30 @@ public sealed class DataLinkMachine
     public TimerStatus T1 { get; private set; } = TimerStatus.Stopped;
     public TimerStatus T3 { get; private set; } = TimerStatus.Stopped;
 
-    private readonly List<string> _queue = new();
+    private readonly List<QueueEntry> _queue = new();
     private readonly Dictionary<int, string> _savedIFrames = new();
+    private readonly Dictionary<int, string> _retained = new();
     private readonly Dictionary<string, string> _symbolic = new(StringComparer.Ordinal);
 
-    /// <summary>The I-frame queue, head first. Entries are opaque payload labels.</summary>
-    public IReadOnlyList<string> Queue => _queue;
+    /// <summary>Transition id reported for the pinned old-frame re-emission path (see <see cref="RetransmitOldFrame"/>).</summary>
+    public const string RetransmitTransitionId = "pinned:retransmit_old_i_frame";
+
+    /// <summary>The I-frame queue, head first, as trace-visible labels (payload labels for fresh data, <c>I(ns=n)</c> for re-queued frames).</summary>
+    public IReadOnlyList<string> Queue => _queue.Select(e => e.Label).ToList();
+
+    /// <summary>The I-frame queue, head first, with the retransmission bookkeeping each entry carries.</summary>
+    public IReadOnlyList<QueueEntry> QueueEntries => _queue;
+
+    /// <summary>Out-of-sequence I frames saved for later in-order delivery (SREJ receive buffer), keyed by N(s).</summary>
+    public IReadOnlyDictionary<int, string> SavedFrames => _savedIFrames;
+
+    /// <summary>
+    /// Retained copies of the I frames this station has sent and not yet
+    /// seen acknowledged, keyed by N(s) - the send history that the
+    /// figures' "Backtrack" / "Push Old I Frame" delegate to the
+    /// implementation. Pruned to [V(a), V(s)) after every dispatch.
+    /// </summary>
+    public IReadOnlyDictionary<int, string> RetainedFrames => _retained;
 
     /// <summary>Symbolic registers (SRT, T1V, T2, NextT1): name → last assigned expression text.</summary>
     public IReadOnlyDictionary<string, string> Symbolic => _symbolic;
@@ -115,7 +146,8 @@ public sealed class DataLinkMachine
     private int? _pendingNs;
     private int? _x;
     private int _queueInsertIndex;
-    private string? _poppedData;
+    private QueueEntry? _poppedEntry;
+    private string? _deliverData;
 
     public DataLinkMachine(TableSet tables, string initialState)
     {
@@ -125,6 +157,32 @@ public sealed class DataLinkMachine
                 $"unknown initial state `{initialState}` — tables define: {string.Join(", ", tables.States.Keys.Order(StringComparer.Ordinal))}");
         State = initialState;
     }
+
+    private DataLinkMachine(DataLinkMachine other)
+    {
+        _tables = other._tables;
+        State = other.State;
+        Vs = other.Vs; Vr = other.Vr; Va = other.Va; Rc = other.Rc;
+        Modulo = other.Modulo; K = other.K; N1 = other.N1; N2 = other.N2;
+        Version22 = other.Version22; SrejEnabled = other.SrejEnabled; HalfDuplex = other.HalfDuplex;
+        LayerThreeInitiated = other.LayerThreeInitiated;
+        OwnReceiverBusy = other.OwnReceiverBusy; PeerReceiverBusy = other.PeerReceiverBusy;
+        RejectException = other.RejectException; SrejectException = other.SrejectException;
+        AcknowledgePending = other.AcknowledgePending;
+        T1 = other.T1; T3 = other.T3;
+        _queue = new List<QueueEntry>(other._queue);
+        _savedIFrames = new Dictionary<int, string>(other._savedIFrames);
+        _retained = new Dictionary<int, string>(other._retained);
+        _symbolic = new Dictionary<string, string>(other._symbolic, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Deep copy of the persistent machine state (variables, flags, timers,
+    /// queue, receive buffer, retained send history). Per-dispatch scratch is
+    /// not copied; it is reset at the start of every <see cref="Dispatch"/>.
+    /// Used by the two-station explorer to branch the state space.
+    /// </summary>
+    public DataLinkMachine Clone() => new(this);
 
     // ─── Seeding + assertion surface (string-keyed for the trace runner) ──
 
@@ -218,6 +276,8 @@ public sealed class DataLinkMachine
         _pendingNs = null;
         _x = null;
         _queueInsertIndex = 0;
+        _poppedEntry = null;
+        _deliverData = input.Data;
 
         if (input.Atoms is not null)
         {
@@ -231,7 +291,14 @@ public sealed class DataLinkMachine
         }
 
         ApplyTimerExpiry(input.Event);
-        _poppedData = PopQueueHead(input);
+        _poppedEntry = PopQueueHead(input);
+
+        // Pinned delegated semantics (docs/explorer.md): a re-queued old
+        // frame popping in an information-transfer state is re-emitted with
+        // its original N(s) rather than run through the table's fresh-frame
+        // pop path, which would renumber it from V(s).
+        if (_poppedEntry is { OldNs: not null } && State is "Connected" or "TimerRecovery")
+            return RetransmitOldFrame(_poppedEntry);
 
         var page = _tables.States[State];
         var candidates = page.Transitions.Where(t => string.Equals(t.On, input.Event, StringComparison.Ordinal)).ToList();
@@ -258,8 +325,53 @@ public sealed class DataLinkMachine
         if (!_tables.States.ContainsKey(transition.Next))
             throw new InvalidOperationException($"transition {transition.Id} targets unknown state `{transition.Next}`");
         State = transition.Next;
+        PruneRetained();
 
         return new DispatchResult(transition.Id, State, _effects);
+    }
+
+    /// <summary>
+    /// Pinned delegated semantics for retransmission (docs/explorer.md,
+    /// "Pinned delegated semantics" #1). The figures re-queue old frames
+    /// ("Push Old I Frame onto Queue" in figc4.7's Invoke_Retransmission,
+    /// "Push Old I Frame N(r) on Queue" on the SREJ paths) but the only pop
+    /// path stamps N(s) := V(s), which would renumber them. Every real
+    /// implementation instead retransmits the retained frame with its
+    /// original N(s) (packet.net ActionDispatcher.EmitOldIFrame; direwolf
+    /// ax25_link.c resend_for_srej / the retransmission loop; prose §6.4.7
+    /// and §6.4.8 "retransmits the I frames"). So: the retained copy goes
+    /// out with its original N(s), the current V(r) as N(r) and P=0; V(s) is
+    /// untouched; the peer-busy and window-full pop checks do not apply (the
+    /// frame is already inside the window); the frame carries an
+    /// acknowledgement, so Acknowledge Pending clears and, mirroring the
+    /// fresh-frame pop, T1 starts (stopping T3) if it is not already running.
+    /// </summary>
+    private DispatchResult RetransmitOldFrame(QueueEntry entry)
+    {
+        var ns = entry.OldNs!.Value;
+        if (entry.Data is null)
+            throw new InvalidOperationException(
+                $"retransmission of I(ns={Invariant(ns)}) requested, but this station holds no copy of that frame: " +
+                "it was never sent, or it has already been acknowledged (the reject that named it was incoherent)");
+
+        _effects.Add(new FrameEffect("I", Command: true, Pf: false, Nr: Vr, Ns: ns, Expedited: false, Data: entry.Data));
+        AcknowledgePending = false;
+        if (T1 != TimerStatus.Running)
+        {
+            T3 = TimerStatus.Stopped;
+            T1 = TimerStatus.Running;
+        }
+        PruneRetained();
+        return new DispatchResult(RetransmitTransitionId, State, _effects);
+    }
+
+    /// <summary>Keep only the retained frames still outstanding, i.e. with N(s) in [V(a), V(s)).</summary>
+    private void PruneRetained()
+    {
+        if (_retained.Count == 0) return;
+        var outstanding = Distance(Va, Vs);
+        foreach (var ns in _retained.Keys.Where(ns => Distance(Va, ns) >= outstanding).ToList())
+            _retained.Remove(ns);
     }
 
     /// <summary>
@@ -268,16 +380,16 @@ public sealed class DataLinkMachine
     /// match the step's <c>data</c> label if both are given); a pop against
     /// an empty queue is allowed so traces may model the queue abstractly.
     /// </summary>
-    private string? PopQueueHead(EventInput input)
+    private QueueEntry? PopQueueHead(EventInput input)
     {
         if (!string.Equals(input.Event, "I_frame_pops_off_queue", StringComparison.Ordinal) || _queue.Count == 0)
             return null;
 
         var head = _queue[0];
         _queue.RemoveAt(0);
-        if (input.Data is not null && !string.Equals(input.Data, head, StringComparison.Ordinal))
+        if (input.Data is not null && !string.Equals(input.Data, head.Label, StringComparison.Ordinal))
             throw new InvalidOperationException(
-                $"I_frame_pops_off_queue: the step says `{input.Data}` popped, but the queue head is `{head}`");
+                $"I_frame_pops_off_queue: the step says `{input.Data}` popped, but the queue head is `{head.Label}`");
         return head;
     }
 
@@ -480,7 +592,8 @@ public sealed class DataLinkMachine
         switch (action.Kind)
         {
             case "signal_upper":
-                _effects.Add(new UpperEffect(action.Verb));
+                _effects.Add(new UpperEffect(action.Verb,
+                    string.Equals(action.Verb, "DL_DATA_indication", StringComparison.Ordinal) ? _deliverData : null));
                 return;
             case "signal_lower":
                 ApplySignalLower(action.Verb);
@@ -526,8 +639,13 @@ public sealed class DataLinkMachine
             case "XID_command": EmitU("XID", command: true, PendingPBit(), expedited: false); return;
 
             case "I Command":
-                _effects.Add(new FrameEffect("I", Command: true, Pf: PendingPBit(), Nr: RequirePendingNr(verb), Ns: RequirePendingNs(verb), Expedited: false));
+            {
+                var ns = RequirePendingNs(verb);
+                var data = _poppedEntry?.Data ?? _event.Data ?? "frame";
+                _effects.Add(new FrameEffect("I", Command: true, Pf: PendingPBit(), Nr: RequirePendingNr(verb), Ns: ns, Expedited: false, Data: data));
+                _retained[ns] = data; // send history: the copy a later retransmission re-emits
                 return;
+            }
 
             case "RR":
             case "RR Response": EmitS("RR", command: false, PendingFBit(), verb); return;
@@ -573,32 +691,30 @@ public sealed class DataLinkMachine
             case "Push I Frame on I Queue":
             case "push_frame_on_queue":
             {
-                var label = _event.Data ?? _poppedData ?? "frame";
                 // Fresh data from layer 3 joins the FIFO tail (C4.3: "All
                 // queues are first-in, first-out"); a frame pushed back
                 // after popping (peer busy / window full) returns to the
-                // head so ordering is preserved.
+                // head, unchanged, so ordering is preserved.
+                var entry = _event.Data is null && _poppedEntry is not null
+                    ? _poppedEntry
+                    : new QueueEntry(_event.Data ?? "frame", OldNs: null, Data: _event.Data ?? "frame");
                 if (string.Equals(_event.Event, "DL_DATA_request", StringComparison.Ordinal))
-                    _queue.Add(label);
+                    _queue.Add(entry);
                 else
-                    QueueInsert(label);
-                _effects.Add(new InternalEffect(verb, label));
+                    QueueInsert(entry);
+                _effects.Add(new InternalEffect(verb, entry.Label));
                 return;
             }
             case "Push Old I Frame onto Queue":
             {
                 // Invoke_Retransmission loop body: the frame being re-queued is
                 // the one numbered by the current (rewound) V(s).
-                var label = $"I(ns={Invariant(Vs)})";
-                QueueInsert(label);
-                _effects.Add(new InternalEffect(verb, label));
+                QueueInsertOld(verb, Vs);
                 return;
             }
             case "Push Old I Frame N(r) on Queue":
             {
-                var label = $"I(ns={Invariant(RequireNr(verb))})";
-                QueueInsert(label);
-                _effects.Add(new InternalEffect(verb, label));
+                QueueInsertOld(verb, RequireNr(verb));
                 return;
             }
             case "MDL-NEGOTIATE Request":
@@ -615,7 +731,15 @@ public sealed class DataLinkMachine
     /// pushed-back popped frame pops next, and a retransmission batch pops in
     /// ascending N(s) order before any newer traffic.
     /// </summary>
-    private void QueueInsert(string label) => _queue.Insert(_queueInsertIndex++, label);
+    private void QueueInsert(QueueEntry entry) => _queue.Insert(_queueInsertIndex++, entry);
+
+    /// <summary>Re-queue the retained copy of I(ns) for retransmission (label <c>I(ns=n)</c>; payload null if no copy is held).</summary>
+    private void QueueInsertOld(string verb, int ns)
+    {
+        var label = $"I(ns={Invariant(ns)})";
+        QueueInsert(new QueueEntry(label, OldNs: ns, Data: _retained.TryGetValue(ns, out var data) ? data : null));
+        _effects.Add(new InternalEffect(verb, label));
+    }
 
     // ─── subroutines ──────────────────────────────────────────────────
 
@@ -763,8 +887,9 @@ public sealed class DataLinkMachine
                 return;
             }
             case "Retrieve Stored V(r) I Frame":
-                if (!_savedIFrames.Remove(Vr))
+                if (!_savedIFrames.Remove(Vr, out var stored))
                     throw new InvalidOperationException($"Retrieve Stored V(r) I Frame: no stored frame with ns={Invariant(Vr)}");
+                _deliverData = stored; // the next DL_DATA_indication delivers the retrieved frame
                 return;
             case "Discard Contents of I Frame":
             case "Discard I Frame":
