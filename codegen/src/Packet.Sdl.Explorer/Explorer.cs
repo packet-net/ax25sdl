@@ -209,7 +209,7 @@ public static class Explorer
                 {
                     var (trace, final) = Replay(stepper, PathTo(nodes, witness));
                     var v = new Violation(Invariants.SelectiveProgress, null,
-                        "timer-free progress: from this state quiescence is reachable only through a T1 expiry; no fault-free, timer-free path completes the recovery (data phase) or the connection (connect phase). " +
+                        "timer-free progress: from this state quiescence is reachable only through a timer expiry (T1, or T3 when enabled); no fault-free, timer-free path completes the recovery (data phase) or the connection (connect phase). " +
                         Describe(stepper, final));
                     return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null);
                 }
@@ -221,9 +221,9 @@ public static class Explorer
 
     /// <summary>
     /// The state to report for a liveness failure: the shallowest state that
-    /// cannot reach quiescence AND has no non-fault (and, when T1 is
-    /// excluded, non-T1) edge to a different state, i.e. where the model is
-    /// actually stuck; failing that (a livelock cycle), the shallowest
+    /// cannot reach quiescence AND has no non-fault (and, when timers are
+    /// excluded, non-timer) edge to a different state, i.e. where the model
+    /// is actually stuck; failing that (a livelock cycle), the shallowest
     /// non-reaching state. Returns -1 when every state can reach quiescence.
     /// The seed itself is usually non-reaching too, but the stuck state is
     /// the one that reads as a counterexample.
@@ -242,7 +242,7 @@ public static class Explorer
                 foreach (var (target, kind) in e)
                 {
                     if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
-                    if (excludeT1 && kind == MoveKind.T1Expiry) continue;
+                    if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                     if (target != i) { stuck = false; break; }
                 }
             }
@@ -251,6 +251,7 @@ public static class Explorer
         return first;
     }
 
+    /// <summary>Reverse reachability from the quiescent states over the non-fault edges; with <paramref name="excludeT1"/> the timer edges (T1, and T3 when enabled) are left out too.</summary>
     private static bool[] CanReachQuiescence(List<Node> nodes, bool excludeT1)
     {
         var reverse = new List<int>[nodes.Count];
@@ -262,7 +263,7 @@ public static class Explorer
             foreach (var (target, kind) in e)
             {
                 if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
-                if (excludeT1 && kind == MoveKind.T1Expiry) continue;
+                if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                 reverse[target].Add(i);
             }
         }

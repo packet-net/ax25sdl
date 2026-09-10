@@ -359,6 +359,274 @@ public class CalibrationTests(ITestOutputHelper output)
         }
     }
 
+    // ─── #43 fixed (the tables-43fixed fixture) and the busy family ───
+    //
+    // ax25spec#94 (V1): the busy family is unreachable on the current tables
+    // because #43 makes a station unable to become busy, so it is explored on
+    // a hand-patched copy (Fixtures.Fixed43Dir, README in the directory) with
+    // the #43 branch swap and the H3 N(r) := V(r) box. The calibration gate
+    // plants three mutations in copies of that fixture and shows each is
+    // caught; the #43 rows above must flip clean on it.
+
+    /// <summary>The busy scenario: A sends 2, B's layer 3 turns flow off after its first delivery; busy periods bounded at 2 polls, T3 on.</summary>
+    private static ExplorerOptions Busy(string tables) => new()
+    {
+        TablesDir = tables, FramesAb = 2, FramesBa = 0, K = 4, Budget = 0, FlowControl = FlowControlAt.B, BusyPolls = 2, T3 = true,
+    };
+
+    /// <summary>Mutation 1: "Set Own Receiver Busy" removed from the DL-FLOW-OFF busy arm (figc4.4 and figc4.5).</summary>
+    private static string MutantNoSetOwnBusy => Fixtures.Mutant(Fixtures.Fixed43Dir, "43fixed-no-set-own-busy", (file, root) =>
+    {
+        if (file is not ("connected.g.json" or "timer_recovery.g.json")) return;
+        Fixtures.RemoveAction(Fixtures.Transition(root, "t05_dl_flow_off_request_yes"), "Set Own Receiver Busy");
+    });
+
+    /// <summary>Mutation 2: Transmit_Enquiry's busy path sends RR Command instead of RNR Command.</summary>
+    private static string MutantRrInBusyEnquiry => Fixtures.Mutant(Fixtures.Fixed43Dir, "43fixed-rr-in-transmit-enquiry", (file, root) =>
+    {
+        if (file != "subroutines.g.json") return;
+        Fixtures.ReplaceAction(Fixtures.SubroutinePath(root, "Transmit_Enquiry", "t02_transmit_enquiry_yes"), "RNR Command", "RR Command");
+    });
+
+    /// <summary>Mutation 3 (the third busy invariant's teeth): the pop path's "peer receiver busy? yes" arm sends the frame instead of pushing it back.</summary>
+    private static string MutantPopIgnoresPeerBusy => Fixtures.Mutant(Fixtures.Fixed43Dir, "43fixed-pop-ignores-peer-busy", (file, root) =>
+    {
+        if (file is not ("connected.g.json" or "timer_recovery.g.json")) return;
+        Fixtures.CopyActions(from: Fixtures.Transition(root, "t03_i_frame_pops_off_queue_no_no_yes"), to: Fixtures.Transition(root, "t03_i_frame_pops_off_queue_yes"));
+    });
+
+    [Fact]
+    public void Defect43_Fixed_Fixture_The_Flow_Off_Scenario_Is_Clean()
+    {
+        // The #43 row flipped: on the fixed fixture B becomes busy, announces
+        // it, holds a1 back and delivers it after FLOW_ON; every invariant
+        // (the two flow checks and the three busy checks included) is quiet.
+        // The busy period is bounded to 2 polls; unbounded, what remains is
+        // hypothesis H4 (next test), not #43.
+        Run(Scenario43 with { TablesDir = Fixtures.Fixed43Dir, BusyPolls = 2 }).Outcome.Should().Be(Outcome.NoViolation);
+        Run(Busy(Fixtures.Fixed43Dir)).Outcome.Should().Be(Outcome.NoViolation);
+        Run(Busy(Fixtures.Fixed43Dir) with { FramesAb = 3, K = 2 }).Outcome.Should().Be(Outcome.NoViolation, "a window-full pop and a peer-busy pop coexist");
+    }
+
+    [Fact]
+    public void Defect43_Fixed_Fixture_The_Busy_Arms_Announce_Busy_With_N_r_Equal_To_V_r()
+    {
+        // The H3 twin of Defect43_Note_...: with the staging box in place the
+        // DL-FLOW-OFF arm sets busy and sends RNR with N(r) = V(r); DL-FLOW-ON
+        // clears busy and sends RR Command with N(r) = V(r). Both pages.
+        var tables = Fixtures.Tables(Fixtures.Fixed43Dir);
+        foreach (var state in new[] { "Connected", "TimerRecovery" })
+        {
+            var m = new DataLinkMachine(tables, state);
+            m.SetVariable("vr", "3");
+            m.SetTimer("t1", TimerStatus.Running);
+
+            var off = m.Dispatch(new EventInput("DL_FLOW_OFF_request"));
+            off.TransitionId.Should().Be("t05_dl_flow_off_request_yes", $"{state}: the swapped guard puts the busy chain on the not-busy arm");
+            m.OwnReceiverBusy.Should().BeTrue();
+            off.Effects.Should().ContainSingle(e => e is FrameEffect)
+                .Which.Should().Match<FrameEffect>(f => f.Frame == "RNR" && !f.Command && !f.Pf && f.Nr == 3);
+
+            var on = m.Dispatch(new EventInput("DL_FLOW_ON_request"));
+            on.TransitionId.Should().Be("t06_dl_flow_on_request_yes_yes");
+            m.OwnReceiverBusy.Should().BeFalse();
+            on.Effects.Should().ContainSingle(e => e is FrameEffect)
+                .Which.Should().Match<FrameEffect>(f => f.Frame == "RR" && f.Command && !f.Pf && f.Nr == 3);
+        }
+    }
+
+    [Fact]
+    public void Calibration_Mutation_Removing_Set_Own_Receiver_Busy_Is_Caught_By_Busy_Tracks_Flow()
+    {
+        // The RNR still goes out (with N(r) = V(r)), but the station is not
+        // busy, so the next frame is delivered while flow is off: the same
+        // two symptoms as #43 on the current tables, in the same order.
+        var result = Run(Busy(MutantNoSetOwnBusy));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyTracksFlow);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t05_dl_flow_off_request_yes");
+        result.Trace[^1].Effects.Should().Contain("frame RNR response pf=0 nr=1", "the announcement is sent, the condition is not entered");
+        result.CounterexampleLength.Should().Be(3);
+
+        var delivery = Run(Busy(MutantNoSetOwnBusy) with { Invariants = Invariants.Default & ~Invariants.BusyTracksFlow });
+        delivery.Outcome.Should().Be(Outcome.Violation);
+        delivery.Violation!.Kind.Should().Be(Invariants.FlowOffDelivery);
+        delivery.Violation.Message.Should().Contain("delivered `a1` upward while its layer 3 has flow off");
+        delivery.CounterexampleLength.Should().Be(5);
+
+        Run(Busy(MutantNoSetOwnBusy) with { Invariants = Invariants.Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery) })
+            .Outcome.Should().Be(Outcome.NoViolation, "behind the two flow checks the mutation is invisible: the data still flows");
+    }
+
+    /// <summary>B has data of its own, so its T1 runs and expires while it is busy; one drop lets the poll be needed.</summary>
+    private static ExplorerOptions BusyPolled(string tables) => Busy(tables) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop };
+
+    [Fact]
+    public void Calibration_Mutation_RR_In_Transmit_Enquiry_Busy_Path_Is_Caught_By_Busy_Rnr()
+    {
+        // A busy station's timer poll must be RNR P=1; sent as RR P=1 it
+        // clears the peer's busy condition and invites I frames the busy
+        // station will discard.
+        var result = Run(BusyPolled(MutantRrInBusyEnquiry));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyRnr);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Violation.Message.Should().Contain("sent RR cmd P=1 nr=1 while its own receiver is busy");
+        result.Trace[^1].Transition.Should().BeOneOf("t12_t1_expiry", "t13_t3_expiry", "t21_t1_expiry_no");
+        result.Trace[^1].SummaryB.Should().Contain("own_busy");
+
+        // With the check off the mutation's harm is airtime, not order: the
+        // peer sends a1 into the busy receiver twice (both discarded), the
+        // busy polls consume the retry budget and the run ends in #9's
+        // teardown (DL-ERROR T with everything acknowledged).
+        var behind = Run(BusyPolled(MutantRrInBusyEnquiry) with { Invariants = Invariants.Default & ~Invariants.BusyRnr });
+        behind.Outcome.Should().Be(Outcome.Violation);
+        behind.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        behind.Trace.Count(s => s.Transition == "t26_i_received_yes_yes_yes_yes_no").Should().BeGreaterThanOrEqualTo(2, "I frames sent into a busy receiver are discarded");
+        behind.Trace[^2].Transition.Should().Be("t21_t1_expiry_yes_yes_no");
+        behind.Trace[^2].Effects.Should().Contain("dl DL-ERROR Indication (T)");
+    }
+
+    [Fact]
+    public void Calibration_Mutation_Pop_Ignoring_Peer_Busy_Is_Caught_By_Peer_Busy_Holds()
+    {
+        var scenario = Busy(Fixtures.Fixed43Dir) with { FramesAb = 3 };
+        var result = Run(scenario with { TablesDir = MutantPopIgnoresPeerBusy });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.PeerBusyHolds);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Violation.Message.Should().Contain("sent I cmd P=0 ns=1 nr=0 [a1] while its peer-receiver-busy condition is set");
+        result.CounterexampleLength.Should().Be(5);
+
+        Run(scenario with { TablesDir = MutantPopIgnoresPeerBusy, Invariants = Invariants.Default & ~Invariants.PeerBusyHolds })
+            .Outcome.Should().Be(Outcome.NoViolation, "the busy receiver discards what it is sent; the harm is airtime, which no other invariant sees");
+        Run(scenario).Outcome.Should().Be(Outcome.NoViolation, "the fixed fixture holds the frames and resumes after RR");
+    }
+
+    // ─── Novel hypothesis H4 (docs/explorer.md): answered RNR polls count against N2 ──
+
+    [Fact]
+    public void HypothesisH4_Polling_A_Busy_Peer_With_Data_Outstanding_Tears_The_Link_Down_After_N2_Answered_Polls()
+    {
+        // No faults. B turns flow off after a0 and stays busy; A's a1 is
+        // discarded. Every T1 poll is answered with RNR F=1, and because
+        // V(s) != N(r) figc4.5 takes the Invoke Retransmission arm (Start T1,
+        // RC untouched) instead of the Start T3 / RC := 0 one. After N2
+        // answered polls the T1 expiry tears the link down with DL-ERROR (I)
+        // while the peer is still busy. §6.4.9 says an RNR answering the poll
+        // stops T1 and starts T3; Linux resets n2count on any F=1 answer.
+        var result = Run(Scenario43 with { TablesDir = Fixtures.Fixed43Dir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace.Count(s => s.Transition == "t19_rnr_received_yes_yes_no").Should().Be(4, "four answered polls, each re-queueing a1 and restarting T1 with RC untouched");
+        result.Trace.Should().NotContain(s => s.Transition == "pinned:retransmit_old_i_frame", "the re-queued frame is held while the peer is busy");
+        result.Trace[^2].Transition.Should().Be("t21_t1_expiry_yes_no");
+        result.Trace[^2].Effects.Should().Contain("dl DL-ERROR Indication (I)");
+        result.Trace[^1].SummaryB.Should().StartWith("Disconnected").And.Contain("own_busy");
+        result.CounterexampleLength.Should().Be(21);
+
+        Run(Scenario43 with { TablesDir = Fixtures.Fixed43Dir, BusyPolls = 3 }).Outcome.Should().Be(Outcome.NoViolation, "a busy period of N2-1 answered polls is survived");
+        // N2 answered polls leave RC at N2: the busy period ends, but the
+        // next T1 expiry (after everything is acknowledged) tears down with
+        // DL-ERROR (T), which is #9 stacked on H4 (33 steps, verified by hand).
+        var atN2 = Run(Scenario43 with { TablesDir = Fixtures.Fixed43Dir, BusyPolls = 4 });
+        atN2.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        atN2.Trace[^2].Transition.Should().Be("t21_t1_expiry_yes_yes_no", "#9: RC was never reset by the progress after FLOW_ON");
+        Run(Scenario43 with { TablesDir = Fixtures.Fixed43Dir, BusyPolls = 5 }).CounterexampleLength.Should().Be(21, "the (N2+1)th poll is the H4 teardown");
+    }
+
+    // ─── Known signatures the busy family reaches with fewer faults ───
+
+    [Fact]
+    public void BusyFamily_H1_Is_Reached_With_No_Channel_Fault_At_All()
+    {
+        // Both stations turn flow off once; A's poll into busy B is answered
+        // RNR F=1 with data outstanding, so A is in TimerRecovery on the
+        // retransmission arm; B's busy-clearing RR is a P=0 command, which
+        // figc4.5 does not leave TimerRecovery on; the acknowledgement that
+        // then arrives on an I frame stops T1 with no exit (H1, ax25spec#91).
+        // Both ends end up there. Zero faults; the base grid needed one.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.Fixed43Dir, FramesAb = 2, FramesBa = 2, K = 2, Budget = 0, FlowControl = FlowControlAt.Both, BusyPolls = 2, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery vs=2 va=2").And.Contain("t1=stopped t3=running");
+        result.Trace[^1].SummaryB.Should().StartWith("TimerRecovery vs=2 va=2").And.Contain("t1=stopped t3=running");
+        result.Trace.Should().Contain(s => s.Transition == "t18_rr_received_no_no_yes", "the busy-clearing RR command P=0 is absorbed inside TimerRecovery");
+        result.CounterexampleLength.Should().Be(34);
+    }
+
+    [Fact]
+    public void BusyFamily_Defect47_Is_Reached_With_No_Channel_Fault_And_At_K4()
+    {
+        // The busy discard makes the gap SREJ needs, A's poll into busy B
+        // puts A in TimerRecovery, and the figc4.5 drain loop then steps V(r)
+        // back after delivering the stored frame, so the go-back-N copy of b1
+        // is accepted in sequence again. Zero faults, k = 4; the base grid
+        // needed k = 2 and two or three drops.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.Fixed43Dir, FramesAb = 2, FramesBa = 3, K = 4, Srej = true, Budget = 0, FlowControl = FlowControlAt.Both, BusyPolls = 2, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Delivery);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Violation.Message.Should().Contain("delivered `b1` upward").And.Contain("duplicate");
+        result.Trace.Should().Contain(s => s.Transition == "t22_i_received_yes_yes_yes_no_yes_no_yes"
+            && s.Effects.Contains("dl DL_DATA_indication [b2]"), "the drain delivers the stored frame and steps V(r) back");
+        result.CounterexampleLength.Should().Be(29);
+    }
+
+    [Fact]
+    public void BusyFamily_Defect42_Is_Reached_With_One_Duplicate_Instead_Of_Two_Drops()
+    {
+        // A discards b1 while busy; after FLOW_ON b2 arrives out of sequence
+        // and draws SREJ nr=1; a duplicate of b2 then takes the #42 arm and
+        // SREJs the frame A already holds.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.Fixed43Dir, FramesAb = 0, FramesBa = 3, K = 2, Srej = true, Budget = 1, Faults = FaultKinds.Duplicate,
+            FlowControl = FlowControlAt.Both, BusyPolls = 2, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.RejectCoherence);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Violation.Message.Should().Contain("SREJ rsp F=0 nr=2").And.Contain("already holds I(ns=2)");
+        result.Trace.Should().Contain(s => s.Transition == "t26_i_received_yes_yes_yes_yes_no", "the busy discard is the gap");
+        result.CounterexampleLength.Should().Be(11);
+    }
+
+    [Fact]
+    public void BusyFamily_A_Lost_Busy_Clearing_RR_Is_Recovered_Only_By_T3()
+    {
+        // The RR that lifts a busy condition is a P=0 command sent once. When
+        // it is lost and the peer has nothing outstanding (T1 stopped), only a
+        // T3 poll can discover the peer is ready (§6.4.9). Without the T3
+        // move the model deadlocks with A holding a1 behind a stale busy
+        // flag; with it the run reaches H1 instead (a lost T3 poll), and
+        // counting TimerRecovery as quiescent makes it clean.
+        var scenario = new ExplorerOptions
+        {
+            TablesDir = Fixtures.Fixed43Dir, FramesAb = 2, FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, FlowControl = FlowControlAt.Both, BusyPolls = 2,
+        };
+        var withoutT3 = Run(scenario);
+        withoutT3.Outcome.Should().Be(Outcome.Violation);
+        withoutT3.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        withoutT3.Trace.Should().Contain(s => s.Action.StartsWith("DROPS RR cmd P=0", StringComparison.Ordinal));
+        withoutT3.Trace[^1].SummaryA.Should().StartWith("Connected").And.Contain("t1=stopped t3=running").And.Contain("peer_busy").And.Contain("q=[a1]");
+
+        var withT3 = Run(scenario with { T3 = true });
+        withT3.Outcome.Should().Be(Outcome.Violation);
+        withT3.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        withT3.Trace.Should().Contain(s => s.Transition == "t13_t3_expiry");
+        withT3.Trace.Should().Contain(s => s.Action.StartsWith("DROPS RNR cmd P=1", StringComparison.Ordinal) || s.Action.StartsWith("DROPS RR cmd P=1", StringComparison.Ordinal));
+
+        Run(scenario with { T3 = true, TimerRecoveryIsQuiescent = true }).Outcome.Should().Be(Outcome.NoViolation);
+    }
+
     // ─── #45 / #48: the v2.0 stub peer in the connect phase ───────────
 
     private static ExplorerOptions V20(SeedKind seed, PeerKind peer, bool timerFree) => new()

@@ -100,6 +100,41 @@ public class InterpreterTests
     }
 
     [Fact]
+    public void A_Requeued_Old_Frame_Is_Held_While_The_Peer_Is_Busy_And_Sent_Once_It_Clears()
+    {
+        // Pinned delegated semantic 1 (docs/explorer.md): a re-queued old
+        // frame is re-emitted with its original N(s), but the pop path's
+        // first decision, "peer receiver busy? yes: push I frame on I queue",
+        // still applies to it (§6.4.9: a station that has received RNR stops
+        // transmitting I frames until the busy condition is cleared).
+        var machine = new DataLinkMachine(Tables.Value, "Connected");
+        machine.SetTimer("t3", TimerStatus.Running);
+        machine.Dispatch(new EventInput("DL_DATA_request", Data: "a0"));
+        machine.Dispatch(new EventInput("DL_DATA_request", Data: "a1"));
+        machine.Dispatch(new EventInput("I_frame_pops_off_queue"));
+        machine.Dispatch(new EventInput("I_frame_pops_off_queue"));
+        machine.Dispatch(new EventInput("REJ_received", Pf: false, Command: false, Nr: 0)); // re-queues I(0), I(1); clears peer busy
+        machine.Dispatch(new EventInput("RNR_received", Pf: false, Command: false, Nr: 0));
+        machine.PeerReceiverBusy.Should().BeTrue();
+        machine.Queue.Should().Equal("I(ns=0)", "I(ns=1)");
+
+        var held = machine.Dispatch(new EventInput("I_frame_pops_off_queue"));
+
+        held.TransitionId.Should().Be(DataLinkMachine.HoldTransitionId);
+        held.Effects.Should().NotContain(e => e is FrameEffect, "nothing goes out to a busy peer");
+        machine.Queue.Should().Equal(new[] { "I(ns=0)", "I(ns=1)" }, "the frame is back at the head, order preserved");
+        machine.Vs.Should().Be(2);
+
+        machine.Dispatch(new EventInput("RR_received", Pf: false, Command: false, Nr: 0));
+        machine.PeerReceiverBusy.Should().BeFalse();
+        var sent = machine.Dispatch(new EventInput("I_frame_pops_off_queue"));
+        sent.TransitionId.Should().Be(DataLinkMachine.RetransmitTransitionId);
+        sent.Effects.Should().ContainSingle(e => e is FrameEffect)
+            .Which.Should().Match<FrameEffect>(f => f.Frame == "I" && f.Ns == 0 && f.Data == "a0");
+        machine.Queue.Should().Equal("I(ns=1)");
+    }
+
+    [Fact]
     public void Environment_May_Only_Supply_Declared_Environment_Atoms()
     {
         var machine = new DataLinkMachine(Tables.Value, "Disconnected");
