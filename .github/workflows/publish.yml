@@ -57,7 +57,17 @@ jobs:
   publish-npm:
     name: publish ax25sdl to npmjs.com
     needs: resolve-version
-    runs-on: [self-hosted, Linux, X64]
+    # DELIBERATE EXCEPTION to this repo's self-hosted-only rule, and the only
+    # one. npm REFUSES a provenance attestation built anywhere else:
+    # "Unsupported GitHub Actions runner environment: self-hosted. Only
+    # github-hosted runners are supported when publishing with provenance"
+    # (E422 on PUT, seen on the first 0.11.0 attempt). Trusted publishing
+    # generates provenance by default, so the choice is a hosted runner or no
+    # attestation, and a signed link from tarball to commit is worth more than
+    # the couple of minutes this small job costs. Every other job in this repo
+    # stays on [self-hosted, Linux, X64]; this is not a precedent for the
+    # drift/build jobs, which are the ones that would actually burn minutes.
+    runs-on: ubuntu-latest
     # Trusted publishing (OIDC), configured at the npmjs end against
     # packet-net/ax25sdl + this workflow file. The runner mints a short-lived
     # id-token instead of presenting a long-lived NPM_TOKEN, so there is no
