@@ -91,7 +91,16 @@ public sealed class Stepper
     {
         _o = options ?? throw new ArgumentNullException(nameof(options));
         _tables = tables ?? throw new ArgumentNullException(nameof(tables));
-        if (_o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
+        if (_o.Modulo is not (8 or 128)) throw new ArgumentException("modulo must be 8 or 128", nameof(options));
+        if (_o.K < 1 || _o.K >= _o.Modulo) throw new ArgumentException($"k must be 1..{Inv(_o.Modulo - 1)} at modulo {Inv(_o.Modulo)}", nameof(options));
+        if (_o.Modulo != 8 && _o.Seed != SeedKind.Connected)
+            throw new ArgumentException("--modulo seeds the Connected state only (the connect-phase seeds use --mod128 for A; the modulo-128 establishment route is blocked by packethacking/ax25spec#54)", nameof(options));
+        if (_o.Modulo128A && _o.Seed == SeedKind.Connected)
+            throw new ArgumentException("--mod128 is a connect-phase option (it seeds A alone); use --modulo 128 to seed a Connected link at modulo 128 on both sides", nameof(options));
+        if (_o.SequenceOffset < 0 || _o.SequenceOffset >= _o.Modulo)
+            throw new ArgumentException($"the sequence offset must be 0..{Inv(_o.Modulo - 1)} at modulo {Inv(_o.Modulo)}", nameof(options));
+        if (_o.SequenceOffset != 0 && _o.Seed != SeedKind.Connected)
+            throw new ArgumentException("the sequence offset applies to the Connected seed only (establishment zeroes the variables)", nameof(options));
         if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0)
             throw new ArgumentException("the Disconnected seed supports A-to-B data only (B has no DL_DATA_request arm while Disconnected)", nameof(options));
         if (_o.Seed == SeedKind.AwaitingV22Connection && (_o.FramesAb > 0 || _o.FramesBa > 0))
@@ -166,8 +175,18 @@ public sealed class Stepper
     private DataLinkMachine NewMachine(Station station, string initialState)
     {
         var m = new DataLinkMachine(_tables, initialState);
-        m.SetVariable("modulo", _o.Modulo128A && station == Station.A ? "128" : "8");
+        m.SetVariable("modulo", _o.Modulo128A && station == Station.A ? "128" : Inv(_o.Modulo));
         m.SetVariable("k", Inv(_o.K));
+        if (initialState == "Connected" && _o.SequenceOffset != 0)
+        {
+            // A link that has already carried SequenceOffset frames each way:
+            // nothing outstanding, nothing pending, the counters just start
+            // near the wrap. The absolute delivery/acknowledgement counters
+            // start at 0 regardless, so the invariants see the same exchange.
+            m.SetVariable("vs", Inv(_o.SequenceOffset));
+            m.SetVariable("va", Inv(_o.SequenceOffset));
+            m.SetVariable("vr", Inv(_o.SequenceOffset));
+        }
         m.SetVariable("n2", Inv(_o.N2));
         // A link actually using SREJ has negotiated v2.2 (§4.3.2.4, §6.3.2).
         m.SetVariable("srej_enabled", _o.Srej ? "true" : "false");
@@ -433,7 +452,7 @@ public sealed class Stepper
     /// The stub is the environment, so no invariant is checked here; a
     /// frame outside its rule set is a MachineError so the gap is visible.
     /// </summary>
-    private static StepOutcome InjectStub(SystemState s, Frame frame, string action, IReadOnlyList<Frame> newIncoming, int newBudget, int number)
+    private StepOutcome InjectStub(SystemState s, Frame frame, string action, IReadOnlyList<Frame> newIncoming, int newBudget, int number)
     {
         var stub = s.StubPeer!;
         Violation? violation = null;
@@ -457,6 +476,8 @@ public sealed class Stepper
         }
 
         var next = s with { StubPeer = stub, ToB = newIncoming, ToA = outgoing, Budget = newBudget };
+        if (violation is null && On(Invariants.ModulusCoherence))
+            violation = ModulusAgreementCheck(next);
         var record = new StepRecord(number, "B", action, rule, effectsText, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
         return new StepOutcome(next, record, violation);
     }
@@ -519,6 +540,8 @@ public sealed class Stepper
                         outgoing.Add(frame);
                         if (violation is null && frame.IsReject && On(Invariants.RejectCoherence))
                             violation = EmitterRejectCheck(station, m, frame);
+                        if (violation is null && On(Invariants.ModulusCoherence))
+                            violation = EstablishmentFrameCheck(station, m, frame);
                         break;
                     }
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
@@ -610,6 +633,9 @@ public sealed class Stepper
             FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
         };
 
+        if (violation is null && On(Invariants.ModulusCoherence))
+            violation = ModulusAgreementCheck(next);
+
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
             SummaryOf(next, Station.A), SummaryOf(next, Station.B));
         return new StepOutcome(next, record, violation);
@@ -669,6 +695,41 @@ public sealed class Stepper
             : "{" + string.Join(",", Enumerable.Range(0, outstanding).Select(i => Inv((m.Va + i) % m.Modulo))) + "}";
         return new Violation(Invariants.RejectCoherence, station,
             $"reject coherence (receiver): station {station} received {kind} nr={Inv(x)} but its outstanding frames are [V(a)={Inv(m.Va)}, V(s)={Inv(m.Vs)}) = {set}: the peer asked for a frame {station} never sent, or one already acknowledged");
+    }
+
+    /// <summary>
+    /// A SABM places the link in modulo 8 (§4.3.3.1) and a SABME in modulo
+    /// 128 (§4.3.3.2), so the frame a station sends to establish must match
+    /// the modulus it is operating at; the figures guard the choice with
+    /// <c>mod_128</c> in Establish_Data_Link and this is what a mutation of
+    /// that guard shows up as.
+    /// </summary>
+    private static Violation? EstablishmentFrameCheck(Station station, DataLinkMachine m, Frame frame)
+    {
+        var required = frame.Type switch { "SABM" => 8, "SABME" => 128, _ => 0 };
+        if (required == 0 || m.Modulo == required) return null;
+        return new Violation(Invariants.ModulusCoherence, station,
+            $"modulus coherence (emitter): station {station} sent {frame.Render()} while operating at modulo {Inv(m.Modulo)}; {frame.Type} establishes modulo {Inv(required)} (§4.3.3.{(required == 8 ? "1" : "2")}), so the station is asking its peer for a modulus it is not itself using");
+    }
+
+    /// <summary>Once both stations are Connected they must be at the same modulus (the stub peer connects at modulo 8).</summary>
+    private static Violation? ModulusAgreementCheck(SystemState s)
+    {
+        if (s.A.State != "Connected") return null;
+        int moduloB;
+        if (s.StubPeer is not null)
+        {
+            if (!s.StubPeer.Connected) return null;
+            moduloB = 8;
+        }
+        else
+        {
+            if (s.B.State != "Connected") return null;
+            moduloB = s.B.Modulo;
+        }
+        if (s.A.Modulo == moduloB) return null;
+        return new Violation(Invariants.ModulusCoherence, null,
+            $"modulus coherence (agreement): both stations are Connected but A is at modulo {Inv(s.A.Modulo)} and B at modulo {Inv(moduloB)}: the link has no agreed sequence-number modulus (SABM establishes modulo 8, SABME modulo 128: §4.3.3.1, §4.3.3.2)");
     }
 
     private static int Distance(int from, int to, int modulo) => ((to - from) % modulo + modulo) % modulo;

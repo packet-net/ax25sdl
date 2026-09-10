@@ -108,7 +108,8 @@ public sealed record SystemState
             .Append(" vs=").Append(Inv(m.Vs)).Append(" va=").Append(Inv(m.Va)).Append(" vr=").Append(Inv(m.Vr))
             .Append(" rc=").Append(Inv(m.Rc))
             .Append(" t1=").Append(m.T1.ToString().ToLowerInvariant())
-            .Append(" t3=").Append(m.T3.ToString().ToLowerInvariant());
+            .Append(" t3=").Append(m.T3.ToString().ToLowerInvariant())
+            .Append(" mod=").Append(Inv(m.Modulo));
         if (m.RejectException) sb.Append(" rej_exc");
         if (m.SrejectException > 0) sb.Append(" srej_exc=").Append(Inv(m.SrejectException));
         if (m.AcknowledgePending) sb.Append(" ack_pending");

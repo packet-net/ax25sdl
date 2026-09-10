@@ -17,6 +17,12 @@ internal static class Fixtures
     /// <summary>packethacking/ax25spec fb727db: SREJ go-back-N in figc4.5 (pre #38) and no #40 guard.</summary>
     public static string Pre38Dir => Path.Combine(RepoRoot.Value, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38");
 
+    /// <summary>Mutation of the current tables: figc4.4's RR-received arm without the V(a) &lt;= N(r) &lt;= V(s) decision (the #95 calibration gate; see its README).</summary>
+    public static string MutRrNrUncheckedDir => Path.Combine(RepoRoot.Value, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-mut-rr-nr-unchecked");
+
+    /// <summary>Mutation of the current tables: Establish_Data_Link with SABM and SABME swapped (the #96 calibration gate; see its README).</summary>
+    public static string MutEstablishSwappedDir => Path.Combine(RepoRoot.Value, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-mut-establish-swapped");
+
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);
 
     public static TableSet Tables(string dir)

@@ -1,0 +1,1983 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "data_link",
+  "state": "Connected",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc4.4",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_dl_disconnect_request",
+      "from": "Connected",
+      "on": "DL_DISCONNECT_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DISC (P = 1)",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingRelease",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_data_request",
+      "from": "Connected",
+      "on": "DL_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Push on I Frame Queue (note: word order?)",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_i_frame_pops_off_queue_yes",
+      "from": "Connected",
+      "on": "I_frame_pops_off_queue",
+      "guard": "peer_receiver_busy",
+      "actions": [
+        {
+          "verb": "Push on I Frame Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_i_frame_pops_off_queue_no_yes",
+      "from": "Connected",
+      "on": "I_frame_pops_off_queue",
+      "guard": "not peer_receiver_busy and vs_eq_va_plus_k",
+      "actions": [
+        {
+          "verb": "Push on I Frame Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_i_frame_pops_off_queue_no_no_no",
+      "from": "Connected",
+      "on": "I_frame_pops_off_queue",
+      "guard": "not peer_receiver_busy and not vs_eq_va_plus_k and not T1_running",
+      "actions": [
+        {
+          "verb": "N(s) := V(s)",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "P := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "I Command",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "V(s) := V(s) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_i_frame_pops_off_queue_no_no_yes",
+      "from": "Connected",
+      "on": "I_frame_pops_off_queue",
+      "guard": "not peer_receiver_busy and not vs_eq_va_plus_k and T1_running",
+      "actions": [
+        {
+          "verb": "N(s) := V(s)",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "P := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "I Command",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "V(s) := V(s) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_dl_unit_data_request",
+      "from": "Connected",
+      "on": "DL_UNIT_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "UI Command",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_dl_flow_off_request_yes",
+      "from": "Connected",
+      "on": "DL_FLOW_OFF_request",
+      "guard": "own_receiver_busy",
+      "actions": [
+        {
+          "verb": "Set Own Receiver Busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "RNR Response",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_dl_flow_off_request_no",
+      "from": "Connected",
+      "on": "DL_FLOW_OFF_request",
+      "guard": "not own_receiver_busy",
+      "actions": [],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_dl_flow_on_request_no",
+      "from": "Connected",
+      "on": "DL_FLOW_ON_request",
+      "guard": "not own_receiver_busy",
+      "actions": [],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_dl_flow_on_request_yes_yes",
+      "from": "Connected",
+      "on": "DL_FLOW_ON_request",
+      "guard": "own_receiver_busy and T1_running",
+      "actions": [
+        {
+          "verb": "Clear Own Receiver Busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR Command",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_dl_flow_on_request_yes_no",
+      "from": "Connected",
+      "on": "DL_FLOW_ON_request",
+      "guard": "own_receiver_busy and not T1_running",
+      "actions": [
+        {
+          "verb": "Clear Own Receiver Busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR Command",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_dl_connect_request_no",
+      "from": "Connected",
+      "on": "DL_CONNECT_request",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_dl_connect_request_yes",
+      "from": "Connected",
+      "on": "DL_CONNECT_request",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t08_all_other_primitives__from_upper_layer",
+      "from": "Connected",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t09_control_field_error_no",
+      "from": "Connected",
+      "on": "control_field_error",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (L)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t09_control_field_error_yes",
+      "from": "Connected",
+      "on": "control_field_error",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (L)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t10_info_not_permitted_in_frame_no",
+      "from": "Connected",
+      "on": "info_not_permitted_in_frame",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (M)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t10_info_not_permitted_in_frame_yes",
+      "from": "Connected",
+      "on": "info_not_permitted_in_frame",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (M)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t11_u_or_s_frame_length_error_no",
+      "from": "Connected",
+      "on": "u_or_s_frame_length_error",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (N)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t11_u_or_s_frame_length_error_yes",
+      "from": "Connected",
+      "on": "u_or_s_frame_length_error",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (N)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t12_t1_expiry",
+      "from": "Connected",
+      "on": "T1_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "RC := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Transmit Enquery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "TimerRecovery",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t13_t3_expiry",
+      "from": "Connected",
+      "on": "T3_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "RC := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Transmit Enquery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "TimerRecovery",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_sabm_received_yes",
+      "from": "Connected",
+      "on": "SABM_received",
+      "guard": "vs_eq_va",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "set_version_2_0",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DL-ERROR Indication (F)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_sabm_received_no",
+      "from": "Connected",
+      "on": "SABM_received",
+      "guard": "not vs_eq_va",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "set_version_2_0",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DL-ERROR Indication (F)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_CONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t15_sabme_received_yes",
+      "from": "Connected",
+      "on": "SABME_received",
+      "guard": "vs_eq_va",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Version 2.2",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DL-ERROR Indication (F)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t15_sabme_received_no",
+      "from": "Connected",
+      "on": "SABME_received",
+      "guard": "not vs_eq_va",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Version 2.2",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DL-ERROR Indication (F)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_CONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t16_frmr_received_no",
+      "from": "Connected",
+      "on": "FRMR_received",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (K)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t16_frmr_received_yes",
+      "from": "Connected",
+      "on": "FRMR_received",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (K)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t17_ua_received_no",
+      "from": "Connected",
+      "on": "UA_received",
+      "guard": "not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (K)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t17_ua_received_yes",
+      "from": "Connected",
+      "on": "UA_received",
+      "guard": "version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (K)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t18_ui_received_yes",
+      "from": "Connected",
+      "on": "UI_received",
+      "guard": "P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Enquiry_Response_F_1",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t18_ui_received_no",
+      "from": "Connected",
+      "on": "UI_received",
+      "guard": "not P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t19_disc_received",
+      "from": "Connected",
+      "on": "DISC_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "DL_DISCONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t20_dm_received",
+      "from": "Connected",
+      "on": "DM_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (E)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "DL_DISCONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "discard_I_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t21_rr_received_yes",
+      "from": "Connected",
+      "on": "RR_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t22_rnr_received_yes",
+      "from": "Connected",
+      "on": "RNR_received",
+      "guard": "va_le_nr_le_vs",
+      "actions": [
+        {
+          "verb": "set_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t22_rnr_received_no_no",
+      "from": "Connected",
+      "on": "RNR_received",
+      "guard": "not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "set_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t22_rnr_received_no_yes",
+      "from": "Connected",
+      "on": "RNR_received",
+      "guard": "not va_le_nr_le_vs and version_2_2",
+      "actions": [
+        {
+          "verb": "set_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t23_lm_seize_confirm_yes",
+      "from": "Connected",
+      "on": "LM_SEIZE_confirm",
+      "guard": "ack_pending",
+      "actions": [
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        },
+        {
+          "verb": "Enquiry Response (F = 0)",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "LM_release_request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t23_lm_seize_confirm_no",
+      "from": "Connected",
+      "on": "LM_SEIZE_confirm",
+      "guard": "not ack_pending",
+      "actions": [
+        {
+          "verb": "LM_release_request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t24_srej_received_yes_yes",
+      "from": "Connected",
+      "on": "SREJ_received",
+      "guard": "va_le_nr_le_vs and P_or_F_eq_1",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(a) := N(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Push Old I Frame N(r) on Queue",
+          "kind": "internal_out"
+        },
+        {
+          "verb": "LM_data_request",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t24_srej_received_yes_no",
+      "from": "Connected",
+      "on": "SREJ_received",
+      "guard": "va_le_nr_le_vs and not P_or_F_eq_1",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Push Old I Frame N(r) on Queue",
+          "kind": "internal_out"
+        },
+        {
+          "verb": "LM_data_request",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t24_srej_received_no_no",
+      "from": "Connected",
+      "on": "SREJ_received",
+      "guard": "not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t24_srej_received_no_yes",
+      "from": "Connected",
+      "on": "SREJ_received",
+      "guard": "not va_le_nr_le_vs and version_2_2",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t25_rej_received_no_no",
+      "from": "Connected",
+      "on": "REJ_received",
+      "guard": "not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t25_rej_received_no_yes",
+      "from": "Connected",
+      "on": "REJ_received",
+      "guard": "not va_le_nr_le_vs and version_2_2",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t25_rej_received_yes",
+      "from": "Connected",
+      "on": "REJ_received",
+      "guard": "va_le_nr_le_vs",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "Check Need For Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(a) := N(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Invoke Retransmission",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and not info_field_length_le_N1_and_content_is_octet_aligned and not version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (O)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_no_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and not info_field_length_le_N1_and_content_is_octet_aligned and version_2_2",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (O)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Clear Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_no_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and not va_le_nr_le_vs and version_2_2",
+      "actions": [
+        {
+          "verb": "N(r) Error Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_yes_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and ns_eq_vr and not P_eq_1 and not ack_pending",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Reject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "Decrement Sreject Exception if > 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Retrieve Stored V(r) I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "LM_seize_request",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "set_acknowledge_pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": [
+        {
+          "start": 5,
+          "length": 3,
+          "predicate": "vr_I_frame_stored",
+          "test_at_end": false
+        }
+      ]
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_yes_no_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and ns_eq_vr and not P_eq_1 and ack_pending",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Reject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "Decrement Sreject Exception if > 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Retrieve Stored V(r) I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": [
+        {
+          "start": 5,
+          "length": 3,
+          "predicate": "vr_I_frame_stored",
+          "test_at_end": false
+        }
+      ]
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_yes_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and ns_eq_vr and P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Reject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "Decrement Sreject Exception if > 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Retrieve Stored V(r) I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "V(r) := V(r) + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": [
+        {
+          "start": 5,
+          "length": 3,
+          "predicate": "vr_I_frame_stored",
+          "test_at_end": false
+        }
+      ]
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_yes_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_yes_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and reject_exception and not P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and not SREJ_enabled",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Reject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "REJ",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and sreject_exception_gt_0",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Save Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := N(s)",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "Increment Sreject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "SREJ",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and ns_gt_vr_plus_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Save Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Reject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "REJ",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_yes_no_yes_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled and not sreject_exception_gt_0 and not ns_gt_vr_plus_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Save Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Increment Sreject Exception",
+          "kind": "processing"
+        },
+        {
+          "verb": "SREJ",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_no_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_no_no_no_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and not vr_lt_ns_lt_vr_plus_k and not P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_yes_yes",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and own_receiver_busy and P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) := V(r)",
+          "kind": "processing"
+        },
+        {
+          "verb": "RR",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Acknowledge Pending",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_yes_yes_yes_yes_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "command and info_field_length_le_N1_and_content_is_octet_aligned and va_le_nr_le_vs and own_receiver_busy and not P_eq_1",
+      "actions": [
+        {
+          "verb": "Check_I_Frame_Acknowledged",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Discard Contents of I Frame",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t26_i_received_no",
+      "from": "Connected",
+      "on": "I_received",
+      "guard": "not command",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (O)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Discard I Frame",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

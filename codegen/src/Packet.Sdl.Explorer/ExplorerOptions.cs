@@ -102,6 +102,15 @@ public enum Invariants
     FlowOffDelivery = 512,
     /// <summary>After DL_FLOW_OFF_request the station's own-receiver-busy condition is set, and after DL_FLOW_ON_request it is clear (§6.4.10).</summary>
     BusyTracksFlow = 1024,
+    /// <summary>
+    /// A station sends SABM only at modulo 8 and SABME only at modulo 128
+    /// (§4.3.3.1, §4.3.3.2), and once both stations are Connected their
+    /// moduli agree. Off by default: on the current tables the connect-phase
+    /// seeds trip it through packethacking/ax25spec#54 (the tables never
+    /// assign the modulus), which the default calibration rows record as
+    /// invisible; see docs/explorer.md.
+    /// </summary>
+    ModulusCoherence = 2048,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
     Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
@@ -119,8 +128,27 @@ public sealed record ExplorerOptions
     /// <summary>I frames B submits for A (labels b0, b1, ...), all queued in the seeded state.</summary>
     public int FramesBa { get; init; }
 
-    /// <summary>Window size k (1..7 at modulo 8). Keep at 4 or below unless the point is the k > modulus/2 constraint.</summary>
+    /// <summary>Window size k (1..7 at modulo 8, 1..127 at modulo 128). Keep at or below half the modulus unless the point is the k > modulus/2 constraint.</summary>
     public int K { get; init; } = 4;
+
+    /// <summary>
+    /// Sequence-number modulus both stations are seeded at: 8 or 128.
+    /// Connected seed only. The figures never invoke Set_Version_2_2 /
+    /// Set_Version_2_0 (packethacking/ax25spec#54), so a modulo-128 link
+    /// cannot be reached through the tables' own establishment; seeding it
+    /// directly is a pinned choice (docs/explorer.md, pinned semantic 9).
+    /// The connect-phase seeds keep <see cref="Modulo128A"/>.
+    /// </summary>
+    public int Modulo { get; init; } = 8;
+
+    /// <summary>
+    /// Connected seed only: V(s), V(a) and V(r) on both stations start at
+    /// this value instead of 0, so the sequence space wraps inside the
+    /// frame bounds (offset 6 at modulo 8 or 126 at modulo 128 with 3
+    /// frames crosses the wrap). The absolute delivery and acknowledgement
+    /// counters are unaffected.
+    /// </summary>
+    public int SequenceOffset { get; init; }
 
     /// <summary>Selective reject negotiated (also sets version_2_2 on both stations).</summary>
     public bool Srej { get; init; }

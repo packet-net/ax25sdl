@@ -1,0 +1,404 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "data_link",
+  "state": "Disconnected",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc4.1",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_dl_disconnect_request",
+      "from": "Disconnected",
+      "on": "DL_DISCONNECT_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL_DISCONNECT_confirm",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_request",
+      "from": "Disconnected",
+      "on": "DL_UNIT_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "UI Command",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_dl_connect_request",
+      "from": "Disconnected",
+      "on": "DL_CONNECT_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "SRT := Initial Default",
+          "kind": "processing"
+        },
+        {
+          "verb": "T1V := 2 * SRT",
+          "kind": "processing"
+        },
+        {
+          "verb": "Establish_Data_Link",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_all_other_primitives__from_upper_layer",
+      "from": "Disconnected",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_all_other_commands",
+      "from": "Disconnected",
+      "on": "all_other_commands",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_all_other_primitives__from_lower_layer",
+      "from": "Disconnected",
+      "on": "all_other_primitives__from_lower_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Discard Primitive",
+          "kind": "processing"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_control_field_error",
+      "from": "Disconnected",
+      "on": "control_field_error",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (L)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t08_info_not_permitted_in_frame",
+      "from": "Disconnected",
+      "on": "info_not_permitted_in_frame",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (M)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t09_u_or_s_frame_length_error",
+      "from": "Disconnected",
+      "on": "u_or_s_frame_length_error",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (N)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t10_ua_received",
+      "from": "Disconnected",
+      "on": "UA_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL_ERROR_indication_C_D",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t11_ui_received_no",
+      "from": "Disconnected",
+      "on": "UI_received",
+      "guard": "not P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t11_ui_received_yes",
+      "from": "Disconnected",
+      "on": "UI_received",
+      "guard": "P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "F := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t12_disc_received",
+      "from": "Disconnected",
+      "on": "DISC_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t13_sabm_received_no",
+      "from": "Disconnected",
+      "on": "SABM_received",
+      "guard": "not able_to_establish",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t13_sabm_received_yes",
+      "from": "Disconnected",
+      "on": "SABM_received",
+      "guard": "able_to_establish",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "set_version_2_0",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_CONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "SRT := Initial Default",
+          "kind": "processing"
+        },
+        {
+          "verb": "T1V := 2 * SRT",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_sabme_received_no",
+      "from": "Disconnected",
+      "on": "SABME_received",
+      "guard": "not able_to_establish",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_sabme_received_yes",
+      "from": "Disconnected",
+      "on": "SABME_received",
+      "guard": "able_to_establish",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Version 2.2",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Exception Conditions",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_CONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "SRT := Initial Default",
+          "kind": "processing"
+        },
+        {
+          "verb": "T1V := 2 * SRT",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "RC := 0",
+          "kind": "processing"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}
