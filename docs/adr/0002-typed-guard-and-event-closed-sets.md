@@ -168,3 +168,11 @@ want compile-checked binding.
 
 - 2026-06-03 — Accepted. Guards landed first (catalog + canonicalisation +
   `Ax25Guard` + `GuardTerm`); events (`Ax25Event`) follow in a stacked PR.
+- 2026-09-10: Amended. The catalog-completeness lint stands. The per-runtime
+  binding-coverage half described above was retired along with
+  `spec-sdl/lint-targets.yaml`: it named paths in repos this repo's CI never
+  checks out, and skipped silently when they were absent, so it had never
+  failed on anything. Consumer binding coverage is now enforced by each
+  consumer's own compiler against the typed closed set this ADR introduced,
+  which is the outcome the ADR was aiming at. See
+  `docs/sdl-guard-and-event-catalogue.md`, "Where the binding gate lives".
