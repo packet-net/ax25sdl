@@ -1,0 +1,39 @@
+# Mod-8 link establishment, initiator side: DL-CONNECT → SABM(P=1) → UA(F=1).
+#
+# §6.3.1: "To connect to a distant TNC, the originating TNC sends a SABM
+# command frame to the distant TNC and starts its T1 timer. … Reception of
+# the UA response frame by the originating TNC causes it to cancel the T1
+# timer and set its internal state variables to 0."
+# §6.3.6.3: "All SABM(E) and DISC frames are sent with the P bit set to 1."
+scenario: mod8-connect-initiator
+description: >
+  Disconnected → DL_CONNECT_request emits SABM P=1 (Establish_Data_Link,
+  figc4.7) and enters Awaiting Connection; UA F=1 confirms the connection,
+  zeroes V(s)/V(a)/V(r), stops T1 and starts T3 (figc4.1 / figc4.2).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.6.3 (SABM(E)/DISC sent with P=1)"
+  - "figc4.1 t03, figc4.7 Establish_Data_Link, figc4.2 t04"
+initial:
+  state: Disconnected
+  variables: { modulo: 8, k: 4 }
+steps:
+  - name: layer 3 asks for a connection
+    inject: { event: DL_CONNECT_request }
+    expect:
+      transition: t03_dl_connect_request
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+      variables: { rc: 1, layer_3_initiated: true, vs: 0, va: 0, vr: 0 }
+      timers: { t1: running, t3: stopped }
+
+  - name: peer accepts with UA F=1
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t04_ua_received_yes_yes
+      state: Connected
+      effects:
+        - { dl: DL_CONNECT_confirm }
+      variables: { vs: 0, va: 0, vr: 0 }
+      timers: { t1: stopped, t3: running }

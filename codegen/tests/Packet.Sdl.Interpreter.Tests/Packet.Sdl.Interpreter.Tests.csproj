@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Packet.Sdl.Interpreter\Packet.Sdl.Interpreter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Skip-with-reason support for the strict xfail (expected_failure)
+         mechanism: an xfailing golden trace reports as skipped with the
+         upstream issue URL, and an xfail that *passes* fails the test. -->
+    <PackageReference Include="Xunit.SkippableFact" />
+  </ItemGroup>
+
+</Project>

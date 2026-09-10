@@ -38,6 +38,31 @@ The transcription rules and how to add a new figure live in:
 - [`docs/sdl-verb-catalogue.md`](docs/sdl-verb-catalogue.md) — action-verb normalisation
 - [`docs/adr/0001-sdl-dsl.md`](docs/adr/0001-sdl-dsl.md) — why YAML + codegen rather than hand-written tables
 
+## Semantic validation — golden traces
+
+Transcription fidelity (graphml → YAML → generated tables) is proved by the
+drift jobs; **behavioural** fidelity is proved by the golden-trace suite. A
+reference interpreter ([`codegen/src/Packet.Sdl.Interpreter/`](codegen/src/Packet.Sdl.Interpreter/))
+executes the emitted JSON tables directly — events in, abstract effects
+(frames, DL primitives, internal-queue posts) out — and each scenario in
+[`traces/`](traces/) replays a protocol exchange against it with
+expectations derived from the AX.25 v2.2 **prose**, cited section by section.
+
+```sh
+dotnet test codegen/tests/Packet.Sdl.Interpreter.Tests
+```
+
+Where a trace fails because the *figure itself* is defective, it is not bent
+to match: it carries `expected_failure: <upstream-issue-url>` and runs as a
+strict xfail (it must keep failing until the upstream fix lands, then the
+suite demands the marker's removal). How to add a trace, the file format,
+and the interpreter's execution policies are documented in
+[`docs/golden-traces.md`](docs/golden-traces.md).
+
+The SREJ round-trip scenario is deliberately absent: it is reserved for
+clean-room authoring from the prose alone, as an independence control — see
+[`traces/srej-round-trip.RESERVED.md`](traces/srej-round-trip.RESERVED.md).
+
 ## Provenance
 
 Extracted from `packet.net` (then `m0lte/packet.net`) on 2026-05-17 — the transcriptions and codegen previously lived alongside the .NET runtime in that monorepo. The SDL transcriptions moved on again to [`packethacking/ax25spec`](https://github.com/packethacking/ax25spec) in 2026-07, making that repo the single normative home (prose + figures) and this one tooling + distribution. History preserved via `git filter-repo` at both steps.

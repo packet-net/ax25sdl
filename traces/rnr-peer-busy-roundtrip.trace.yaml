@@ -1,0 +1,53 @@
+# Peer busy / unbusy round trip: RNR raises the peer-busy condition and
+# starts the poll timer; the T1 poll goes out as RR(P=1); the peer's RR(F=1)
+# clears the busy condition and returns to Connected.
+#
+# §6.4.9: "Whenever a TNC receives an RNR frame, it stops transmitting
+# I frames until the busy condition is cleared. … an RR or RNR command with
+# the P bit set is sent to poll the distant TNC of its status; then timer
+# T1 is started. … If an RR frame is received in response to the poll, then
+# T1 is stopped and the busy condition cleared."
+scenario: rnr-peer-busy-roundtrip
+description: >
+  Connected, everything acknowledged (V(s)=V(a)=1): RNR nr=1 sets
+  peer-receiver-busy, stops T3 and starts T1 as the status-poll timer
+  (figc4.4 t22 + figc4.7 Check_I_Frame_Acknowledged busy branch); T1 expiry
+  polls with RR command P=1 and enters Timer Recovery (figc4.4 t12); the
+  peer's RR response F=1 nr=1 clears the busy condition and recovery
+  completes back to Connected with T3 running (figc4.5 t18 yes/yes/yes).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.9 (Receiving an RNR Frame)"
+  - "ax.25.2.2.4_Oct_25.md §6.4.11 (Waiting Acknowledgement)"
+  - "figc4.4 t22, t12; figc4.7 Check_I_Frame_Acknowledged, Transmit_Enquiry; figc4.5 t18"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4, vs: 1, va: 1, vr: 0 }
+  timers: { t1: stopped, t3: running }
+steps:
+  - name: peer signals busy
+    inject: { event: RNR_received, command: false, pf: false, nr: 1 }
+    expect:
+      transition: t22_rnr_received_yes
+      state: Connected
+      effects: []
+      variables: { peer_receiver_busy: true, va: 1 }
+      timers: { t1: running, t3: stopped }
+
+  - name: poll timer fires — RR(P=1) status poll
+    inject: { event: T1_expiry }
+    expect:
+      transition: t12_t1_expiry
+      state: TimerRecovery
+      effects:
+        - { frame: RR, command: true, pf: true, nr: 0 }
+      variables: { rc: 1 }
+      timers: { t1: running }
+
+  - name: peer reports ready — busy clears, back to Connected
+    inject: { event: RR_received, command: false, pf: true, nr: 1 }
+    expect:
+      transition: t18_rr_received_yes_yes_yes
+      state: Connected
+      effects: []
+      variables: { peer_receiver_busy: false, rc: 0, va: 1 }
+      timers: { t1: stopped, t3: running }

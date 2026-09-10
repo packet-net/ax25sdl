@@ -1,0 +1,49 @@
+# Link disconnection: DL-DISCONNECT → DISC(P=1) → UA(F=1); a later DISC in
+# Disconnected is answered with DM.
+#
+# §6.3.4: "either TNC may indicate a request to disconnect the link by
+# transmitting a DISC command frame and starting timer T1. … After
+# receiving a UA or DM response to a sent DISC command, the TNC cancels
+# timer T1 and enters the disconnected state."
+# §6.3.5: "In the disconnected state, a TNC monitors received commands …
+# and transmits a DM frame in response to a DISC command."
+scenario: mod8-disconnect
+description: >
+  Connected → DL_DISCONNECT_request sends DISC P=1 and enters Awaiting
+  Release (figc4.4 t01); UA F=1 completes the release (figc4.3 t03); a DISC
+  received afterwards in Disconnected draws DM F=1 (figc4.1 t12).
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.3.4 (Link Disconnection)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.5 (Disconnected State)"
+  - "figc4.4 t01, figc4.3 t03, figc4.1 t12"
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4 }
+  timers: { t3: running }
+steps:
+  - name: layer 3 asks to disconnect
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: t01_dl_disconnect_request
+      state: AwaitingRelease
+      effects:
+        - { frame: DISC, command: true, pf: true }
+      variables: { rc: 0 }
+      timers: { t1: running, t3: stopped }
+
+  - name: peer acknowledges with UA F=1
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t03_ua_received_yes
+      state: Disconnected
+      effects:
+        - { dl: DL_DISCONNECT_confirm }
+      timers: { t1: stopped }
+
+  - name: stray DISC in Disconnected is answered with DM
+    inject: { event: DISC_received, pf: true }
+    expect:
+      transition: t12_disc_received
+      state: Disconnected
+      effects:
+        - { frame: DM, command: false, pf: true }

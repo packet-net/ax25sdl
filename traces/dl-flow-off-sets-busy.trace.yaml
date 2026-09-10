@@ -1,0 +1,31 @@
+# Own-receiver-busy entry: DL-FLOW-OFF from layer 3 should set the busy
+# condition and announce it with RNR.
+#
+# §6.4.10: "Whenever a TNC enters a busy condition, it indicates this by
+# sending an RNR response at the next opportunity."
+#
+# EXPECTED FAILURE — figc4.4 draws the Set-Own-Receiver-Busy / RNR chain on
+# the *yes* branch of the "own receiver busy?" decision, so a not-busy
+# station can never enter the busy condition via DL-FLOW-OFF: the not-busy
+# branch does nothing. Catalogued upstream as packethacking/ax25spec#43.
+scenario: dl-flow-off-sets-busy
+description: >
+  Connected, not busy: DL_FLOW_OFF_request should set own-receiver-busy and
+  emit RNR response with the current V(r) (prose §6.4.10); the table's
+  branch inversion (figc4.4 t05) leaves the machine not-busy and silent.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §6.4.10 (Sending a Busy Indication)"
+  - "figc4.4 t05"
+expected_failure: https://github.com/packethacking/ax25spec/issues/43
+initial:
+  state: Connected
+  variables: { modulo: 8, k: 4 }
+  timers: { t3: running }
+steps:
+  - name: layer 3 turns flow off — busy should be raised and announced
+    inject: { event: DL_FLOW_OFF_request }
+    expect:
+      state: Connected
+      effects:
+        - { frame: RNR, command: false, nr: 0 }
+      variables: { own_receiver_busy: true }
