@@ -7,6 +7,7 @@ using Packet.Sdl.CodeGen.Python;
 using Packet.Sdl.CodeGen.Rust;
 using Packet.Sdl.CodeGen.Ts;
 using Packet.Sdl.IR;
+using Packet.Sdl.IR.Totality;
 
 namespace Packet.Sdl.CodeGen;
 
@@ -196,6 +197,39 @@ internal static class Program
             return 1;
         }
 
+        // Resolve every page up front. The totality lint needs the composed
+        // guards (after the ax25sdl#53 stale-read substitution), i.e. exactly
+        // what the backends emit, and the emit loops below reuse the same IR.
+        var resolvedPages = pages.Select(Resolver.Resolve).ToList();
+        var resolvedSubPages = subroutinePages.Select(Resolver.Resolve).ToList();
+
+        // Totality + determinism lint (docs/lint-totality.md): per (state,
+        // event) arm and per subroutine, every feasible valuation of the live
+        // guard atoms must be matched by exactly one transition. Known
+        // findings on the real figures are downgraded to warnings by the
+        // allow-list; a stale allow-list entry is itself an error.
+        var totality = TotalityLint.Run(resolvedPages, resolvedSubPages, AtomDomain.Instance);
+        var known = KnownFindings.Load(plan.KnownFindingsPath, plan.KnownFindingsExplicit);
+        var applied = KnownFindings.Apply(totality, known, plan.KnownFindingsPath);
+        Console.WriteLine(TotalityLint.Summarise(totality));
+        if (totality.UnknownAtoms.Count > 0)
+        {
+            Console.WriteLine("  lint  totality/determinism: atoms with no definition in the atom domain model, treated as independent booleans: "
+                + string.Join(", ", totality.UnknownAtoms));
+        }
+        if (applied.Warnings.Count > 0)
+        {
+            Console.WriteLine($"  lint  totality/determinism: {applied.Warnings.Count} known finding(s) downgraded to warnings by {plan.KnownFindingsPath}");
+            foreach (var w in applied.Warnings) Console.Error.WriteLine($"::warning::{w}");
+        }
+        errors.AddRange(applied.Errors);
+
+        if (errors.Count > 0)
+        {
+            foreach (var e in errors) Console.Error.WriteLine($"::error::{e}");
+            return 1;
+        }
+
         var writtenCsharpCode    = new HashSet<string>(StringComparer.Ordinal);
         var writtenCsharpTests   = new HashSet<string>(StringComparer.Ordinal);
         var writtenMermaid       = new HashSet<string>(StringComparer.Ordinal);
@@ -220,15 +254,10 @@ internal static class Program
             writtenJson.Add(Path.GetFullPath(schemaPath));
         }
 
-        // Collect resolved IR so TS index emission sees the full set in
-        // deterministic order at the end of the run.
-        var resolvedPages = new List<ResolvedPage>(pages.Count);
-        var resolvedSubPages = new List<ResolvedSubroutinesPage>(subroutinePages.Count);
-
-        foreach (var page in pages)
+        for (var pageIndex = 0; pageIndex < pages.Count; pageIndex++)
         {
-            var resolved = Resolver.Resolve(page);
-            resolvedPages.Add(resolved);
+            var page = pages[pageIndex];
+            var resolved = resolvedPages[pageIndex];
 
             var label = "";
             if (plan.EmitCsharp)
@@ -340,10 +369,10 @@ internal static class Program
         // Subroutine pages: one .g.cs / .g.go / .g.ts per page (no
         // generated tests on this side — matches the C# emitter's
         // historical scope).
-        foreach (var subPage in subroutinePages)
+        for (var subIndex = 0; subIndex < subroutinePages.Count; subIndex++)
         {
-            var resolved = Resolver.Resolve(subPage);
-            resolvedSubPages.Add(resolved);
+            var subPage = subroutinePages[subIndex];
+            var resolved = resolvedSubPages[subIndex];
 
             string className = "";
             if (plan.EmitCsharp)
@@ -1089,6 +1118,9 @@ internal sealed class CodegenOptions
     [Option("in", Default = "spec-sdl", HelpText = "Directory containing *.sdl.yaml inputs.")]
     public string InDir { get; set; } = "spec-sdl";
 
+    [Option("known-findings", Default = "", HelpText = "Allow-list of known totality/determinism findings (docs/lint-totality.md). Defaults to codegen/lint-known-findings.yaml relative to the working directory, treated as empty when absent; an explicit path must exist.")]
+    public string KnownFindings { get; set; } = "";
+
     // ─── C# ────────────────────────────────────────────────────────────
     [Option("csharp", Default = false, HelpText = "Emit C# backend (defaults to spec/csharp + spec/csharp/tests).")]
     public bool Csharp { get; set; }
@@ -1159,6 +1191,10 @@ internal sealed class CodegenOptions
 internal sealed class CodegenPlan
 {
     public required string InDir { get; init; }
+    /// <summary>Path of the totality-lint allow-list (docs/lint-totality.md).</summary>
+    public required string KnownFindingsPath { get; init; }
+    /// <summary>True when the user passed --known-findings, so a missing file is an error rather than an empty list.</summary>
+    public required bool KnownFindingsExplicit { get; init; }
     public required bool EmitCsharp { get; init; }
     public required bool EmitGo { get; init; }
     public required bool EmitTs { get; init; }
@@ -1184,6 +1220,7 @@ internal sealed class CodegenPlan
     private const string DefaultRustOut     = "spec/rust/src";
     private const string DefaultCOut        = "spec/c/src";
     private const string DefaultPythonOut   = "spec/python/ax25sdl";
+    private const string DefaultKnownFindings = "codegen/lint-known-findings.yaml";
 
     public static CodegenPlan From(CodegenOptions opt)
     {
@@ -1213,6 +1250,8 @@ internal sealed class CodegenPlan
         return new CodegenPlan
         {
             InDir       = opt.InDir,
+            KnownFindingsPath     = opt.KnownFindings.Length > 0 ? opt.KnownFindings : DefaultKnownFindings,
+            KnownFindingsExplicit = opt.KnownFindings.Length > 0,
             EmitCsharp  = emitCsharp,
             EmitGo      = emitGo,
             EmitTs      = emitTs,

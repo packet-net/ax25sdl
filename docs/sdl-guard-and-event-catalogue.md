@@ -58,6 +58,17 @@ catalog is **authoritative**:
 3. **Malformed catalog.** Duplicate canonical, alias claimed by two canonicals,
    empty alias.
 
+### Atom semantics: the domain model
+
+The catalogue says what the atoms are called; it does not say how they relate.
+`codegen/src/Packet.Sdl.IR/Totality/AtomDomain.cs` does: every canonical atom
+defined as a function of the underlying protocol variables (the sequence
+variables modulo 8, k, the P/F bit, the role, the modulus, T1, RC), each with
+its spec citation. The totality / determinism lint uses it to tell a real
+figure hole from a corner no protocol state can reach. A new canonical here
+needs a definition there (a unit test enforces it). See
+[`lint-totality.md`](lint-totality.md).
+
 ### Where the binding gate lives
 
 The codegen checks that every predicate atom is **catalogued**. It does not
