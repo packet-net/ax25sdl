@@ -7,7 +7,11 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --tables DIR           JSON tables directory (default spec/json)
   --frames-ab N          I frames A submits for B, 0..3 (default 2)
   --frames-ba N          I frames B submits for A, 0..3 (default 0)
-  --k N                  window size 1..7 (default 4; keep <= 4 unless testing the k > modulus/2 constraint)
+  --k N                  window size 1..modulus-1 (default 4; keep <= modulus/2 unless testing the k > modulus/2 constraint)
+  --modulo 8|128         seed both stations at this modulus (default 8; connected seed only, a pinned choice: the
+                         tables never assign the modulus themselves, packethacking/ax25spec#54)
+  --seq-offset N         connected seed only: start V(s), V(a), V(r) at N on both stations so the sequence space
+                         wraps inside the frame bounds (default 0)
   --srej                 selective reject negotiated (default off)
   --n2 N                 retry limit (default 4)
   --budget N             channel fault budget (default 0)
@@ -27,6 +31,8 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
+  --modulus-coherence    SABM only at modulo 8, SABME only at modulo 128 (§4.3.3.1, §4.3.3.2), and both stations at
+                         the same modulus once Connected (off by default: the connect-phase seeds trip it via #54)
   --quiescence-accepts-timer-recovery   triage aid: a station in TimerRecovery counts as quiescent
   --max-depth N          depth bound (default 80)
   --max-states N         visited-state bound (default 400000)
@@ -35,8 +41,8 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 """;
 
 string tables = "spec/json";
-int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
-bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
+int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1, modulo = 8, seqOffset = 0;
+bool srej = false, peerDeclines = false, mod128 = false, selective = false, rejMayEqualVs = false, trQuiescent = false, modulusCoherence = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
@@ -57,6 +63,8 @@ try
             case "--frames-ab": framesAb = Int(Next(args, ref i)); break;
             case "--frames-ba": framesBa = Int(Next(args, ref i)); break;
             case "--k": k = Int(Next(args, ref i)); break;
+            case "--modulo": modulo = Int(Next(args, ref i)); break;
+            case "--seq-offset": seqOffset = Int(Next(args, ref i)); break;
             case "--n2": n2 = Int(Next(args, ref i)); break;
             case "--budget": budget = Int(Next(args, ref i)); break;
             case "--max-depth": maxDepth = Int(Next(args, ref i)); break;
@@ -87,6 +95,7 @@ try
             case "--mod128": mod128 = true; break;
             case "--selective-progress": selective = true; break;
             case "--rej-may-equal-vs": rejMayEqualVs = true; break;
+            case "--modulus-coherence": modulusCoherence = true; break;
             case "--quiescence-accepts-timer-recovery": trQuiescent = true; break;
             case "--faults":
                 faults = FaultKinds.None;
@@ -141,6 +150,7 @@ try
         }
     }
     if (selective) invariants |= Invariants.SelectiveProgress;
+    if (modulusCoherence) invariants |= Invariants.ModulusCoherence;
 
     var options = new ExplorerOptions
     {
@@ -148,6 +158,8 @@ try
         FramesAb = framesAb,
         FramesBa = framesBa,
         K = k,
+        Modulo = modulo,
+        SequenceOffset = seqOffset,
         Srej = srej,
         N2 = n2,
         Budget = budget,

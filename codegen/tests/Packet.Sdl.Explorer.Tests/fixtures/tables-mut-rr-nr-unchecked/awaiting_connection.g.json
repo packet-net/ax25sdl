@@ -1,0 +1,511 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "data_link",
+  "state": "AwaitingConnection",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc4.2",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_dl_disconnect_request",
+      "from": "AwaitingConnection",
+      "on": "DL_DISCONNECT_request",
+      "guard": "",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_disc_received",
+      "from": "AwaitingConnection",
+      "on": "DISC_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_dm_received_yes",
+      "from": "AwaitingConnection",
+      "on": "DM_received",
+      "guard": "F_eq_1",
+      "actions": [
+        {
+          "verb": "discard_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_DISCONNECT_indication",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_dm_received_no",
+      "from": "AwaitingConnection",
+      "on": "DM_received",
+      "guard": "not F_eq_1",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ua_received_no",
+      "from": "AwaitingConnection",
+      "on": "UA_received",
+      "guard": "not F_eq_1",
+      "actions": [
+        {
+          "verb": "DL_ERROR_indication_D",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ua_received_yes_yes",
+      "from": "AwaitingConnection",
+      "on": "UA_received",
+      "guard": "F_eq_1 and layer_3_initiated",
+      "actions": [
+        {
+          "verb": "DL_CONNECT_confirm",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ua_received_yes_no_yes",
+      "from": "AwaitingConnection",
+      "on": "UA_received",
+      "guard": "F_eq_1 and not layer_3_initiated and vs_eq_va",
+      "actions": [
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ua_received_yes_no_no",
+      "from": "AwaitingConnection",
+      "on": "UA_received",
+      "guard": "F_eq_1 and not layer_3_initiated and not vs_eq_va",
+      "actions": [
+        {
+          "verb": "SRT := Initial Default",
+          "kind": "processing"
+        },
+        {
+          "verb": "T1V := 2 * SRT",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_CONNECT_confirm",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_t1_expiry_yes",
+      "from": "AwaitingConnection",
+      "on": "T1_expiry",
+      "guard": "RC_eq_N2",
+      "actions": [
+        {
+          "verb": "discard_frame_queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (G)",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "DL_DISCONNECT_indication",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Disconnected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_t1_expiry_no",
+      "from": "AwaitingConnection",
+      "on": "T1_expiry",
+      "guard": "not RC_eq_N2",
+      "actions": [
+        {
+          "verb": "RC := RC + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "SABM (P == 1)",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Start T1",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_all_other_primitives__from_lower_layer",
+      "from": "AwaitingConnection",
+      "on": "all_other_primitives__from_lower_layer",
+      "guard": "",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_dl_connect_request",
+      "from": "AwaitingConnection",
+      "on": "DL_CONNECT_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Discard Queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Layer 3 Initiated",
+          "kind": "processing"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t08_dl_unit_data_request",
+      "from": "AwaitingConnection",
+      "on": "DL_UNIT_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "UI Command",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t09_dl_data_request_yes",
+      "from": "AwaitingConnection",
+      "on": "DL_DATA_request",
+      "guard": "layer_3_initiated",
+      "actions": [
+        {
+          "verb": "push_frame_on_queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t09_dl_data_request_no",
+      "from": "AwaitingConnection",
+      "on": "DL_DATA_request",
+      "guard": "not layer_3_initiated",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t10_i_frame_pops_off_queue_yes",
+      "from": "AwaitingConnection",
+      "on": "I_frame_pops_off_queue",
+      "guard": "layer_3_initiated",
+      "actions": [
+        {
+          "verb": "push_frame_on_queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t10_i_frame_pops_off_queue_no",
+      "from": "AwaitingConnection",
+      "on": "I_frame_pops_off_queue",
+      "guard": "not layer_3_initiated",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t11_all_other_primitives__from_upper_layer",
+      "from": "AwaitingConnection",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t12_ui_received_yes",
+      "from": "AwaitingConnection",
+      "on": "UI_received",
+      "guard": "P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DM (F = 1)",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t12_ui_received_no",
+      "from": "AwaitingConnection",
+      "on": "UI_received",
+      "guard": "not P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t13_control_field_error",
+      "from": "AwaitingConnection",
+      "on": "control_field_error",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (L)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_info_not_permitted_in_frame",
+      "from": "AwaitingConnection",
+      "on": "info_not_permitted_in_frame",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (M)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t15_u_or_s_frame_length_error",
+      "from": "AwaitingConnection",
+      "on": "u_or_s_frame_length_error",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "DL-ERROR Indication (N)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t16_sabm_received",
+      "from": "AwaitingConnection",
+      "on": "SABM_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "UA",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t17_sabme_received",
+      "from": "AwaitingConnection",
+      "on": "SABME_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}
