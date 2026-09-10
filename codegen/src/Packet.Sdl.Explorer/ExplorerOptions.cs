@@ -34,6 +34,45 @@ public enum SeedKind
     Connected,
     /// <summary>Both stations Disconnected; A has issued DL_CONNECT_request and queued its data.</summary>
     Disconnected,
+    /// <summary>
+    /// A is in AwaitingV22Connection with its SABME P=1 already in flight
+    /// to B (RC 1, layer 3 initiated, T1 running, modulo 128, version 2.2);
+    /// B is Disconnected. This is the state figc4.6 exists for. On the
+    /// current tables a cold DL_CONNECT_request never reaches it
+    /// (packethacking/ax25spec#44 routes the SABME initiator to
+    /// AwaitingConnection), so the seed enters it directly, exactly as the
+    /// golden trace frmr-fallback-downgrades-to-sabm does. Connect phase
+    /// only: no data.
+    /// </summary>
+    AwaitingV22Connection,
+}
+
+/// <summary>Which stations layer 3 may flow-control (DL_FLOW_OFF_request / DL_FLOW_ON_request moves).</summary>
+public enum FlowControlAt
+{
+    None,
+    A,
+    B,
+    Both,
+}
+
+/// <summary>What plays station B.</summary>
+public enum PeerKind
+{
+    /// <summary>The table-driven reference interpreter, like A.</summary>
+    Tables,
+    /// <summary>
+    /// The hand-written v2.0 stub peer (<see cref="V20Peer"/>): answers
+    /// SABME with FRMR (an unknown control field, v2.0 §2.3.4.3.3.1),
+    /// SABM with UA. Connect phase only, no data phase.
+    /// </summary>
+    V20Frmr,
+    /// <summary>
+    /// The same stub answering SABME with DM F=1 instead (a command other
+    /// than SABM while disconnected, v2.0 §2.3.4.3.5 / §2.4.3.4.3; what
+    /// XRouter does on the wire, packethacking/ax25spec#48).
+    /// </summary>
+    V20Dm,
 }
 
 /// <summary>The invariants, each individually switchable so the calibration suite can say which one fires.</summary>
@@ -59,9 +98,13 @@ public enum Invariants
     SelectiveProgress = 128,
     /// <summary>The interpreter threw: an unbound verb/atom, a non-deterministic table, or a pinned-semantics gap. Always reported.</summary>
     MachineError = 256,
+    /// <summary>No DL_DATA_indication is delivered at a station while its layer 3 has flow off (after DL_FLOW_OFF_request, before DL_FLOW_ON_request).</summary>
+    FlowOffDelivery = 512,
+    /// <summary>After DL_FLOW_OFF_request the station's own-receiver-busy condition is set, and after DL_FLOW_ON_request it is clear (§6.4.10).</summary>
+    BusyTracksFlow = 1024,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>
@@ -99,6 +142,30 @@ public sealed record ExplorerOptions
 
     /// <summary>Disconnected seed only: station A is seeded at modulo 128, so its DL_CONNECT_request sends SABME.</summary>
     public bool Modulo128A { get; init; }
+
+    /// <summary>
+    /// What plays station B. The v2.0 stub peers are for the connect-phase
+    /// seeds only (Disconnected or AwaitingV22Connection) and carry no data
+    /// phase, so both frame counts must be 0; the scenario ends at "link
+    /// established with modulo 8", which is the quiescent condition.
+    /// </summary>
+    public PeerKind Peer { get; init; } = PeerKind.Tables;
+
+    /// <summary>
+    /// Which stations may issue DL_FLOW_OFF_request / DL_FLOW_ON_request.
+    /// A station issues FLOW_OFF once it has delivered
+    /// <see cref="FlowOffAfterDelivered"/> frames upward (and only on a page
+    /// with a direct arm, i.e. Connected or TimerRecovery), then FLOW_ON at
+    /// any later point; that is one round, and <see cref="FlowRounds"/>
+    /// bounds the rounds so the space stays finite.
+    /// </summary>
+    public FlowControlAt FlowControl { get; init; } = FlowControlAt.None;
+
+    /// <summary>Rounds of FLOW_OFF then FLOW_ON each flow-controlling station may issue.</summary>
+    public int FlowRounds { get; init; } = 1;
+
+    /// <summary>Frames a station must have delivered upward before its FLOW_OFF is enabled.</summary>
+    public int FlowOffAfterDelivered { get; init; } = 1;
 
     public Invariants Invariants { get; init; } = Invariants.Default;
 

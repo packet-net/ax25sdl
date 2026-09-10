@@ -1,4 +1,5 @@
 using Packet.Sdl.Explorer;
+using Packet.Sdl.Interpreter;
 using Xunit.Abstractions;
 
 namespace Packet.Sdl.Explorer.Tests;
@@ -274,6 +275,200 @@ public class CalibrationTests(ITestOutputHelper output)
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    // ─── #43: DL-FLOW-OFF acts on the wrong branch ────────────────────
+
+    private static ExplorerOptions Scenario43 => new()
+    {
+        TablesDir = Fixtures.CurrentDir, FramesAb = 2, FramesBa = 0, K = 4, Budget = 0, FlowControl = FlowControlAt.B,
+    };
+
+    [Fact]
+    public void Defect43_Flow_Off_At_A_Not_Busy_Station_Leaves_It_Not_Busy()
+    {
+        // B delivers a0 upward, its layer 3 turns flow off. figc4.4 draws the
+        // Set-Own-Receiver-Busy / RNR chain on the "own receiver busy? yes"
+        // arm, so a not-busy station takes the empty "no" arm and stays
+        // not-busy and silent: layer 3 can never enter the busy condition
+        // (§6.4.10) from a clean state.
+        var result = Run(Scenario43);
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyTracksFlow);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t05_dl_flow_off_request_no");
+        result.Trace[^1].Effects.Should().BeEmpty("the not-busy arm does nothing: no RNR, no busy condition");
+        result.Trace[^1].SummaryB.Should().NotContain("own_busy");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Defect43_With_The_Busy_Check_Off_Data_Arrives_While_Flow_Is_Off()
+    {
+        // The consequence layer 3 sees: the second frame is delivered upward
+        // while flow is off, because nothing held it back.
+        var result = Run(Scenario43 with { Invariants = Invariants.Default & ~Invariants.BusyTracksFlow });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.FlowOffDelivery);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Violation.Message.Should().Contain("delivered `a1` upward while its layer 3 has flow off");
+        result.Trace.Should().Contain(step => step.Transition == "t05_dl_flow_off_request_no");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void Defect43_With_Both_Flow_Checks_Off_The_Flow_Moves_Are_No_Ops()
+    {
+        // On the current tables DL_FLOW_OFF / DL_FLOW_ON from a not-busy
+        // station do nothing, so behind #43 the scenario is the plain 2-frame
+        // exchange and it converges.
+        var result = Run(Scenario43 with { Invariants = Invariants.Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery) });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    [Fact]
+    public void Defect43_Note_The_Busy_Arms_Emit_RNR_And_RR_Without_N_r_Staging()
+    {
+        // Not reachable by the explorer on the current tables (nothing sets
+        // own-receiver-busy from not-busy, which is #43 itself), so pinned at
+        // the interpreter where it will be noticed the moment the branches
+        // are swapped upstream: the RNR on the DL-FLOW-OFF busy arm and the
+        // RR Command on the DL-FLOW-ON busy arm (figc4.4 t05/t06 and the
+        // figc4.5 twins) are drawn without an N(r) := V(r) staging box,
+        // unlike every other RR/RNR emission in the figures (Transmit_Enquiry,
+        // Enquiry_Response, the I-frame paths). Under the interpreter's
+        // staging policy (docs/explorer.md, pinned semantic 3) they are
+        // errors. Hypothesis H3 in docs/explorer.md.
+        var tables = Fixtures.Tables(Fixtures.CurrentDir);
+        foreach (var (state, ev, expected) in new[]
+                 {
+                     ("Connected", "DL_FLOW_OFF_request", "RNR Response"),
+                     ("Connected", "DL_FLOW_ON_request", "RR Command"),
+                     ("TimerRecovery", "DL_FLOW_OFF_request", "RNR Response (F = 0)"),
+                     ("TimerRecovery", "DL_FLOW_ON_request", "RR Command (P = 0)"),
+                 })
+        {
+            var m = new DataLinkMachine(tables, state);
+            m.SetVariable("own_receiver_busy", "true");
+            m.SetTimer("t1", TimerStatus.Running);
+            var act = () => m.Dispatch(new EventInput(ev));
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage($"`{expected}` emitted without a preceding N(r) staging assignment*", $"{state} {ev} busy arm");
+        }
+    }
+
+    // ─── #45 / #48: the v2.0 stub peer in the connect phase ───────────
+
+    private static ExplorerOptions V20(SeedKind seed, PeerKind peer, bool timerFree) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, Seed = seed, Modulo128A = seed == SeedKind.Disconnected, Peer = peer, FramesAb = 0, Budget = 0,
+        Invariants = timerFree ? Invariants.Default | Invariants.SelectiveProgress : Invariants.Default,
+    };
+
+    [Fact]
+    public void Defect45_Cold_V22_Connect_Never_Reaches_Figc46_So_The_Fallback_Is_Never_Attempted()
+    {
+        // The brief's seed: A Disconnected at modulo 128 issues
+        // DL_CONNECT_request; B is a v2.0 station that answers SABME with
+        // FRMR. #44 routes the SABME initiator to AwaitingConnection
+        // (figc4.2), which has no FRMR arm: the FRMR is swallowed by the
+        // "all other primitives" catch-all and the fallback of figc4.6 t14
+        // is never even reached from a cold connect. The link only comes up
+        // because figc4.2's T1 retry happens to send SABM, which the peer
+        // accepts; so with the default checks the run is clean, and the
+        // timer-free progress check is what sees it.
+        var result = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: true));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.SelectiveProgress);
+        result.Trace[0].Transition.Should().StartWith("v20:sabme_unknown_control_field_frmr");
+        result.Trace[1].Transition.Should().Be("t06_all_other_primitives__from_lower_layer", "#44: figc4.2 has no FRMR arm");
+        result.Trace[1].SummaryA.Should().StartWith("AwaitingConnection");
+        result.CounterexampleLength.Should().Be(2);
+
+        var lenient = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false));
+        lenient.Outcome.Should().Be(Outcome.NoViolation, "the figc4.2 T1 retry sends SABM and the v2.0 peer accepts it; A stays at modulo 128 (never reassigned by the tables, the #54 blind spot), which this abstract frame model cannot see");
+    }
+
+    [Fact]
+    public void Defect45_From_AwaitingV22Connection_The_Frmr_Fallback_Resends_Sabme()
+    {
+        // Seeded where figc4.6 applies (as #44's fix would route a cold
+        // connect): the FRMR takes t14, whose Establish Data Link runs before
+        // Set Version 2.0 and so sends SABME again while modulo 128 is still
+        // in effect. The v2.0 peer FRMRs that too; A is now on figc4.2, which
+        // ignores it, and only the T1 retry's SABM brings the link up.
+        var result = Run(V20(SeedKind.AwaitingV22Connection, PeerKind.V20Frmr, timerFree: true));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.SelectiveProgress);
+        result.Trace[1].Transition.Should().Be("t14_frmr_received");
+        result.Trace[1].Effects.Should().Contain("frame SABME command pf=1", "#45: the fallback re-establishes with SABME, not SABM");
+        result.Trace[1].SummaryA.Should().StartWith("AwaitingConnection");
+        result.Trace[2].Transition.Should().StartWith("v20:sabme_unknown_control_field_frmr");
+        result.Trace[3].Transition.Should().Be("t06_all_other_primitives__from_lower_layer");
+        result.CounterexampleLength.Should().Be(4);
+
+        Run(V20(SeedKind.AwaitingV22Connection, PeerKind.V20Frmr, timerFree: false)).Outcome.Should().Be(Outcome.NoViolation,
+            "with a timeout allowed the figc4.2 retry rescues the connect");
+    }
+
+    [Fact]
+    public void Defect48_Dm_To_Sabme_In_AwaitingV22Connection_Tears_Down()
+    {
+        // figc4.6's DM column: F=1 (what a well-behaved pre-v2.2 peer sends
+        // to a polled SABME, and what XRouter sends on the wire) goes
+        // straight to Disconnected with no fallback. One deliver each way.
+        var result = Run(V20(SeedKind.AwaitingV22Connection, PeerKind.V20Dm, timerFree: false));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[0].Transition.Should().StartWith("v20:sabme_is_not_sabm_dm_f1");
+        result.Trace[1].Transition.Should().Be("t11_dm_received_yes");
+        result.Trace[1].SummaryA.Should().StartWith("Disconnected");
+        result.CounterexampleLength.Should().Be(2);
+
+        // The table-driven peer refusing with DM (able_to_establish = false) lands on the same arm.
+        var tables = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.AwaitingV22Connection, PeerDeclinesSabme = true, FramesAb = 0, Budget = 0,
+        });
+        tables.Outcome.Should().Be(Outcome.Violation);
+        tables.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        tables.Trace[1].Transition.Should().Be("t11_dm_received_yes");
+    }
+
+    [Fact]
+    public void Defect48_Cold_V22_Connect_Refused_With_Dm_Dies_On_Figc42()
+    {
+        // The brief's seed with the DM variant: same shape as the existing
+        // #44/#48 case, now against the stub. figc4.2's DM F=1 arm tears down.
+        var result = Run(V20(SeedKind.Disconnected, PeerKind.V20Dm, timerFree: false));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[0].SummaryA.Should().StartWith("AwaitingConnection", "#44");
+        result.Trace[1].Transition.Should().Be("t03_dm_received_yes", "#48 class on figc4.2");
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Connect_Phase_Sanity_The_V20_Peer_Accepts_A_Mod8_Connect_Without_A_Timeout()
+    {
+        // No fixed tables exist to discriminate #45/#48 against; the control
+        // is the same peer with a v2.0 initiator: SABM, UA, up, no timer.
+        foreach (var peer in new[] { PeerKind.V20Frmr, PeerKind.V20Dm })
+        {
+            var result = Run(V20(SeedKind.Disconnected, peer, timerFree: true) with { Modulo128A = false });
+            result.Outcome.Should().Be(Outcome.NoViolation, $"{peer}");
+        }
+    }
+
+    [Fact]
+    public void Connect_Phase_Sanity_A_V22_Peer_Answers_The_Seeded_Sabme_With_Ua()
+    {
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Budget = 0,
+            Invariants = Invariants.Default | Invariants.SelectiveProgress,
         });
         result.Outcome.Should().Be(Outcome.NoViolation);
     }

@@ -191,10 +191,10 @@ public static class Explorer
         if (options.Invariants.HasFlag(Invariants.Quiescence))
         {
             var reach = CanReachQuiescence(nodes, excludeT1: false);
-            for (var i = 0; i < nodes.Count; i++)
+            var witness = PickWitness(nodes, reach, excludeT1: false);
+            if (witness >= 0)
             {
-                if (reach[i]) continue;
-                var (trace, final) = Replay(stepper, PathTo(nodes, i));
+                var (trace, final) = Replay(stepper, PathTo(nodes, witness));
                 var v = new Violation(Invariants.Quiescence, null,
                     "quiescence unreachable: from this state no fault-free path leads to a quiescent state (both Connected, nothing in flight or queued, V(s)=V(a) on both, all data delivered). " +
                     Describe(stepper, final));
@@ -204,12 +204,12 @@ public static class Explorer
             if (options.Invariants.HasFlag(Invariants.SelectiveProgress))
             {
                 var reachNoT1 = CanReachQuiescence(nodes, excludeT1: true);
-                for (var i = 0; i < nodes.Count; i++)
+                witness = PickWitness(nodes, reachNoT1, excludeT1: true);
+                if (witness >= 0)
                 {
-                    if (reachNoT1[i]) continue;
-                    var (trace, final) = Replay(stepper, PathTo(nodes, i));
+                    var (trace, final) = Replay(stepper, PathTo(nodes, witness));
                     var v = new Violation(Invariants.SelectiveProgress, null,
-                        "selective-recovery progress: from this state quiescence is reachable only through a T1 expiry; no fault-free, timer-free path completes the recovery. " +
+                        "timer-free progress: from this state quiescence is reachable only through a T1 expiry; no fault-free, timer-free path completes the recovery (data phase) or the connection (connect phase). " +
                         Describe(stepper, final));
                     return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null);
                 }
@@ -217,6 +217,38 @@ public static class Explorer
         }
 
         return new ExplorationResult(Outcome.NoViolation, null, Array.Empty<StepRecord>(), nodes.Count, edges, maxDepth, false, false, null);
+    }
+
+    /// <summary>
+    /// The state to report for a liveness failure: the shallowest state that
+    /// cannot reach quiescence AND has no non-fault (and, when T1 is
+    /// excluded, non-T1) edge to a different state, i.e. where the model is
+    /// actually stuck; failing that (a livelock cycle), the shallowest
+    /// non-reaching state. Returns -1 when every state can reach quiescence.
+    /// The seed itself is usually non-reaching too, but the stuck state is
+    /// the one that reads as a counterexample.
+    /// </summary>
+    private static int PickWitness(List<Node> nodes, bool[] reach, bool excludeT1)
+    {
+        var first = -1;
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (reach[i]) continue;
+            if (first < 0) first = i;
+            var e = nodes[i].Edges;
+            var stuck = true;
+            if (e is not null)
+            {
+                foreach (var (target, kind) in e)
+                {
+                    if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
+                    if (excludeT1 && kind == MoveKind.T1Expiry) continue;
+                    if (target != i) { stuck = false; break; }
+                }
+            }
+            if (stuck) return i;
+        }
+        return first;
     }
 
     private static bool[] CanReachQuiescence(List<Node> nodes, bool excludeT1)

@@ -21,6 +21,10 @@ public enum MoveKind
     SeizeConfirm,
     /// <summary>T1_expiry at the station (quiescent-timeout abstraction; see docs/explorer.md).</summary>
     T1Expiry,
+    /// <summary>DL_FLOW_OFF_request from the station's layer 3 (scenario-enabled; see docs/explorer.md).</summary>
+    FlowOff,
+    /// <summary>DL_FLOW_ON_request from the station's layer 3, lifting an earlier FlowOff.</summary>
+    FlowOn,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -90,6 +94,14 @@ public sealed class Stepper
         if (_o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
         if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0)
             throw new ArgumentException("the Disconnected seed supports A-to-B data only (B has no DL_DATA_request arm while Disconnected)", nameof(options));
+        if (_o.Seed == SeedKind.AwaitingV22Connection && (_o.FramesAb > 0 || _o.FramesBa > 0))
+            throw new ArgumentException("the AwaitingV22Connection seed is a connect-phase seed: no data (figc4.6 discards DL_DATA_request while layer 3 initiated)", nameof(options));
+        if (_o.Peer != PeerKind.Tables && _o.Seed == SeedKind.Connected)
+            throw new ArgumentException("the v2.0 stub peer is for the connect-phase seeds only (--seed disconnected or awaiting-v22)", nameof(options));
+        if (_o.Peer != PeerKind.Tables && (_o.FramesAb > 0 || _o.FramesBa > 0))
+            throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
+        if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
+            throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
         foreach (var (state, page) in tables.States)
             _eventsByState[state] = new HashSet<string>(page.Transitions.Select(t => t.On), StringComparer.Ordinal);
         _submittedA = Enumerable.Range(0, _o.FramesAb).Select(i => "a" + Inv(i)).ToArray();
@@ -115,10 +127,28 @@ public sealed class Stepper
     public SystemState Seed()
     {
         var initial = _o.Seed == SeedKind.Connected ? "Connected" : "Disconnected";
-        var state = new SystemState { A = NewMachine(Station.A, initial), B = NewMachine(Station.B, initial) };
+        var stub = _o.Peer == PeerKind.Tables ? null : new V20Peer(_o.Peer, Connected: false);
+        // With a stub peer the table-driven B is a placeholder that is never dispatched.
+        var state = new SystemState { A = NewMachine(Station.A, initial), B = NewMachine(Station.B, initial), StubPeer = stub };
 
         if (_o.Seed == SeedKind.Disconnected)
             state = Require(Inject(state, Station.A, new EventInput("DL_CONNECT_request"), "DL_CONNECT_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
+
+        if (_o.Seed == SeedKind.AwaitingV22Connection)
+        {
+            // The golden trace's initial state (frmr-fallback-downgrades-to-sabm)
+            // plus the SABME that put A there, still on the air.
+            var a = new DataLinkMachine(_tables, "AwaitingV22Connection");
+            a.SetVariable("modulo", "128");
+            a.SetVariable("k", Inv(_o.K));
+            a.SetVariable("n2", Inv(_o.N2));
+            a.SetVariable("version_2_2", "true");
+            a.SetVariable("srej_enabled", _o.Srej ? "true" : "false");
+            a.SetVariable("rc", "1");
+            a.SetVariable("layer_3_initiated", "true");
+            a.SetTimer("t1", TimerStatus.Running);
+            state = state with { A = a, ToB = new[] { new Frame("SABME", Command: true, Pf: true, Nr: null, Ns: null, Data: null) } };
+        }
 
         foreach (var label in _submittedA)
             state = Require(Inject(state, Station.A, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
@@ -156,13 +186,31 @@ public sealed class Stepper
     public bool IsQuiescent(SystemState s)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return QuiescentState(s.A.State) && QuiescentState(s.B.State)
+        // With the v2.0 stub as B, "B at rest" is simply "the stub is
+        // connected" (link established with modulo 8; it has no queue,
+        // variables or timers).
+        var bAtRest = s.StubPeer is not null
+            ? s.StubPeer.Connected
+            : QuiescentState(s.B.State) && s.B.QueueEntries.Count == 0 && s.B.Vs == s.B.Va && !s.SeizeOwedB;
+        return QuiescentState(s.A.State) && bAtRest
             && s.ToA.Count == 0 && s.ToB.Count == 0
-            && s.A.QueueEntries.Count == 0 && s.B.QueueEntries.Count == 0
-            && s.A.Vs == s.A.Va && s.B.Vs == s.B.Va
+            && s.A.QueueEntries.Count == 0
+            && s.A.Vs == s.A.Va
             && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
-            && !s.SeizeOwedA && !s.SeizeOwedB;
+            && !s.SeizeOwedA;
     }
+
+    /// <summary>One-line summary of a station for the counterexample log (the stub's own summary when it plays B).</summary>
+    private static string SummaryOf(SystemState s, Station station) =>
+        station == Station.B && s.StubPeer is not null ? s.StubPeer.Summary() : SystemState.Summary(s.Machine(station));
+
+    private bool FlowControls(Station station) => _o.FlowControl switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
 
     private bool QuiescentState(string state) =>
         state == "Connected" || (_o.TimerRecoveryIsQuiescent && state == "TimerRecovery");
@@ -192,6 +240,10 @@ public sealed class Stepper
                 }
             }
 
+            // The stub peer has no queue, timers or link multiplexer, and
+            // layer 3 never flow-controls it: channel moves only.
+            if (station == Station.B && s.StubPeer is not null) continue;
+
             if (PopChangesState(s, station))
             {
                 popEnabled[(int)station] = true;
@@ -200,6 +252,23 @@ public sealed class Stepper
 
             if (s.SeizeOwed(station) && SeizeConfirmEvent(s.Machine(station)) is not null)
                 moves.Add(new Move(MoveKind.SeizeConfirm, station));
+
+            // Layer-3 flow control, only where the page has a direct arm
+            // (Connected, TimerRecovery): FLOW_OFF once the station has
+            // delivered enough frames upward and a round is left, FLOW_ON
+            // whenever flow is off.
+            if (FlowControls(station))
+            {
+                if (s.FlowOff(station))
+                {
+                    if (Handles(s.Machine(station), "DL_FLOW_ON_request")) moves.Add(new Move(MoveKind.FlowOn, station));
+                }
+                else if (s.FlowRounds(station) < _o.FlowRounds && s.DeliveredAt(station) >= _o.FlowOffAfterDelivered
+                         && Handles(s.Machine(station), "DL_FLOW_OFF_request"))
+                {
+                    moves.Add(new Move(MoveKind.FlowOff, station));
+                }
+            }
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -293,23 +362,30 @@ public sealed class Stepper
             case MoveKind.Deliver:
             {
                 var frame = incoming[0];
+                if (station == Station.B && s.StubPeer is not null)
+                    return InjectStub(s, frame, $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, number);
                 return Inject(s, station, FrameInput(s.Machine(station), frame, station),
                     $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, clearOwed: false, number);
             }
             case MoveKind.Duplicate:
             {
                 var frame = incoming[0];
-                return Inject(s, station, FrameInput(s.Machine(station), frame, station),
-                    $"receives {frame.Render()} from {peer} (channel fault: DUPLICATE, a copy stays at the head; budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
-                    incoming, s.Budget - 1, clearOwed: false, number);
+                var action = $"receives {frame.Render()} from {peer} (channel fault: DUPLICATE, a copy stays at the head; budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})";
+                if (station == Station.B && s.StubPeer is not null)
+                    return InjectStub(s, frame, action, incoming, s.Budget - 1, number);
+                return Inject(s, station, FrameInput(s.Machine(station), frame, station), action, incoming, s.Budget - 1, clearOwed: false, number);
             }
+            case MoveKind.FlowOff:
+                return Inject(s, station, new EventInput("DL_FLOW_OFF_request"), "DL_FLOW_OFF_request (layer 3 turns flow off)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.FlowOn:
+                return Inject(s, station, new EventInput("DL_FLOW_ON_request"), "DL_FLOW_ON_request (layer 3 turns flow back on)", incoming, s.Budget, clearOwed: false, number);
             case MoveKind.Drop:
             {
                 var frame = incoming[0];
                 var next = WithIncoming(s, station, incoming.Skip(1).ToList()) with { Budget = s.Budget - 1 };
                 return new StepOutcome(next,
                     new StepRecord(number, $"channel {peer}->{station}", $"DROPS {frame.Render()} (budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
-                        null, Array.Empty<string>(), SystemState.Summary(next.A), SystemState.Summary(next.B)),
+                        null, Array.Empty<string>(), SummaryOf(next, Station.A), SummaryOf(next, Station.B)),
                     null);
             }
             case MoveKind.Reorder:
@@ -319,7 +395,7 @@ public sealed class Stepper
                 var next = WithIncoming(s, station, swapped) with { Budget = s.Budget - 1 };
                 return new StepOutcome(next,
                     new StepRecord(number, $"channel {peer}->{station}", $"REORDERS {incoming[0].Render()} behind {incoming[1].Render()} (budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
-                        null, Array.Empty<string>(), SystemState.Summary(next.A), SystemState.Summary(next.B)),
+                        null, Array.Empty<string>(), SummaryOf(next, Station.A), SummaryOf(next, Station.B)),
                     null);
             }
             case MoveKind.Pop:
@@ -350,6 +426,40 @@ public sealed class Stepper
 
     private static SystemState WithIncoming(SystemState s, Station station, IReadOnlyList<Frame> incoming) =>
         station == Station.A ? s with { ToA = incoming } : s with { ToB = incoming };
+
+    /// <summary>
+    /// Deliver a frame to the v2.0 stub playing station B: its responses
+    /// join the B-to-A channel and the rule that fired is the transition.
+    /// The stub is the environment, so no invariant is checked here; a
+    /// frame outside its rule set is a MachineError so the gap is visible.
+    /// </summary>
+    private static StepOutcome InjectStub(SystemState s, Frame frame, string action, IReadOnlyList<Frame> newIncoming, int newBudget, int number)
+    {
+        var stub = s.StubPeer!;
+        Violation? violation = null;
+        string? rule = null;
+        var outgoing = new List<Frame>(s.ToA);
+        var effectsText = new List<string>();
+        try
+        {
+            var (nextStub, responses, firedRule) = stub.Receive(frame);
+            rule = firedRule;
+            foreach (var response in responses)
+            {
+                outgoing.Add(response);
+                effectsText.Add("frame " + response.Render());
+            }
+            stub = nextStub;
+        }
+        catch (InvalidOperationException ex)
+        {
+            violation = new Violation(Invariants.MachineError, Station.B, $"v2.0 stub peer at station B: {ex.Message}");
+        }
+
+        var next = s with { StubPeer = stub, ToB = newIncoming, ToA = outgoing, Budget = newBudget };
+        var record = new StepRecord(number, "B", action, rule, effectsText, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+        return new StepOutcome(next, record, violation);
+    }
 
     /// <summary>
     /// Dispatch <paramref name="input"/> on a clone of the station's machine,
@@ -413,6 +523,11 @@ public sealed class Stepper
                     }
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
                     {
+                        if (violation is null && On(Invariants.FlowOffDelivery) && s.FlowOff(station))
+                        {
+                            violation = new Violation(Invariants.FlowOffDelivery, station,
+                                $"station {station} delivered `{ue.Detail}` upward while its layer 3 has flow off (DL_FLOW_OFF_request issued and not yet lifted): the busy condition did not hold the data back");
+                        }
                         var submitted = Submitted(peer);
                         var expected = delivered < submitted.Length ? submitted[delivered] : null;
                         if (expected is not null && string.Equals(ue.Detail, expected, StringComparison.Ordinal))
@@ -443,6 +558,27 @@ public sealed class Stepper
             if (!reset) acked += Distance(pre.Va, m.Va, m.Modulo);
         }
 
+        // Layer-3 flow control bookkeeping and the busy-condition check
+        // (§6.4.10: entering the busy condition is what DL-FLOW-OFF is for,
+        // and the figure's own DL-FLOW-ON arm only acts when busy is set).
+        var flowOff = s.FlowOff(station);
+        var flowRounds = s.FlowRounds(station);
+        if (result is not null && input!.Event == "DL_FLOW_OFF_request")
+        {
+            flowOff = true;
+            if (violation is null && On(Invariants.BusyTracksFlow) && !m.OwnReceiverBusy)
+                violation = new Violation(Invariants.BusyTracksFlow, station,
+                    $"station {station} took {result.TransitionId} on DL_FLOW_OFF_request but its own-receiver-busy condition is still clear: layer 3 cannot enter the busy condition (§6.4.10) from not-busy");
+        }
+        else if (result is not null && input!.Event == "DL_FLOW_ON_request")
+        {
+            flowOff = false;
+            flowRounds++;
+            if (violation is null && On(Invariants.BusyTracksFlow) && m.OwnReceiverBusy)
+                violation = new Violation(Invariants.BusyTracksFlow, station,
+                    $"station {station} took {result.TransitionId} on DL_FLOW_ON_request but its own-receiver-busy condition is still set");
+        }
+
         if (violation is null && On(Invariants.DefinedState) && !KnownStates.Contains(m.State))
             violation = new Violation(Invariants.DefinedState, station, $"station {station} is in undefined state `{m.State}`");
 
@@ -468,10 +604,14 @@ public sealed class Stepper
             DeliveredAtB = station == Station.B ? delivered : s.DeliveredAtB,
             AckedA = station == Station.A ? acked : s.AckedA,
             AckedB = station == Station.B ? acked : s.AckedB,
+            FlowOffA = station == Station.A ? flowOff : s.FlowOffA,
+            FlowOffB = station == Station.B ? flowOff : s.FlowOffB,
+            FlowRoundsA = station == Station.A ? flowRounds : s.FlowRoundsA,
+            FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
-            SystemState.Summary(next.A), SystemState.Summary(next.B));
+            SummaryOf(next, Station.A), SummaryOf(next, Station.B));
         return new StepOutcome(next, record, violation);
     }
 
