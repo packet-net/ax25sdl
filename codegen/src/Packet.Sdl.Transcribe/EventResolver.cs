@@ -52,9 +52,46 @@ public static class EventResolver
         [("I Frame", "Signal reception from lower layer")] = "I_received",
     };
 
+    /// <summary>
+    /// Service-primitive families, by the prefix the figures draw before the
+    /// first dash: DL- (Data Link), MDL- (Management Data Link), LM- (Link
+    /// Multiplexer), PH- (Physical) and HW- (the radio hardware below the
+    /// physical machines, Annex C2). Some figures draw an underscore where
+    /// the dash belongs ("PH_SIEZE Confirm" on C2a.4), so either is accepted.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PrimitivePrefix = new(
+        "^(DL|MDL|LM|PH|HW)[-_]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// A timer expiry: "Timer T1 Expiry" (Data Link), "T102 Expiry" (C2a),
+    /// "TM 201 Expiry" (C5.2, drawn with a space) and "TR210 Expiry" (C6).
+    /// The timer name keeps its case and loses any space.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex TimerExpiry = new(
+        "^(?:Timer )?(T[A-Z]* ?[0-9]+) Expiry$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>A frame drawn with its command/response role ("XID Command", "FRMR Response", C5).</summary>
+    private static readonly System.Text.RegularExpressions.Regex FrameWithRole = new(
+        "^([A-Z]+) (Command|Response)$");
+
+    /// <summary>An event id must be usable as an identifier in every backend and in a transition id.</summary>
+    private static readonly System.Text.RegularExpressions.Regex EventIdShape = new("^[A-Za-z][A-Za-z0-9_]*$");
+
     public static string ResolveTriggerEvent(string label, string shapeClass)
     {
-        var trimmed = label.Trim();
+        var resolved = ResolveUnchecked(label, shapeClass);
+        if (!EventIdShape.IsMatch(resolved))
+            throw new InvalidDataException(
+                $"trigger label '{label.Trim()}' ({shapeClass}) resolves to '{resolved}', which is not a valid event id. " +
+                "Add a rule or an ExplicitMap entry for it in codegen/src/Packet.Sdl.Transcribe/EventResolver.cs.");
+        return resolved;
+    }
+
+    private static string ResolveUnchecked(string label, string shapeClass)
+    {
+        // A trigger label is one name however yEd wraps it, so line breaks
+        // and runs of spaces count as a single space.
+        var trimmed = System.Text.RegularExpressions.Regex.Replace(label, @"\s+", " ").Trim();
         if (ExplicitMap.TryGetValue((trimmed, shapeClass), out var explicitName))
             return explicitName;
 
@@ -62,30 +99,51 @@ public static class EventResolver
         if (trimmed.Equals("All Other Commands", StringComparison.OrdinalIgnoreCase))
             return "all_other_commands";
 
-        // "Timer T1 Expiry" / "Timer T2 Expiry" / "Timer T3 Expiry" → "T1_expiry" etc.
-        var timerMatch = System.Text.RegularExpressions.Regex.Match(
-            trimmed, "^Timer (T[0-9])+ Expiry$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (timerMatch.Success)
-            return timerMatch.Groups[1].Value + "_expiry";
+        // Any other "All Other ... Primitives" catch-all ("All Other DL
+        // Primitives", C6) records which side it was drawn on, the same way
+        // the plain "All Other Primitives" does in ExplicitMap above.
+        if (trimmed.StartsWith("All Other ", StringComparison.OrdinalIgnoreCase)
+         && trimmed.EndsWith(" Primitives", StringComparison.OrdinalIgnoreCase))
+        {
+            var side = shapeClass switch
+            {
+                "Signal reception from upper layer" => "__from_upper_layer",
+                "Signal reception from lower layer" => "__from_lower_layer",
+                _ => "",
+            };
+            return SnakeLower(trimmed) + side;
+        }
 
-        // "DL-X Y" → "DL_X_y" / "MDL-X Y" → "MDL_X_y" / "LM-X Y" → "LM_X_y"
-        // (request/confirm/indicate lowercased)
-        if (trimmed.StartsWith("DL-", StringComparison.OrdinalIgnoreCase)
-         || trimmed.StartsWith("MDL-", StringComparison.OrdinalIgnoreCase)
-         || trimmed.StartsWith("LM-", StringComparison.OrdinalIgnoreCase))
+        // "Timer T1 Expiry" → "T1_expiry"; "TM 201 Expiry" → "TM201_expiry".
+        var timerMatch = TimerExpiry.Match(trimmed);
+        if (timerMatch.Success)
+            return timerMatch.Groups[1].Value.Replace(" ", "", StringComparison.Ordinal).ToUpperInvariant() + "_expiry";
+
+        // "DL-X Y" → "DL_X_y", likewise MDL-, LM-, PH- and HW-
+        // (request/confirm/indication lowercased).
+        if (PrimitivePrefix.IsMatch(trimmed))
             return NormaliseDashPrefixedPrimitive(trimmed);
 
         // Bare frame name → "<NAME>_received"
         if (FrameNames.Contains(trimmed))
             return trimmed + "_received";
 
+        // "XID Response" → "XID_response_received" (events.yaml § frames_received).
+        var roleMatch = FrameWithRole.Match(trimmed);
+        if (roleMatch.Success && FrameNames.Contains(roleMatch.Groups[1].Value))
+            return $"{roleMatch.Groups[1].Value}_{roleMatch.Groups[2].Value.ToLowerInvariant()}_received";
+
         // "Control Field Error" / "Info Not Permitted In Frame" / "U or S
-        // Frame Length Error" — title-case → fully snake_case lowercase to
-        // match events.yaml § internal entries. (I_frame_pops_off_queue is
-        // the lone exception, handled via ExplicitMap above.)
-        return string.Join('_', trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                                       .Select(s => s.ToLowerInvariant()));
+        // Frame Length Error" / "Queue Empty": title case to fully
+        // snake_case lowercase to match events.yaml § internal entries.
+        // (I_frame_pops_off_queue is the lone exception, handled via
+        // ExplicitMap above.)
+        return SnakeLower(trimmed);
     }
+
+    private static string SnakeLower(string s) =>
+        string.Join('_', s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                          .Select(p => p.ToLowerInvariant()));
 
     private static string NormaliseDashPrefixedPrimitive(string label)
     {
@@ -94,10 +152,15 @@ public static class EventResolver
         // "DL-ERROR Indication (L)" → "DL_ERROR_indication"  (drop parenthetical)
         // "LM-SEIZE Confirm" → "LM_SEIZE_confirm"
         // "MDL-NEGOTIATE Request" → "MDL_NEGOTIATE_request"
+        // "PH-SIEZE Confirm" → "PH_SIEZE_confirm"  (figure spelling kept)
+        // "PH-EXPEDITED_DATA Request" → "PH_EXPEDITED_DATA_request"
         var stripped = StripTrailingParenthetical(label);
         var parts = stripped.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        // First part keeps its case (DL/MDL/LM + verb, replace dashes with underscores).
-        var head = parts[0].Replace('-', '_');
+        // First part is the primitive name: upper-cased, dashes to
+        // underscores. The figures' spelling is kept (SIEZE stays SIEZE);
+        // only the case is normalised, so "PH-Quiet Indication" (C3.2) and
+        // "PH-QUIET Indication" (C3.1) are one event.
+        var head = parts[0].Replace('-', '_').ToUpperInvariant();
         // Trailing words lowercase (the action: Request/Confirm/Indication/Indicate).
         var tail = string.Join('_', parts.Skip(1).Select(p => p.ToLowerInvariant()));
         return string.IsNullOrEmpty(tail) ? head : $"{head}_{tail}";

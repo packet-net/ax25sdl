@@ -15,14 +15,14 @@ public static class SubroutinesWalker
 
     public static SubroutinePage Walk(GraphmlGraph graph, string graphmlFilename)
     {
-        var machine = MachineFromFilename(graphmlFilename);
+        var (machine, figure) = MachineAndFigureFromFilename(graphmlFilename);
         var page = new SubroutinePage
         {
             Machine = machine,
             Source = new PageSource
             {
-                Spec = "ax.25.2.2.4_Oct_25",
-                Figure = "figc4.7",
+                Spec = Packet.Sdl.IR.AnnexC.Spec,
+                Figure = figure,
             },
         };
 
@@ -72,26 +72,19 @@ public static class SubroutinesWalker
         return page;
     }
 
-    private static string MachineFromFilename(string filename)
+    /// <summary>
+    /// "DataLink_Subroutines.graphml" gives ("data_link", "figc4.7");
+    /// "ManagementDataLink_T1NegotiationSubroutines.graphml" gives
+    /// ("management_data_link", "figc5.8"). Looked up in the Annex C table;
+    /// an unknown prefix or page, or a state page, throws.
+    /// </summary>
+    private static (string Machine, string Figure) MachineAndFigureFromFilename(string filename)
     {
-        // "DataLink_Subroutines.graphml" → "data_link"
-        var bare = Path.GetFileNameWithoutExtension(filename);
-        var underscoreAt = bare.IndexOf('_');
-        if (underscoreAt < 0)
+        var (machine, page) = Packet.Sdl.IR.AnnexC.ResolveGraphmlFilename(filename);
+        if (!page.IsSubroutines)
             throw new InvalidDataException(
-                $"subroutines filename '{filename}' must be <Machine>_Subroutines.graphml.");
-        return PascalCaseToSnakeCase(bare[..underscoreAt]);
-    }
-
-    private static string PascalCaseToSnakeCase(string pascal)
-    {
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < pascal.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(pascal[i])) sb.Append('_');
-            sb.Append(char.ToLowerInvariant(pascal[i]));
-        }
-        return sb.ToString();
+                $"graphml filename '{filename}' names the {machine.Title} {page.Key} state, but the graphml is drawn as a subroutines page.");
+        return (machine.Id, page.Figure);
     }
 
     /// <summary>
@@ -216,6 +209,8 @@ public static class SubroutinesWalker
         if (node.ShapeClass == "Test or decision") yield break;
         var kind = EventResolver.ShapeClassToActionKind(node.ShapeClass);
         if (kind is null) yield break;
+        // One action per line of the label, as on state pages (see
+        // Walker.NodeToPathSteps).
         var lines = node.Label
             .Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries)
             .Select(EventResolver.NormaliseActionLabel)

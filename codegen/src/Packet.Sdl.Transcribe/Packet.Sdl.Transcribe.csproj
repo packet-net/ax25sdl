@@ -14,4 +14,9 @@
     <PackageReference Include="CommandLineParser" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Annex C machine and figure table (Packet.Sdl.IR.AnnexC) is shared with codegen. -->
+    <ProjectReference Include="..\Packet.Sdl.IR\Packet.Sdl.IR.csproj" />
+  </ItemGroup>
+
 </Project>

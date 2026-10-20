@@ -242,9 +242,143 @@ public class TranscribeTests
     [InlineData("Control Field Error",     "Signal reception from lower layer", "control_field_error")]
     [InlineData("Info Not Permitted In Frame", "Signal reception from lower layer", "info_not_permitted_in_frame")]
     [InlineData("U or S Frame Length Error", "Signal reception from lower layer", "u_or_s_frame_length_error")]
+    // Annex C machines other than Data Link (packethacking/ax25spec#116).
+    [InlineData("LM-SEIZE Confirm",        "Signal reception from lower layer", "LM_SEIZE_confirm")]
+    [InlineData("LM-SIEZE Request",        "Signal reception from upper layer", "LM_SIEZE_request")]
+    [InlineData("LM-EXPEDITED-DATA Request", "Signal reception from upper layer", "LM_EXPEDITED_DATA_request")]
+    [InlineData("PH-SIEZE Confirm",        "Signal reception from lower layer", "PH_SIEZE_confirm")]
+    [InlineData("PH-Quiet Indication",     "Signal reception from lower layer", "PH_QUIET_indication")]
+    [InlineData("PH_SIEZE Confirm",        "Signal reception from lower layer", "PH_SIEZE_confirm")]
+    [InlineData("PH-EXPEDITED_DATA Request", "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
+    [InlineData("HW-AOS Indication",       "Signal reception from lower layer", "HW_AOS_indication")]
+    [InlineData("MDL-NEGOTIATE Request",   "Signal reception from upper layer", "MDL_NEGOTIATE_request")]
+    [InlineData("Timer T3 Expiry",         "Internal Signal Reception",         "T3_expiry")]
+    [InlineData("T102 Expiry",             "Internal Signal Reception",         "T102_expiry")]
+    [InlineData("TM 201 Expiry",           "Signal reception from upper layer", "TM201_expiry")]
+    [InlineData("TR210 Expiry",            "Signal reception from lower layer", "TR210_expiry")]
+    [InlineData("XID Response",            "Signal reception from lower layer", "XID_response_received")]
+    [InlineData("XID Command",             "Signal reception from lower layer", "XID_command_received")]
+    [InlineData("FRMR Response",           "Signal reception from lower layer", "FRMR_response_received")]
+    [InlineData("All Other DL Primitives", "Signal reception from upper layer", "all_other_dl_primitives__from_upper_layer")]
+    [InlineData("All Other DL Primitives", "Signal reception from lower layer", "all_other_dl_primitives__from_lower_layer")]
+    [InlineData("Queue Empty",             "Internal Signal Reception",         "queue_empty")]
+    [InlineData("PH-DATA\nIndication",     "Signal reception from lower layer", "PH_DATA_indication")]
     public void EventResolver_canonicalises_trigger_labels(string label, string shapeClass, string expected)
     {
         EventResolver.ResolveTriggerEvent(label, shapeClass).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("T106 Expiry Or T108?", "Internal Signal Reception")]
+    [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer")]
+    public void EventResolver_rejects_a_label_with_no_rule_rather_than_emit_a_bad_id(string label, string shapeClass)
+    {
+        // Before #116 an unruled label fell through to a lower-cased id that
+        // could carry dashes or '?', breaking the transition-id pattern.
+        var act = () => EventResolver.ResolveTriggerEvent(label, shapeClass);
+        act.Should().Throw<InvalidDataException>().WithMessage("*not a valid event id*EventResolver.cs*");
+    }
+
+    // ─── Annex C machine and figure table ─────────────────────────────
+
+    [Theory]
+    [InlineData("DataLink_Disconnected.graphml",          "data_link",            "Disconnected", "figc4.1")]
+    [InlineData("DataLink_AwaitingV22Connection.graphml", "data_link",            "AwaitingV22Connection", "figc4.6")]
+    [InlineData("LinkMux_Idle.graphml",                   "link_mux",             "Idle",         "figc3.1")]
+    [InlineData("LinkMux_SiezePending.graphml",           "link_mux",             "SiezePending", "figc3.2")]
+    // Ready is a state of four machines; each gets its own figure.
+    [InlineData("SimplexPhy_Ready.graphml",               "simplex_phy",          "Ready",        "figc2a.1")]
+    [InlineData("ManagementDataLink_Ready.graphml",       "management_data_link", "Ready",        "figc5.1")]
+    [InlineData("Segmenter_Ready.graphml",                "segmenter",            "Ready",        "figc6.1")]
+    [InlineData("Reassembler_Ready.graphml",              "reassembler",          "Ready",        "figc6.2")]
+    [InlineData("DuplexPhy_Receiving.graphml",            "duplex_phy",           "Receiving",    "figc2b.2")]
+    [InlineData("SimplexPhy_Receiving.graphml",           "simplex_phy",          "Receiving",    "figc2a.2")]
+    public void Walker_takes_machine_and_figure_from_the_Annex_C_table(
+        string filename, string expectedMachine, string expectedState, string expectedFigure)
+    {
+        var page = Walker.Walk(SingleColumnGraph(expectedState, "All Other Primitives"), filename);
+
+        page.Machine.Should().Be(expectedMachine);
+        page.State.Should().Be(expectedState);
+        page.Source.Figure.Should().Be(expectedFigure);
+    }
+
+    [Theory]
+    [InlineData("DataLink_Subroutines.graphml",                         "data_link",            "figc4.7")]
+    [InlineData("LinkMux_Subroutines.graphml",                          "link_mux",             "figc3.4")]
+    [InlineData("SimplexPhy_Subroutines.graphml",                       "simplex_phy",          "figc2a.s")]
+    [InlineData("ManagementDataLink_T1NegotiationSubroutines.graphml",  "management_data_link", "figc5.8")]
+    public void Subroutines_walker_takes_machine_and_figure_from_the_Annex_C_table(
+        string filename, string expectedMachine, string expectedFigure)
+    {
+        var page = SubroutinesWalker.Walk(SynthesiseSingleStartGraph("Queue Event"), filename);
+
+        page.Machine.Should().Be(expectedMachine);
+        page.Source.Figure.Should().Be(expectedFigure);
+    }
+
+    [Theory]
+    [InlineData("LinkMultiplexer_Idle.graphml", "*prefix 'LinkMultiplexer' is not an Annex C machine*LinkMux*")]
+    [InlineData("LinkMux_Seize.graphml",        "*'Seize' is not a page of Link Multiplexer*SiezePending*")]
+    [InlineData("DataLink_Subroutines.graphml", "*subroutines page*no Subroutine start node*")]
+    [InlineData("Idle.graphml",                 "*<Machine>_<Page>.graphml*")]
+    public void Walker_rejects_a_filename_the_Annex_C_table_does_not_know(string filename, string expectedMessage)
+    {
+        var act = () => Walker.Walk(SingleColumnGraph("Idle", "All Other Primitives"), filename);
+        act.Should().Throw<InvalidDataException>().WithMessage(expectedMessage);
+    }
+
+    [Fact]
+    public void A_PH_trigger_gets_a_schema_shaped_transition_id()
+    {
+        // The C3.1 trial transcriptions got `t07_ph-sieze_confirm`, which the
+        // schema's ^t[0-9]{2}_[a-z0-9_]+$ pattern rejects.
+        var page = Walker.Walk(SingleColumnGraph("Idle", "PH-SIEZE Confirm", "Signal reception from lower layer"),
+                               "LinkMux_Idle.graphml");
+
+        var t = page.Transitions.Should().ContainSingle().Subject;
+        t.Id.Should().Be("t01_ph_sieze_confirm").And.MatchRegex("^t[0-9]{2}_[a-z0-9_]+$");
+        t.On.Should().Be("PH_SIEZE_confirm");
+        t.OnLabel.Should().Be("PH-SIEZE Confirm");
+    }
+
+    [Fact]
+    public void Every_Annex_C_machine_id_is_in_the_schema_enum()
+    {
+        var schemaPath = Path.Combine(FindRepoRoot(Path.GetDirectoryName(typeof(TranscribeTests).Assembly.Location)!),
+                                      "spec-sdl", "schema", "sdl-machine.schema.json");
+        var schema = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(schemaPath))!;
+        var allowed = schema["properties"]!["machine"]!["enum"]!.AsArray().Select(n => n!.GetValue<string>()).ToList();
+
+        Packet.Sdl.IR.AnnexC.Machines.Select(m => m.Id).Should().BeSubsetOf(allowed);
+    }
+
+    [Fact]
+    public void Annex_C_table_is_consistent()
+    {
+        var table = Packet.Sdl.IR.AnnexC.Pages;
+        table.Select(p => p.Figure).Should().OnlyHaveUniqueItems();
+        table.Select(p => (p.Machine, p.Key)).Should().OnlyHaveUniqueItems();
+        table.Select(p => p.Machine).Distinct()
+             .Should().BeEquivalentTo(Packet.Sdl.IR.AnnexC.Machines.Select(m => m.Id));
+        table.Where(p => p.IsSubroutines).Should().OnlyContain(p => p.Key.EndsWith("Subroutines"));
+        // C2a.1 to C2a.7 + C2a.s, C2b.1 to C2b.5, C3.1 to C3.4, C4.1 to C4.7,
+        // C5.1 to C5.8, C6.1 to C6.4.
+        table.Should().HaveCount(8 + 5 + 4 + 7 + 8 + 4);
+    }
+
+    /// <summary>Entry State → one trigger → back to the same State.</summary>
+    private static GraphmlGraph SingleColumnGraph(string state, string trigger,
+                                                  string shapeClass = "Signal reception from upper layer")
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "0 " + state,  0, 0),
+            new("n1", shapeClass, trigger,    0, 1),
+            new("n2", "State", "0 " + state,  0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+        return new GraphmlGraph("synthetic", nodes, edges);
     }
 
     [Theory]
@@ -286,9 +420,9 @@ public class TranscribeTests
             new("e2", "n2", "n3", label0),
             new("e3", "n2", "n4", label1),
         };
-        var graph = new GraphmlGraph("DataLink_TestState.graphml", nodes, edges);
+        var graph = new GraphmlGraph("DataLink_Connected.graphml", nodes, edges);
 
-        var act = () => Walker.Walk(graph, "DataLink_TestState.graphml");
+        var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().Throw<InvalidDataException>()
             .WithMessage("*no branch label*every out-edge of a Test-or-decision must be labelled*");
@@ -312,9 +446,9 @@ public class TranscribeTests
             new("e2", "n2", "n3", "Yes"),
             new("e3", "n2", "n4", "No"),
         };
-        var graph = new GraphmlGraph("DataLink_TestState.graphml", nodes, edges);
+        var graph = new GraphmlGraph("DataLink_Connected.graphml", nodes, edges);
 
-        var act = () => Walker.Walk(graph, "DataLink_TestState.graphml");
+        var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().NotThrow();
     }
@@ -393,9 +527,9 @@ public class TranscribeTests
             new("e1", "n1", "n2", ""),
             new("e2", "n2", "n1", ""),   // unguarded back-edge
         };
-        var graph = new GraphmlGraph("DataLink_TestState.graphml", nodes, edges);
+        var graph = new GraphmlGraph("DataLink_Connected.graphml", nodes, edges);
 
-        var act = () => Walker.Walk(graph, "DataLink_TestState.graphml");
+        var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().Throw<System.IO.InvalidDataException>().WithMessage("*guarded*");
     }

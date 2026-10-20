@@ -176,10 +176,11 @@ internal static class Program
         // State-target lint: every transition's `next:` must name a state
         // that exists somewhere in the same machine. Catches transcription
         // typos like `next: connecteed` that would otherwise wedge the
-        // session in a state the runtime can't dispatch on. Runtime-
-        // agnostic, operating on SDL pages directly rather than against any
-        // runtime file.
-        LintStateTargets(pages, errors);
+        // session in a state the runtime can't dispatch on. A target that
+        // Annex C draws for the machine but that has no page yet is not a
+        // typo: it marks the machine as partly transcribed, and the machine
+        // is withheld from generation (below) instead of failing the build.
+        var withheld = LintStateTargets(pages, errors);
 
         // Per-state catchall-coverage lint: every state should have at
         // least one transition triggered by a `catchalls:` event (e.g.
@@ -200,6 +201,32 @@ internal static class Program
         // Resolve every page up front. The totality lint needs the composed
         // guards (after the ax25sdl#53 stale-read substitution), i.e. exactly
         // what the backends emit, and the emit loops below reuse the same IR.
+        // A partly transcribed machine has been checked like any other (every
+        // lint above ran on its pages), but nothing is generated from it until
+        // every state its pages lead to has a page: no tables, no verbs or
+        // guard atoms, no totality run, and none of the events only it uses in
+        // the closed event sets. Data Link output is unchanged while, say, the
+        // Link Multiplexer is transcribed one figure at a time.
+        // docs/sdl-transcription-runbook.md, "Partly transcribed machines".
+        var withheldOnlyEvents = new HashSet<string>(StringComparer.Ordinal);
+        if (withheld.Count > 0)
+        {
+            foreach (var (machine, missing) in withheld.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            {
+                Console.WriteLine($"  withheld  {machine}: partly transcribed, no page yet for {string.Join(", ", missing.Order(StringComparer.Ordinal))}. " +
+                                  "Its pages are checked, but nothing is generated from them.");
+            }
+            var keptEvents = pages.Where(p => !withheld.ContainsKey(p.Machine))
+                                  .SelectMany(p => p.Transitions).Select(t => t.On)
+                                  .ToHashSet(StringComparer.Ordinal);
+            withheldOnlyEvents.UnionWith(pages.Where(p => withheld.ContainsKey(p.Machine))
+                                              .SelectMany(p => p.Transitions).Select(t => t.On)
+                                              .Where(e => !keptEvents.Contains(e)));
+            pages = pages.Where(p => !withheld.ContainsKey(p.Machine)).ToList();
+            subroutinePages = subroutinePages.Where(p => !withheld.ContainsKey(p.Machine)).ToList();
+        }
+        var emittedEvents = events.Where(e => !withheldOnlyEvents.Contains(e)).ToList();
+
         var resolvedPages = pages.Select(Resolver.Resolve).ToList();
         var resolvedSubPages = subroutinePages.Select(Resolver.Resolve).ToList();
 
@@ -481,7 +508,7 @@ internal static class Program
                 Console.WriteLine("  ok  (all pages + subroutines)  →  Ax25Guard.g.cs");
 
                 var eventEnumPath = Path.Combine(plan.CsharpOut, "Ax25Event.g.cs");
-                WriteIfChanged(eventEnumPath, CsharpEmitter.EmitEventEnum(events));
+                WriteIfChanged(eventEnumPath, CsharpEmitter.EmitEventEnum(emittedEvents));
                 writtenCsharpCode.Add(Path.GetFullPath(eventEnumPath));
                 Console.WriteLine("  ok  (events.yaml)  →  Ax25Event.g.cs");
             }
@@ -498,7 +525,7 @@ internal static class Program
                 Console.WriteLine("  ok  (all pages + subroutines)  →  ax25-guard.g.ts");
 
                 var eventUnionPath = Path.Combine(plan.TsOut, "ax25-event.g.ts");
-                WriteIfChanged(eventUnionPath, TsEmitter.EmitEventUnion(events));
+                WriteIfChanged(eventUnionPath, TsEmitter.EmitEventUnion(emittedEvents));
                 writtenTs.Add(Path.GetFullPath(eventUnionPath));
                 Console.WriteLine("  ok  (events.yaml)  →  ax25-event.g.ts");
             }
@@ -515,7 +542,7 @@ internal static class Program
                 Console.WriteLine("  ok  (all pages + subroutines)  →  ax25_guard.g.rs");
 
                 var eventEnumPath = Path.Combine(plan.RustOut, "ax25_event.g.rs");
-                WriteIfChanged(eventEnumPath, RustEmitter.EmitEventEnum(events));
+                WriteIfChanged(eventEnumPath, RustEmitter.EmitEventEnum(emittedEvents));
                 writtenRust.Add(Path.GetFullPath(eventEnumPath));
                 Console.WriteLine("  ok  (events.yaml)  →  ax25_event.g.rs");
             }
@@ -967,39 +994,33 @@ internal static class Program
     // ─── State-target lint ──────────────────────────────────────────────
 
     /// <summary>
-    /// Every transition's `next:` must name a state that exists somewhere
-    /// in the same machine. Catches transcription typos before the runtime
-    /// silently wedges in a state for which no transitions are dispatched.
+    /// Every transition's `next:` must name a state of the same machine.
+    /// Catches transcription typos before the runtime silently wedges in a
+    /// state for which no transitions are dispatched. Returns the machines
+    /// that are only partly transcribed, each with the Annex C states its
+    /// pages lead to that have no page yet.
     /// </summary>
     /// <remarks>
-    /// "Same machine" is taken from the page's <c>machine:</c> field. We
-    /// collect every declared state per machine from <c>state:</c> fields
-    /// across all pages and check `next:` against that set.
+    /// "Same machine" is taken from the page's <c>machine:</c> field, which
+    /// must be an Annex C machine (<see cref="AnnexC"/>). A target with no
+    /// page is an error unless <see cref="AnnexC"/> lists it as a state of
+    /// that machine, in which case it has simply not been transcribed yet
+    /// and the machine is withheld from generation by the caller. Pages
+    /// marked <c>coverage: partial</c> are skipped, as before: their
+    /// cross-page consistency is knowingly incomplete.
     /// </remarks>
-    /// <summary>
-    /// Allow-list of <c>next:</c> state targets that don't have a
-    /// corresponding <c>*.sdl.yaml</c> page yet but ARE registered at
-    /// runtime (typically with an empty transition list — see
-    /// <c>TransitionMap</c> wiring in the rig builders). Add an entry
-    /// here with a one-line reason rather than letting the lint shrug.
-    /// </summary>
-    private static readonly HashSet<string> StateTargetAllowList = new(StringComparer.Ordinal)
-    {
-        // figc4.5 not yet transcribed. figc4.4 t38 / t39 (T1 / T3
-        // expiry from Connected) target TimerRecovery, which is a real
-        // state in the v2.2 spec but its page hasn't been transcribed
-        // yet. Runtime registers TransitionMap[TimerRecovery] = empty
-        // so the dispatcher dictionary lookup succeeds; semantically a
-        // gap until figc4.5 lands. See plan.md §6.4.
-        "TimerRecovery",
-    };
-
-    private static void LintStateTargets(List<SdlPage> pages, List<string> errors)
+    private static Dictionary<string, HashSet<string>> LintStateTargets(List<SdlPage> pages, List<string> errors)
     {
         var statesByMachine = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var page in pages)
         {
             if (string.IsNullOrWhiteSpace(page.Machine) || string.IsNullOrWhiteSpace(page.State)) continue;
+            if (AnnexC.MachineById(page.Machine) is null)
+            {
+                errors.Add(
+                    $"{page.SourcePath}: machine `{page.Machine}` is not an Annex C machine " +
+                    $"(known: {string.Join(", ", AnnexC.Machines.Select(m => m.Id))}).");
+            }
             if (!statesByMachine.TryGetValue(page.Machine, out var set))
             {
                 set = new HashSet<string>(StringComparer.Ordinal);
@@ -1008,26 +1029,36 @@ internal static class Program
             set.Add(page.State);
         }
 
+        var partly = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var page in pages)
         {
-            // `coverage: partial` signals "this transcription is a
-            // work-in-progress" — cross-page consistency is intentionally
-            // incomplete. Same escape hatch the catchall lint uses.
             if (string.Equals(page.Coverage, "partial", StringComparison.OrdinalIgnoreCase)) continue;
             if (!statesByMachine.TryGetValue(page.Machine, out var validStates)) continue;
+            var annexStates = AnnexC.StatesOf(page.Machine);
             foreach (var t in page.Transitions)
             {
                 if (string.IsNullOrWhiteSpace(t.Next)) continue;
                 if (validStates.Contains(t.Next)) continue;
-                if (StateTargetAllowList.Contains(t.Next)) continue;
+                if (annexStates.Contains(t.Next, StringComparer.Ordinal))
+                {
+                    if (!partly.TryGetValue(page.Machine, out var missing))
+                    {
+                        missing = new HashSet<string>(StringComparer.Ordinal);
+                        partly[page.Machine] = missing;
+                    }
+                    missing.Add(t.Next);
+                    continue;
+                }
                 errors.Add(
                     $"{page.SourcePath}: transition `{t.Id}` targets state `{t.Next}` which is not " +
-                    $"a known state in machine `{page.Machine}` (known: {string.Join(", ", validStates.OrderBy(x => x, StringComparer.Ordinal))}). " +
-                    "Typo, OR add a new *.sdl.yaml page declaring the target state, OR add an entry to " +
-                    "StateTargetAllowList in codegen/src/Packet.Sdl.CodeGen/Program.cs with a one-line reason.");
+                    $"a known state in machine `{page.Machine}` (transcribed: {string.Join(", ", validStates.OrderBy(x => x, StringComparer.Ordinal))}; " +
+                    $"Annex C: {string.Join(", ", annexStates)}). " +
+                    "Typo, OR the figure names a state Annex C does not have: raise it as an issue against the figure.");
             }
         }
+        return partly;
     }
+
 
     // ─── Per-state catchall coverage lint ───────────────────────────────
 
