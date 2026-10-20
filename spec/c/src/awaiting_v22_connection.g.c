@@ -47,14 +47,14 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_awaiting_v22_connection_t10_ui_received_no_actions[] = {
+    data_link_awaiting_v22_connection_t10_ui_received_yes_actions[] = {
         {.verb = "UI Check", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "DM (F = 1)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const ActionStep
-    data_link_awaiting_v22_connection_t10_ui_received_yes_actions[] = {
+    data_link_awaiting_v22_connection_t10_ui_received_no_actions[] = {
         {.verb = "UI Check", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "DM (F = 1)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const ActionStep
@@ -65,13 +65,19 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_awaiting_v22_connection_t12_ua_received_no_actions[] = {
-        {.verb = "DL_ERROR_indication_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+    data_link_awaiting_v22_connection_t12_ua_received_yes_yes_actions[] = {
+        {.verb = "DL_CONNECT_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(s) := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(a) := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(r) := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "MDL-NEGOTIATE Request", .kind = AX25SDL_KIND_INTERNAL_OUT},
 };
 
 static const ActionStep
-    data_link_awaiting_v22_connection_t12_ua_received_yes_yes_actions[] = {
-        {.verb = "DL_CONNECT_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+    data_link_awaiting_v22_connection_t12_ua_received_yes_no_yes_actions[] = {
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "V(s) := 0", .kind = AX25SDL_KIND_PROCESSING},
@@ -97,14 +103,8 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_awaiting_v22_connection_t12_ua_received_yes_no_yes_actions[] = {
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(s) := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(a) := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(r) := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "MDL-NEGOTIATE Request", .kind = AX25SDL_KIND_INTERNAL_OUT},
+    data_link_awaiting_v22_connection_t12_ua_received_no_actions[] = {
+        {.verb = "DL_ERROR_indication_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const ActionStep
@@ -299,20 +299,6 @@ static const TransitionSpec data_link_awaiting_v22_connection_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t10_ui_received_no",
-        .from = "AwaitingV22Connection",
-        .on = "UI_received",
-        .guard = "not P_eq_1",
-        .actions = data_link_awaiting_v22_connection_t10_ui_received_no_actions,
-        .actions_len = 2,
-        .next = "AwaitingV22Connection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t10_ui_received_yes",
         .from = "AwaitingV22Connection",
         .on = "UI_received",
@@ -328,13 +314,13 @@ static const TransitionSpec data_link_awaiting_v22_connection_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t11_dm_received_no",
+        .id = "t10_ui_received_no",
         .from = "AwaitingV22Connection",
-        .on = "DM_received",
-        .guard = "not F_eq_1",
-        .actions = NULL,
-        .actions_len = 0,
-        .next = "AwaitingConnection",
+        .on = "UI_received",
+        .guard = "not P_eq_1",
+        .actions = data_link_awaiting_v22_connection_t10_ui_received_no_actions,
+        .actions_len = 2,
+        .next = "AwaitingV22Connection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -357,13 +343,13 @@ static const TransitionSpec data_link_awaiting_v22_connection_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t12_ua_received_no",
+        .id = "t11_dm_received_no",
         .from = "AwaitingV22Connection",
-        .on = "UA_received",
+        .on = "DM_received",
         .guard = "not F_eq_1",
-        .actions = data_link_awaiting_v22_connection_t12_ua_received_no_actions,
-        .actions_len = 1,
-        .next = "AwaitingV22Connection",
+        .actions = NULL,
+        .actions_len = 0,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -378,6 +364,21 @@ static const TransitionSpec data_link_awaiting_v22_connection_transitions[] = {
         .actions =
             data_link_awaiting_v22_connection_t12_ua_received_yes_yes_actions,
         .actions_len = 8,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t12_ua_received_yes_no_yes",
+        .from = "AwaitingV22Connection",
+        .on = "UA_received",
+        .guard = "F_eq_1 and not layer_3_initiated and vs_eq_va",
+        .actions =
+            data_link_awaiting_v22_connection_t12_ua_received_yes_no_yes_actions,
+        .actions_len = 7,
         .next = "Connected",
         .notes = "",
         .references = NULL,
@@ -401,14 +402,13 @@ static const TransitionSpec data_link_awaiting_v22_connection_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t12_ua_received_yes_no_yes",
+        .id = "t12_ua_received_no",
         .from = "AwaitingV22Connection",
         .on = "UA_received",
-        .guard = "F_eq_1 and not layer_3_initiated and vs_eq_va",
-        .actions =
-            data_link_awaiting_v22_connection_t12_ua_received_yes_no_yes_actions,
-        .actions_len = 7,
-        .next = "Connected",
+        .guard = "not F_eq_1",
+        .actions = data_link_awaiting_v22_connection_t12_ua_received_no_actions,
+        .actions_len = 1,
+        .next = "AwaitingV22Connection",
         .notes = "",
         .references = NULL,
         .references_len = 0,

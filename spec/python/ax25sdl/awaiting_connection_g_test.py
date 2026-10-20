@@ -69,20 +69,6 @@ def test_t03_dm_received_no() -> None:
     assert len(t.actions) == 0
 
 
-def test_t04_ua_received_no() -> None:
-    t = next(
-        (x for x in DATA_LINK_AWAITING_CONNECTION.transitions if x.id == "t04_ua_received_no"),
-        None,
-    )
-    assert t is not None, "transition t04_ua_received_no not found"
-    assert t.on == "UA_received"
-    assert t.next == "AwaitingConnection"
-    assert t.guard == "not F_eq_1"
-    assert len(t.actions) == 1
-    assert t.actions[0].verb == "DL_ERROR_indication_D"
-    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
-
-
 def test_t04_ua_received_yes_yes() -> None:
     t = next(
         (x for x in DATA_LINK_AWAITING_CONNECTION.transitions if x.id == "t04_ua_received_yes_yes"),
@@ -163,6 +149,20 @@ def test_t04_ua_received_yes_no_no() -> None:
     assert t.actions[8].kind == ActionKind.PROCESSING
     assert t.actions[9].verb == "Select_T1_Value"
     assert t.actions[9].kind == ActionKind.SUBROUTINE
+
+
+def test_t04_ua_received_no() -> None:
+    t = next(
+        (x for x in DATA_LINK_AWAITING_CONNECTION.transitions if x.id == "t04_ua_received_no"),
+        None,
+    )
+    assert t is not None, "transition t04_ua_received_no not found"
+    assert t.on == "UA_received"
+    assert t.next == "AwaitingConnection"
+    assert t.guard == "not F_eq_1"
+    assert len(t.actions) == 1
+    assert t.actions[0].verb == "DL_ERROR_indication_D"
+    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
 
 
 def test_t05_t1_expiry_yes() -> None:

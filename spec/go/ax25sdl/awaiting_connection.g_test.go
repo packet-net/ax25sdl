@@ -141,37 +141,6 @@ func TestDataLinkAwaitingConnection_t03_dm_received_no(t *testing.T) {
 	}
 }
 
-func TestDataLinkAwaitingConnection_t04_ua_received_no(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkAwaitingConnection.Transitions {
-		if DataLinkAwaitingConnection.Transitions[i].ID == "t04_ua_received_no" {
-			tx = &DataLinkAwaitingConnection.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t04_ua_received_no not found")
-	}
-	if tx.On != "UA_received" {
-		t.Errorf("On = %q, want UA_received", tx.On)
-	}
-	if tx.Next != "AwaitingConnection" {
-		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
-	}
-	if tx.Guard != "not F_eq_1" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not F_eq_1")
-	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "DL_ERROR_indication_D" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "DL_ERROR_indication_D")
-	}
-	if tx.Actions[0].Kind != SignalUpper {
-		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
-	}
-}
-
 func TestDataLinkAwaitingConnection_t04_ua_received_yes_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkAwaitingConnection.Transitions {
@@ -382,6 +351,37 @@ func TestDataLinkAwaitingConnection_t04_ua_received_yes_no_no(t *testing.T) {
 	}
 	if tx.Actions[9].Kind != Subroutine {
 		t.Errorf("Actions[9].Kind = %v, want Subroutine", tx.Actions[9].Kind)
+	}
+}
+
+func TestDataLinkAwaitingConnection_t04_ua_received_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkAwaitingConnection.Transitions {
+		if DataLinkAwaitingConnection.Transitions[i].ID == "t04_ua_received_no" {
+			tx = &DataLinkAwaitingConnection.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t04_ua_received_no not found")
+	}
+	if tx.On != "UA_received" {
+		t.Errorf("On = %q, want UA_received", tx.On)
+	}
+	if tx.Next != "AwaitingConnection" {
+		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
+	}
+	if tx.Guard != "not F_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not F_eq_1")
+	}
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "DL_ERROR_indication_D" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "DL_ERROR_indication_D")
+	}
+	if tx.Actions[0].Kind != SignalUpper {
+		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
 	}
 }
 

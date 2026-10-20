@@ -152,6 +152,22 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions).toHaveLength(0);
   });
 
+  it("t06_dl_flow_on_request_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t06_dl_flow_on_request_yes_yes");
+    expect(t, "transition t06_dl_flow_on_request_yes_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("DL_FLOW_ON_request");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "own_receiver_busy", negate: false }, { atom: "T1_running", negate: false }]);
+    expect(t.actions).toHaveLength(3);
+    expect(t.actions[0].verb).toBe("Clear Own Receiver Busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("RR Command (P = 0)");
+    expect(t.actions[1].kind).toBe("signal_lower");
+    expect(t.actions[2].verb).toBe("Clear Acknowledge Pending");
+    expect(t.actions[2].kind).toBe("processing");
+  });
+
   it("t06_dl_flow_on_request_yes_no", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t06_dl_flow_on_request_yes_no");
     expect(t, "transition t06_dl_flow_on_request_yes_no not found").toBeDefined();
@@ -170,22 +186,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[3].kind).toBe("processing");
     expect(t.actions[4].verb).toBe("Start T1");
     expect(t.actions[4].kind).toBe("processing");
-  });
-
-  it("t06_dl_flow_on_request_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t06_dl_flow_on_request_yes_yes");
-    expect(t, "transition t06_dl_flow_on_request_yes_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("DL_FLOW_ON_request");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "own_receiver_busy", negate: false }, { atom: "T1_running", negate: false }]);
-    expect(t.actions).toHaveLength(3);
-    expect(t.actions[0].verb).toBe("Clear Own Receiver Busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("RR Command (P = 0)");
-    expect(t.actions[1].kind).toBe("signal_lower");
-    expect(t.actions[2].verb).toBe("Clear Acknowledge Pending");
-    expect(t.actions[2].kind).toBe("processing");
   });
 
   it("t06_dl_flow_on_request_no", () => {
@@ -298,40 +298,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[4].kind).toBe("processing");
   });
 
-  it("t13_sabm_received_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t13_sabm_received_no");
-    expect(t, "transition t13_sabm_received_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SABM_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "vs_eq_va", negate: true }]);
-    expect(t.actions).toHaveLength(12);
-    expect(t.actions[0].verb).toBe("F := P");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("set_version_2_0");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("UA");
-    expect(t.actions[2].kind).toBe("signal_lower");
-    expect(t.actions[3].verb).toBe("Clear Exception Conditions");
-    expect(t.actions[3].kind).toBe("subroutine");
-    expect(t.actions[4].verb).toBe("DL-ERROR Indication (F)");
-    expect(t.actions[4].kind).toBe("signal_upper");
-    expect(t.actions[5].verb).toBe("discard_I_frame_queue");
-    expect(t.actions[5].kind).toBe("processing");
-    expect(t.actions[6].verb).toBe("DL_CONNECT_indication");
-    expect(t.actions[6].kind).toBe("signal_upper");
-    expect(t.actions[7].verb).toBe("Stop T1");
-    expect(t.actions[7].kind).toBe("processing");
-    expect(t.actions[8].verb).toBe("Stop T3");
-    expect(t.actions[8].kind).toBe("processing");
-    expect(t.actions[9].verb).toBe("V(s) := 0");
-    expect(t.actions[9].kind).toBe("processing");
-    expect(t.actions[10].verb).toBe("V(a) := 0");
-    expect(t.actions[10].kind).toBe("processing");
-    expect(t.actions[11].verb).toBe("V(r) := 0");
-    expect(t.actions[11].kind).toBe("processing");
-  });
-
   it("t13_sabm_received_yes", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t13_sabm_received_yes");
     expect(t, "transition t13_sabm_received_yes not found").toBeDefined();
@@ -352,17 +318,17 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[4].kind).toBe("signal_upper");
   });
 
-  it("t14_sabme_received_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t14_sabme_received_no");
-    expect(t, "transition t14_sabme_received_no not found").toBeDefined();
+  it("t13_sabm_received_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t13_sabm_received_no");
+    expect(t, "transition t13_sabm_received_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("SABME_received");
+    expect(t.on).toBe("SABM_received");
     expect(t.next).toBe("Connected");
     expect(t.guard).toEqual([{ atom: "vs_eq_va", negate: true }]);
     expect(t.actions).toHaveLength(12);
     expect(t.actions[0].verb).toBe("F := P");
     expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Set Version 2.2");
+    expect(t.actions[1].verb).toBe("set_version_2_0");
     expect(t.actions[1].kind).toBe("processing");
     expect(t.actions[2].verb).toBe("UA");
     expect(t.actions[2].kind).toBe("signal_lower");
@@ -404,6 +370,40 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[3].kind).toBe("subroutine");
     expect(t.actions[4].verb).toBe("DL-ERROR Indication (F)");
     expect(t.actions[4].kind).toBe("signal_upper");
+  });
+
+  it("t14_sabme_received_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t14_sabme_received_no");
+    expect(t, "transition t14_sabme_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SABME_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "vs_eq_va", negate: true }]);
+    expect(t.actions).toHaveLength(12);
+    expect(t.actions[0].verb).toBe("F := P");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Set Version 2.2");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("UA");
+    expect(t.actions[2].kind).toBe("signal_lower");
+    expect(t.actions[3].verb).toBe("Clear Exception Conditions");
+    expect(t.actions[3].kind).toBe("subroutine");
+    expect(t.actions[4].verb).toBe("DL-ERROR Indication (F)");
+    expect(t.actions[4].kind).toBe("signal_upper");
+    expect(t.actions[5].verb).toBe("discard_I_frame_queue");
+    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[6].verb).toBe("DL_CONNECT_indication");
+    expect(t.actions[6].kind).toBe("signal_upper");
+    expect(t.actions[7].verb).toBe("Stop T1");
+    expect(t.actions[7].kind).toBe("processing");
+    expect(t.actions[8].verb).toBe("Stop T3");
+    expect(t.actions[8].kind).toBe("processing");
+    expect(t.actions[9].verb).toBe("V(s) := 0");
+    expect(t.actions[9].kind).toBe("processing");
+    expect(t.actions[10].verb).toBe("V(a) := 0");
+    expect(t.actions[10].kind).toBe("processing");
+    expect(t.actions[11].verb).toBe("V(r) := 0");
+    expect(t.actions[11].kind).toBe("processing");
   });
 
   it("t15_frmr_received", () => {
@@ -470,6 +470,90 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[5].kind).toBe("processing");
   });
 
+  it("t18_rr_received_yes_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_yes_yes");
+    expect(t, "transition t18_rr_received_yes_yes_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("RR_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
+    expect(t.actions).toHaveLength(6);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("V(a) := N(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Start T3");
+    expect(t.actions[4].kind).toBe("processing");
+    expect(t.actions[5].verb).toBe("RC := 0");
+    expect(t.actions[5].kind).toBe("processing");
+  });
+
+  it("t18_rr_received_yes_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_yes_no");
+    expect(t, "transition t18_rr_received_yes_yes_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("RR_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: true }]);
+    expect(t.actions).toHaveLength(8);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("V(a) := N(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Invoke Retransmission");
+    expect(t.actions[4].kind).toBe("subroutine");
+    expect(t.actions[5].verb).toBe("Stop T3");
+    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[6].verb).toBe("Start T1");
+    expect(t.actions[6].kind).toBe("processing");
+    expect(t.actions[7].verb).toBe("set_acknowledge_pending");
+    expect(t.actions[7].kind).toBe("processing");
+  });
+
+  it("t18_rr_received_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_no_yes");
+    expect(t, "transition t18_rr_received_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("RR_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
+  it("t18_rr_received_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_no_no");
+    expect(t, "transition t18_rr_received_yes_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("RR_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
   it("t18_rr_received_no_yes_yes", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_no_yes_yes");
     expect(t, "transition t18_rr_received_no_yes_yes not found").toBeDefined();
@@ -486,13 +570,13 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[2].kind).toBe("processing");
   });
 
-  it("t18_rr_received_no_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_no_yes_no_no");
-    expect(t, "transition t18_rr_received_no_yes_no_no not found").toBeDefined();
+  it("t18_rr_received_no_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_no_yes_no_yes");
+    expect(t, "transition t18_rr_received_no_yes_no_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("RR_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
     expect(t.actions).toHaveLength(3);
     expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
@@ -502,13 +586,13 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[2].kind).toBe("subroutine");
   });
 
-  it("t18_rr_received_no_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_no_yes_no_yes");
-    expect(t, "transition t18_rr_received_no_yes_no_yes not found").toBeDefined();
+  it("t18_rr_received_no_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_no_yes_no_no");
+    expect(t, "transition t18_rr_received_no_yes_no_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("RR_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
     expect(t.actions).toHaveLength(3);
     expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
@@ -546,51 +630,37 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[1].kind).toBe("subroutine");
   });
 
-  it("t18_rr_received_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_no_no");
-    expect(t, "transition t18_rr_received_yes_no_no not found").toBeDefined();
+  it("t19_rnr_received_yes_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_yes_yes");
+    expect(t, "transition t19_rnr_received_yes_yes_yes not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("RR_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.on).toBe("RNR_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
+    expect(t.actions).toHaveLength(6);
+    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
     expect(t.actions[1].verb).toBe("Stop T1");
     expect(t.actions[1].kind).toBe("processing");
     expect(t.actions[2].verb).toBe("Select_T1_Value");
     expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("V(a) := N(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Start T3");
+    expect(t.actions[4].kind).toBe("processing");
+    expect(t.actions[5].verb).toBe("RC := 0");
+    expect(t.actions[5].kind).toBe("processing");
   });
 
-  it("t18_rr_received_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_no_yes");
-    expect(t, "transition t18_rr_received_yes_no_yes not found").toBeDefined();
+  it("t19_rnr_received_yes_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_yes_no");
+    expect(t, "transition t19_rnr_received_yes_yes_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("RR_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t18_rr_received_yes_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_yes_no");
-    expect(t, "transition t18_rr_received_yes_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("RR_received");
+    expect(t.on).toBe("RNR_received");
     expect(t.next).toBe("TimerRecovery");
     expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: true }]);
     expect(t.actions).toHaveLength(8);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
     expect(t.actions[1].verb).toBe("Stop T1");
     expect(t.actions[1].kind).toBe("processing");
@@ -608,26 +678,40 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[7].kind).toBe("processing");
   });
 
-  it("t18_rr_received_yes_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t18_rr_received_yes_yes_yes");
-    expect(t, "transition t18_rr_received_yes_yes_yes not found").toBeDefined();
+  it("t19_rnr_received_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_no_yes");
+    expect(t, "transition t19_rnr_received_yes_no_yes not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("RR_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
-    expect(t.actions).toHaveLength(6);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.on).toBe("RNR_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
     expect(t.actions[1].verb).toBe("Stop T1");
     expect(t.actions[1].kind).toBe("processing");
     expect(t.actions[2].verb).toBe("Select_T1_Value");
     expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("V(a) := N(r)");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Start T3");
-    expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("RC := 0");
-    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
+  it("t19_rnr_received_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_no_no");
+    expect(t, "transition t19_rnr_received_yes_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("RNR_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
   });
 
   it("t19_rnr_received_no_yes_yes", () => {
@@ -646,13 +730,13 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[2].kind).toBe("processing");
   });
 
-  it("t19_rnr_received_no_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_no_yes_no_no");
-    expect(t, "transition t19_rnr_received_no_yes_no_no not found").toBeDefined();
+  it("t19_rnr_received_no_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_no_yes_no_yes");
+    expect(t, "transition t19_rnr_received_no_yes_no_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
     expect(t.actions).toHaveLength(3);
     expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
@@ -662,13 +746,13 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[2].kind).toBe("subroutine");
   });
 
-  it("t19_rnr_received_no_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_no_yes_no_yes");
-    expect(t, "transition t19_rnr_received_no_yes_no_yes not found").toBeDefined();
+  it("t19_rnr_received_no_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_no_yes_no_no");
+    expect(t, "transition t19_rnr_received_no_yes_no_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: true }, { atom: "command_and_P_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
     expect(t.actions).toHaveLength(3);
     expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
     expect(t.actions[0].kind).toBe("processing");
@@ -706,90 +790,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[1].kind).toBe("subroutine");
   });
 
-  it("t19_rnr_received_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_no_no");
-    expect(t, "transition t19_rnr_received_yes_no_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t19_rnr_received_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_no_yes");
-    expect(t, "transition t19_rnr_received_yes_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t19_rnr_received_yes_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_yes_no");
-    expect(t, "transition t19_rnr_received_yes_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: true }]);
-    expect(t.actions).toHaveLength(8);
-    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("V(a) := N(r)");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Invoke Retransmission");
-    expect(t.actions[4].kind).toBe("subroutine");
-    expect(t.actions[5].verb).toBe("Stop T3");
-    expect(t.actions[5].kind).toBe("processing");
-    expect(t.actions[6].verb).toBe("Start T1");
-    expect(t.actions[6].kind).toBe("processing");
-    expect(t.actions[7].verb).toBe("set_acknowledge_pending");
-    expect(t.actions[7].kind).toBe("processing");
-  });
-
-  it("t19_rnr_received_yes_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t19_rnr_received_yes_yes_yes");
-    expect(t, "transition t19_rnr_received_yes_yes_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("RNR_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
-    expect(t.actions).toHaveLength(6);
-    expect(t.actions[0].verb).toBe("set_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("V(a) := N(r)");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Start T3");
-    expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("RC := 0");
-    expect(t.actions[5].kind).toBe("processing");
-  });
-
   it("t20_lm_seize_confirm_yes", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t20_lm_seize_confirm_yes");
     expect(t, "transition t20_lm_seize_confirm_yes not found").toBeDefined();
@@ -816,20 +816,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions).toHaveLength(1);
     expect(t.actions[0].verb).toBe("LM_release_request");
     expect(t.actions[0].kind).toBe("signal_lower");
-  });
-
-  it("t21_t1_expiry_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t21_t1_expiry_no");
-    expect(t, "transition t21_t1_expiry_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("T1_expiry");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "RC_eq_N2", negate: true }]);
-    expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("Transmit Enquiry");
-    expect(t.actions[0].kind).toBe("subroutine");
-    expect(t.actions[1].verb).toBe("RC := RC + 1");
-    expect(t.actions[1].kind).toBe("processing");
   });
 
   it("t21_t1_expiry_yes_yes_yes", () => {
@@ -886,46 +872,18 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[3].kind).toBe("signal_lower");
   });
 
-  it("t22_i_received_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_no");
-    expect(t, "transition t22_i_received_no not found").toBeDefined();
+  it("t21_t1_expiry_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t21_t1_expiry_no");
+    expect(t, "transition t21_t1_expiry_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("I_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "command", negate: true }]);
+    expect(t.on).toBe("T1_expiry");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "RC_eq_N2", negate: true }]);
     expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("DL-ERROR Indication (O)");
-    expect(t.actions[0].kind).toBe("signal_upper");
-    expect(t.actions[1].verb).toBe("Discard I Frame");
-    expect(t.actions[1].kind).toBe("processing");
-  });
-
-  it("t22_i_received_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_no");
-    expect(t, "transition t22_i_received_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("I_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: true }]);
-    expect(t.actions).toHaveLength(3);
-    expect(t.actions[0].verb).toBe("DL-ERROR Indication (O)");
-    expect(t.actions[0].kind).toBe("signal_upper");
-    expect(t.actions[1].verb).toBe("Establish_Data_Link");
-    expect(t.actions[1].kind).toBe("subroutine");
-    expect(t.actions[2].verb).toBe("Clear Layer 3 Initiated");
-    expect(t.actions[2].kind).toBe("processing");
-  });
-
-  it("t22_i_received_yes_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_no");
-    expect(t, "transition t22_i_received_yes_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("I_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: true }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("N(r) Recovery");
+    expect(t.actions[0].verb).toBe("Transmit Enquiry");
     expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("RC := RC + 1");
+    expect(t.actions[1].kind).toBe("processing");
   });
 
   it("t22_i_received_yes_yes_yes_yes_yes", () => {
@@ -998,6 +956,32 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[11].kind).toBe("processing");
   });
 
+  it("t22_i_received_yes_yes_yes_no_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_yes_no_yes");
+    expect(t, "transition t22_i_received_yes_yes_yes_no_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "ack_pending", negate: false }]);
+    expect(t.actions).toHaveLength(8);
+    expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("V(r) := V(r) + 1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Clear Reject Exception");
+    expect(t.actions[2].kind).toBe("processing");
+    expect(t.actions[3].verb).toBe("Decrement Sreject Exception if > 0");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("DL_DATA_indication");
+    expect(t.actions[4].kind).toBe("signal_upper");
+    expect(t.actions[5].verb).toBe("Retrieve Stored V(r) I Frame");
+    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[6].verb).toBe("DL_DATA_indication");
+    expect(t.actions[6].kind).toBe("signal_upper");
+    expect(t.actions[7].verb).toBe("V(r) := V(r) - 1");
+    expect(t.actions[7].kind).toBe("processing");
+  });
+
   it("t22_i_received_yes_yes_yes_no_yes_no_no", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_yes_no_no");
     expect(t, "transition t22_i_received_yes_yes_yes_no_yes_no_no not found").toBeDefined();
@@ -1026,32 +1010,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[8].kind).toBe("processing");
     expect(t.actions[9].verb).toBe("LM_seize_request");
     expect(t.actions[9].kind).toBe("signal_lower");
-  });
-
-  it("t22_i_received_yes_yes_yes_no_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_yes_no_yes");
-    expect(t, "transition t22_i_received_yes_yes_yes_no_yes_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("I_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "ack_pending", negate: false }]);
-    expect(t.actions).toHaveLength(8);
-    expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
-    expect(t.actions[0].kind).toBe("subroutine");
-    expect(t.actions[1].verb).toBe("V(r) := V(r) + 1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Clear Reject Exception");
-    expect(t.actions[2].kind).toBe("processing");
-    expect(t.actions[3].verb).toBe("Decrement Sreject Exception if > 0");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("DL_DATA_indication");
-    expect(t.actions[4].kind).toBe("signal_upper");
-    expect(t.actions[5].verb).toBe("Retrieve Stored V(r) I Frame");
-    expect(t.actions[5].kind).toBe("processing");
-    expect(t.actions[6].verb).toBe("DL_DATA_indication");
-    expect(t.actions[6].kind).toBe("signal_upper");
-    expect(t.actions[7].verb).toBe("V(r) := V(r) - 1");
-    expect(t.actions[7].kind).toBe("processing");
   });
 
   it("t22_i_received_yes_yes_yes_no_no_yes_yes_yes", () => {
@@ -1090,28 +1048,26 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[1].kind).toBe("processing");
   });
 
-  it("t22_i_received_yes_yes_yes_no_no_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_no_yes_no_no");
-    expect(t, "transition t22_i_received_yes_yes_yes_no_no_yes_no_no not found").toBeDefined();
+  it("t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes");
+    expect(t, "transition t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }]);
-    expect(t.actions).toHaveLength(7);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }]);
+    expect(t.actions).toHaveLength(6);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
-    expect(t.actions[1].verb).toBe("Discard Contents of I Frame");
+    expect(t.actions[1].verb).toBe("Save Contents of I Frame");
     expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Set Reject Exception");
+    expect(t.actions[2].verb).toBe("N(r) := V(r)");
     expect(t.actions[2].kind).toBe("processing");
-    expect(t.actions[3].verb).toBe("F := P");
+    expect(t.actions[3].verb).toBe("F := 0");
     expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("N(r) := V(r)");
+    expect(t.actions[4].verb).toBe("Sreject := Sreject + 1");
     expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("REJ");
+    expect(t.actions[5].verb).toBe("SREJ");
     expect(t.actions[5].kind).toBe("signal_lower");
-    expect(t.actions[6].verb).toBe("set_acknowledge_pending");
-    expect(t.actions[6].kind).toBe("processing");
   });
 
   it("t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes", () => {
@@ -1162,26 +1118,28 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[5].kind).toBe("signal_lower");
   });
 
-  it("t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes");
-    expect(t, "transition t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes not found").toBeDefined();
+  it("t22_i_received_yes_yes_yes_no_no_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_yes_no_no_yes_no_no");
+    expect(t, "transition t22_i_received_yes_yes_yes_no_no_yes_no_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("I_received");
     expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: false }, { atom: "sreject_exception_gt_0", negate: false }]);
-    expect(t.actions).toHaveLength(6);
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "own_receiver_busy", negate: true }, { atom: "ns_eq_vr", negate: true }, { atom: "vr_lt_ns_lt_vr_plus_k", negate: false }, { atom: "reject_exception", negate: true }, { atom: "SREJ_enabled", negate: true }]);
+    expect(t.actions).toHaveLength(7);
     expect(t.actions[0].verb).toBe("Check_I_Frame_Acknowledged");
     expect(t.actions[0].kind).toBe("subroutine");
-    expect(t.actions[1].verb).toBe("Save Contents of I Frame");
+    expect(t.actions[1].verb).toBe("Discard Contents of I Frame");
     expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("N(r) := V(r)");
+    expect(t.actions[2].verb).toBe("Set Reject Exception");
     expect(t.actions[2].kind).toBe("processing");
-    expect(t.actions[3].verb).toBe("F := 0");
+    expect(t.actions[3].verb).toBe("F := P");
     expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Sreject := Sreject + 1");
+    expect(t.actions[4].verb).toBe("N(r) := V(r)");
     expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("SREJ");
+    expect(t.actions[5].verb).toBe("REJ");
     expect(t.actions[5].kind).toBe("signal_lower");
+    expect(t.actions[6].verb).toBe("set_acknowledge_pending");
+    expect(t.actions[6].kind).toBe("processing");
   });
 
   it("t22_i_received_yes_yes_yes_no_no_no_yes", () => {
@@ -1218,6 +1176,132 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[0].kind).toBe("subroutine");
     expect(t.actions[1].verb).toBe("Discard Contents of I Frame");
     expect(t.actions[1].kind).toBe("processing");
+  });
+
+  it("t22_i_received_yes_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_yes_no");
+    expect(t, "transition t22_i_received_yes_yes_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }, { atom: "va_le_nr_le_vs", negate: true }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("N(r) Recovery");
+    expect(t.actions[0].kind).toBe("subroutine");
+  });
+
+  it("t22_i_received_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_yes_no");
+    expect(t, "transition t22_i_received_yes_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: true }]);
+    expect(t.actions).toHaveLength(3);
+    expect(t.actions[0].verb).toBe("DL-ERROR Indication (O)");
+    expect(t.actions[0].kind).toBe("signal_upper");
+    expect(t.actions[1].verb).toBe("Establish_Data_Link");
+    expect(t.actions[1].kind).toBe("subroutine");
+    expect(t.actions[2].verb).toBe("Clear Layer 3 Initiated");
+    expect(t.actions[2].kind).toBe("processing");
+  });
+
+  it("t22_i_received_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t22_i_received_no");
+    expect(t, "transition t22_i_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("I_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "command", negate: true }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("DL-ERROR Indication (O)");
+    expect(t.actions[0].kind).toBe("signal_upper");
+    expect(t.actions[1].verb).toBe("Discard I Frame");
+    expect(t.actions[1].kind).toBe("processing");
+  });
+
+  it("t23_rej_received_yes_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_yes_yes");
+    expect(t, "transition t23_rej_received_yes_yes_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("REJ_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
+    expect(t.actions).toHaveLength(6);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("V(a) := N(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Start T3");
+    expect(t.actions[4].kind).toBe("processing");
+    expect(t.actions[5].verb).toBe("RC := 0");
+    expect(t.actions[5].kind).toBe("processing");
+  });
+
+  it("t23_rej_received_yes_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_yes_no");
+    expect(t, "transition t23_rej_received_yes_yes_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("REJ_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: true }]);
+    expect(t.actions).toHaveLength(8);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("V(a) := N(r)");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Invoke Retransmission");
+    expect(t.actions[4].kind).toBe("subroutine");
+    expect(t.actions[5].verb).toBe("Stop T3");
+    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[6].verb).toBe("Start T1");
+    expect(t.actions[6].kind).toBe("processing");
+    expect(t.actions[7].verb).toBe("Clear Acknowledge Pending");
+    expect(t.actions[7].kind).toBe("processing");
+  });
+
+  it("t23_rej_received_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_no_yes");
+    expect(t, "transition t23_rej_received_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("REJ_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
+  it("t23_rej_received_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_no_no");
+    expect(t, "transition t23_rej_received_yes_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("REJ_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
   });
 
   it("t23_rej_received_no_yes_yes_yes", () => {
@@ -1356,230 +1440,6 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[1].kind).toBe("subroutine");
   });
 
-  it("t23_rej_received_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_no_yes");
-    expect(t, "transition t23_rej_received_yes_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("REJ_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t23_rej_received_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_no_no");
-    expect(t, "transition t23_rej_received_yes_no_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("REJ_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t23_rej_received_yes_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_yes_yes");
-    expect(t, "transition t23_rej_received_yes_yes_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("REJ_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: false }]);
-    expect(t.actions).toHaveLength(6);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("V(a) := N(r)");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Start T3");
-    expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("RC := 0");
-    expect(t.actions[5].kind).toBe("processing");
-  });
-
-  it("t23_rej_received_yes_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t23_rej_received_yes_yes_no");
-    expect(t, "transition t23_rej_received_yes_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("REJ_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response_and_F_eq_1", negate: false }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "vs_eq_nr", negate: true }]);
-    expect(t.actions).toHaveLength(8);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("V(a) := N(r)");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Invoke Retransmission");
-    expect(t.actions[4].kind).toBe("subroutine");
-    expect(t.actions[5].verb).toBe("Stop T3");
-    expect(t.actions[5].kind).toBe("processing");
-    expect(t.actions[6].verb).toBe("Start T1");
-    expect(t.actions[6].kind).toBe("processing");
-    expect(t.actions[7].verb).toBe("Clear Acknowledge Pending");
-    expect(t.actions[7].kind).toBe("processing");
-  });
-
-  it("t24_srej_received_no_yes_yes_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_yes_yes");
-    expect(t, "transition t24_srej_received_no_yes_yes_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: false }, { atom: "vs_eq_nr", negate: false }]);
-    expect(t.actions).toHaveLength(3);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("V(a) := N(r)");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Check_I_Frame_Acknowledged");
-    expect(t.actions[2].kind).toBe("subroutine");
-  });
-
-  it("t24_srej_received_no_yes_yes_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_yes_no");
-    expect(t, "transition t24_srej_received_no_yes_yes_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: false }, { atom: "vs_eq_nr", negate: true }]);
-    expect(t.actions).toHaveLength(8);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("V(a) := N(r)");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Check_I_Frame_Acknowledged");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("Push Old I Frame N(r) on Queue");
-    expect(t.actions[3].kind).toBe("internal_out");
-    expect(t.actions[4].verb).toBe("LM_data_request");
-    expect(t.actions[4].kind).toBe("signal_lower");
-    expect(t.actions[5].verb).toBe("Stop T3");
-    expect(t.actions[5].kind).toBe("processing");
-    expect(t.actions[6].verb).toBe("Start T1");
-    expect(t.actions[6].kind).toBe("processing");
-    expect(t.actions[7].verb).toBe("Clear Acknowledge Pending");
-    expect(t.actions[7].kind).toBe("processing");
-  });
-
-  it("t24_srej_received_no_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_no_yes");
-    expect(t, "transition t24_srej_received_no_yes_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "vs_eq_va", negate: false }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-  });
-
-  it("t24_srej_received_no_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_no_no");
-    expect(t, "transition t24_srej_received_no_yes_no_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("TimerRecovery");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "vs_eq_va", negate: true }]);
-    expect(t.actions).toHaveLength(6);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Push Old I Frame N(r) on Queue");
-    expect(t.actions[1].kind).toBe("internal_out");
-    expect(t.actions[2].verb).toBe("LM_data_request");
-    expect(t.actions[2].kind).toBe("signal_lower");
-    expect(t.actions[3].verb).toBe("Stop T3");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("Start T1");
-    expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("Clear Acknowledge Pending");
-    expect(t.actions[5].kind).toBe("processing");
-  });
-
-  it("t24_srej_received_no_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_no_no");
-    expect(t, "transition t24_srej_received_no_no_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
-    expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("N(r) Recovery");
-    expect(t.actions[1].kind).toBe("subroutine");
-  });
-
-  it("t24_srej_received_no_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_no_yes");
-    expect(t, "transition t24_srej_received_no_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
-    expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("N(r) Recovery");
-    expect(t.actions[1].kind).toBe("subroutine");
-  });
-
-  it("t24_srej_received_yes_no_no", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_yes_no_no");
-    expect(t, "transition t24_srej_received_yes_no_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "response", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
-  it("t24_srej_received_yes_no_yes", () => {
-    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_yes_no_yes");
-    expect(t, "transition t24_srej_received_yes_no_yes not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SREJ_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "response", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
-    expect(t.actions).toHaveLength(4);
-    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Stop T1");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("Select_T1_Value");
-    expect(t.actions[2].kind).toBe("subroutine");
-    expect(t.actions[3].verb).toBe("N(r) Recovery");
-    expect(t.actions[3].kind).toBe("subroutine");
-  });
-
   it("t24_srej_received_yes_yes_yes_yes", () => {
     const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_yes_yes_yes_yes");
     expect(t, "transition t24_srej_received_yes_yes_yes_yes not found").toBeDefined();
@@ -1678,6 +1538,146 @@ describe("DataLinkTimerRecovery", () => {
     expect(t.actions[6].kind).toBe("processing");
     expect(t.actions[7].verb).toBe("Clear Acknowledge Pending");
     expect(t.actions[7].kind).toBe("processing");
+  });
+
+  it("t24_srej_received_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_yes_no_yes");
+    expect(t, "transition t24_srej_received_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
+  it("t24_srej_received_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_yes_no_no");
+    expect(t, "transition t24_srej_received_yes_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response", negate: false }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.actions).toHaveLength(4);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Stop T1");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Select_T1_Value");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("N(r) Recovery");
+    expect(t.actions[3].kind).toBe("subroutine");
+  });
+
+  it("t24_srej_received_no_yes_yes_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_yes_yes");
+    expect(t, "transition t24_srej_received_no_yes_yes_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: false }, { atom: "vs_eq_nr", negate: false }]);
+    expect(t.actions).toHaveLength(3);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("V(a) := N(r)");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Check_I_Frame_Acknowledged");
+    expect(t.actions[2].kind).toBe("subroutine");
+  });
+
+  it("t24_srej_received_no_yes_yes_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_yes_no");
+    expect(t, "transition t24_srej_received_no_yes_yes_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: false }, { atom: "vs_eq_nr", negate: true }]);
+    expect(t.actions).toHaveLength(8);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("V(a) := N(r)");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("Check_I_Frame_Acknowledged");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("Push Old I Frame N(r) on Queue");
+    expect(t.actions[3].kind).toBe("internal_out");
+    expect(t.actions[4].verb).toBe("LM_data_request");
+    expect(t.actions[4].kind).toBe("signal_lower");
+    expect(t.actions[5].verb).toBe("Stop T3");
+    expect(t.actions[5].kind).toBe("processing");
+    expect(t.actions[6].verb).toBe("Start T1");
+    expect(t.actions[6].kind).toBe("processing");
+    expect(t.actions[7].verb).toBe("Clear Acknowledge Pending");
+    expect(t.actions[7].kind).toBe("processing");
+  });
+
+  it("t24_srej_received_no_yes_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_no_yes");
+    expect(t, "transition t24_srej_received_no_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "vs_eq_va", negate: false }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+  });
+
+  it("t24_srej_received_no_yes_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_yes_no_no");
+    expect(t, "transition t24_srej_received_no_yes_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("TimerRecovery");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: false }, { atom: "P_eq_1", negate: true }, { atom: "vs_eq_va", negate: true }]);
+    expect(t.actions).toHaveLength(6);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Push Old I Frame N(r) on Queue");
+    expect(t.actions[1].kind).toBe("internal_out");
+    expect(t.actions[2].verb).toBe("LM_data_request");
+    expect(t.actions[2].kind).toBe("signal_lower");
+    expect(t.actions[3].verb).toBe("Stop T3");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("Start T1");
+    expect(t.actions[4].kind).toBe("processing");
+    expect(t.actions[5].verb).toBe("Clear Acknowledge Pending");
+    expect(t.actions[5].kind).toBe("processing");
+  });
+
+  it("t24_srej_received_no_no_yes", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_no_yes");
+    expect(t, "transition t24_srej_received_no_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: false }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("N(r) Recovery");
+    expect(t.actions[1].kind).toBe("subroutine");
+  });
+
+  it("t24_srej_received_no_no_no", () => {
+    const t = DataLinkTimerRecovery.transitions.find((x) => x.id === "t24_srej_received_no_no_no");
+    expect(t, "transition t24_srej_received_no_no_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SREJ_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "response", negate: true }, { atom: "va_le_nr_le_vs", negate: true }, { atom: "version_2_2", negate: true }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("clear_peer_receiver_busy");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("N(r) Recovery");
+    expect(t.actions[1].kind).toBe("subroutine");
   });
 
   it("t25_all_other_primitives__from_lower_layer", () => {

@@ -16,18 +16,18 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_u_i_check_t01_ui_check_no_actions[] = {
-        {.verb = "DL-ERROR Indication (Q)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-};
-
-static const ActionStep
-    data_link_subroutines_u_i_check_t02_ui_check_yes_yes_actions[] = {
+    data_link_subroutines_u_i_check_t01_ui_check_yes_yes_actions[] = {
         {.verb = "DL_UNIT_DATA_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const ActionStep
-    data_link_subroutines_u_i_check_t03_ui_check_yes_no_actions[] = {
+    data_link_subroutines_u_i_check_t02_ui_check_yes_no_actions[] = {
         {.verb = "DL-ERROR Indication (K)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+};
+
+static const ActionStep
+    data_link_subroutines_u_i_check_t03_ui_check_no_actions[] = {
+        {.verb = "DL-ERROR Indication (Q)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const ActionStep
@@ -39,7 +39,7 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_select_t1_t03_select_t1_no_yes_actions[] = {
+    data_link_subroutines_select_t1_t02_select_t1_no_yes_actions[] = {
         {.verb = "Next T1 := (RC*0.25)+SRT*2", .kind = AX25SDL_KIND_PROCESSING},
 };
 
@@ -61,26 +61,14 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_check_need_for_response_t03_check_need_for_response_no_yes_actions
+    data_link_subroutines_check_need_for_response_t02_check_need_for_response_no_yes_actions
         [] = {
             {.verb = "DL-ERROR Indication (A)",
              .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const ActionStep
-    data_link_subroutines_establish_extended_data_link_t01_establish_extended_data_link_no_actions
-        [] = {
-            {.verb = "Clear Exception Conditions",
-             .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "RC := 1", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "SABM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-            {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_subroutines_establish_extended_data_link_t02_establish_extended_data_link_yes_actions
+    data_link_subroutines_establish_extended_data_link_t01_establish_extended_data_link_yes_actions
         [] = {
             {.verb = "Clear Exception Conditions",
              .kind = AX25SDL_KIND_PROCESSING},
@@ -92,7 +80,7 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_establish_data_link_t01_establish_data_link_no_actions
+    data_link_subroutines_establish_extended_data_link_t02_establish_extended_data_link_no_actions
         [] = {
             {.verb = "Clear Exception Conditions",
              .kind = AX25SDL_KIND_PROCESSING},
@@ -104,13 +92,25 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_establish_data_link_t02_establish_data_link_yes_actions
+    data_link_subroutines_establish_data_link_t01_establish_data_link_yes_actions
         [] = {
             {.verb = "Clear Exception Conditions",
              .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "RC := 1", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "SABME", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+            {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_subroutines_establish_data_link_t02_establish_data_link_no_actions
+        [] = {
+            {.verb = "Clear Exception Conditions",
+             .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "RC := 1", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "SABM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
             {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
 };
@@ -193,16 +193,7 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_subroutines_transmit_enquiry_t01_transmit_enquiry_no_actions[] = {
-        {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "N(r) := V(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "RR Command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_subroutines_transmit_enquiry_t02_transmit_enquiry_yes_actions[] =
+    data_link_subroutines_transmit_enquiry_t01_transmit_enquiry_yes_actions[] =
         {
             {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "N(r) := V(r)", .kind = AX25SDL_KIND_PROCESSING},
@@ -210,6 +201,15 @@ static const ActionStep
             {.verb = "Clear Acknowledge Pending",
              .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_subroutines_transmit_enquiry_t02_transmit_enquiry_no_actions[] = {
+        {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "N(r) := V(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "RR Command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
@@ -296,21 +296,10 @@ static const SubroutinePath data_link_subroutines_set_version_2_2_paths[] = {
 
 static const SubroutinePath data_link_subroutines_u_i_check_paths[] = {
     {
-        .id = "t01_ui_check_no",
-        .guard = "not command",
-        .actions = data_link_subroutines_u_i_check_t01_ui_check_no_actions,
-        .actions_len = 1,
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t02_ui_check_yes_yes",
+        .id = "t01_ui_check_yes_yes",
         .guard =
             "command and info_field_length_le_N1_and_content_is_octet_aligned",
-        .actions = data_link_subroutines_u_i_check_t02_ui_check_yes_yes_actions,
+        .actions = data_link_subroutines_u_i_check_t01_ui_check_yes_yes_actions,
         .actions_len = 1,
         .notes = "",
         .references = NULL,
@@ -319,10 +308,21 @@ static const SubroutinePath data_link_subroutines_u_i_check_paths[] = {
         .loops_len = 0,
     },
     {
-        .id = "t03_ui_check_yes_no",
+        .id = "t02_ui_check_yes_no",
         .guard = "command and not "
                  "info_field_length_le_N1_and_content_is_octet_aligned",
-        .actions = data_link_subroutines_u_i_check_t03_ui_check_yes_no_actions,
+        .actions = data_link_subroutines_u_i_check_t02_ui_check_yes_no_actions,
+        .actions_len = 1,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t03_ui_check_no",
+        .guard = "not command",
+        .actions = data_link_subroutines_u_i_check_t03_ui_check_no_actions,
         .actions_len = 1,
         .notes = "",
         .references = NULL,
@@ -345,10 +345,10 @@ static const SubroutinePath data_link_subroutines_select_t1_paths[] = {
         .loops_len = 0,
     },
     {
-        .id = "t02_select_t1_no_no",
-        .guard = "not RC_eq_0 and not T1_expired",
-        .actions = NULL,
-        .actions_len = 0,
+        .id = "t02_select_t1_no_yes",
+        .guard = "not RC_eq_0 and T1_expired",
+        .actions = data_link_subroutines_select_t1_t02_select_t1_no_yes_actions,
+        .actions_len = 1,
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -356,10 +356,10 @@ static const SubroutinePath data_link_subroutines_select_t1_paths[] = {
         .loops_len = 0,
     },
     {
-        .id = "t03_select_t1_no_yes",
-        .guard = "not RC_eq_0 and T1_expired",
-        .actions = data_link_subroutines_select_t1_t03_select_t1_no_yes_actions,
-        .actions_len = 1,
+        .id = "t03_select_t1_no_no",
+        .guard = "not RC_eq_0 and not T1_expired",
+        .actions = NULL,
+        .actions_len = 0,
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -397,10 +397,11 @@ static const SubroutinePath data_link_subroutines_check_need_for_response_paths[
         .loops_len = 0,
     },
     {
-        .id = "t02_check_need_for_response_no_no",
-        .guard = "not command_and_P_eq_1 and not response_and_F_eq_1",
-        .actions = NULL,
-        .actions_len = 0,
+        .id = "t02_check_need_for_response_no_yes",
+        .guard = "not command_and_P_eq_1 and response_and_F_eq_1",
+        .actions =
+            data_link_subroutines_check_need_for_response_t02_check_need_for_response_no_yes_actions,
+        .actions_len = 1,
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -408,11 +409,10 @@ static const SubroutinePath data_link_subroutines_check_need_for_response_paths[
         .loops_len = 0,
     },
     {
-        .id = "t03_check_need_for_response_no_yes",
-        .guard = "not command_and_P_eq_1 and response_and_F_eq_1",
-        .actions =
-            data_link_subroutines_check_need_for_response_t03_check_need_for_response_no_yes_actions,
-        .actions_len = 1,
+        .id = "t03_check_need_for_response_no_no",
+        .guard = "not command_and_P_eq_1 and not response_and_F_eq_1",
+        .actions = NULL,
+        .actions_len = 0,
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -424,10 +424,10 @@ static const SubroutinePath data_link_subroutines_check_need_for_response_paths[
 static const SubroutinePath
     data_link_subroutines_establish_extended_data_link_paths[] = {
         {
-            .id = "t01_establish_extended_data_link_no",
-            .guard = "not mod_128",
+            .id = "t01_establish_extended_data_link_yes",
+            .guard = "mod_128",
             .actions =
-                data_link_subroutines_establish_extended_data_link_t01_establish_extended_data_link_no_actions,
+                data_link_subroutines_establish_extended_data_link_t01_establish_extended_data_link_yes_actions,
             .actions_len = 6,
             .notes = "",
             .references = NULL,
@@ -436,10 +436,10 @@ static const SubroutinePath
             .loops_len = 0,
         },
         {
-            .id = "t02_establish_extended_data_link_yes",
-            .guard = "mod_128",
+            .id = "t02_establish_extended_data_link_no",
+            .guard = "not mod_128",
             .actions =
-                data_link_subroutines_establish_extended_data_link_t02_establish_extended_data_link_yes_actions,
+                data_link_subroutines_establish_extended_data_link_t02_establish_extended_data_link_no_actions,
             .actions_len = 6,
             .notes = "",
             .references = NULL,
@@ -451,10 +451,10 @@ static const SubroutinePath
 
 static const SubroutinePath data_link_subroutines_establish_data_link_paths[] = {
     {
-        .id = "t01_establish_data_link_no",
-        .guard = "not mod_128",
+        .id = "t01_establish_data_link_yes",
+        .guard = "mod_128",
         .actions =
-            data_link_subroutines_establish_data_link_t01_establish_data_link_no_actions,
+            data_link_subroutines_establish_data_link_t01_establish_data_link_yes_actions,
         .actions_len = 6,
         .notes = "",
         .references = NULL,
@@ -463,10 +463,10 @@ static const SubroutinePath data_link_subroutines_establish_data_link_paths[] = 
         .loops_len = 0,
     },
     {
-        .id = "t02_establish_data_link_yes",
-        .guard = "mod_128",
+        .id = "t02_establish_data_link_no",
+        .guard = "not mod_128",
         .actions =
-            data_link_subroutines_establish_data_link_t02_establish_data_link_yes_actions,
+            data_link_subroutines_establish_data_link_t02_establish_data_link_no_actions,
         .actions_len = 6,
         .notes = "",
         .references = NULL,
@@ -587,10 +587,10 @@ static const SubroutinePath data_link_subroutines_n_r_error_recovery_paths[] = {
 
 static const SubroutinePath data_link_subroutines_transmit_enquiry_paths[] = {
     {
-        .id = "t01_transmit_enquiry_no",
-        .guard = "not own_receiver_busy",
+        .id = "t01_transmit_enquiry_yes",
+        .guard = "own_receiver_busy",
         .actions =
-            data_link_subroutines_transmit_enquiry_t01_transmit_enquiry_no_actions,
+            data_link_subroutines_transmit_enquiry_t01_transmit_enquiry_yes_actions,
         .actions_len = 5,
         .notes = "",
         .references = NULL,
@@ -599,10 +599,10 @@ static const SubroutinePath data_link_subroutines_transmit_enquiry_paths[] = {
         .loops_len = 0,
     },
     {
-        .id = "t02_transmit_enquiry_yes",
-        .guard = "own_receiver_busy",
+        .id = "t02_transmit_enquiry_no",
+        .guard = "not own_receiver_busy",
         .actions =
-            data_link_subroutines_transmit_enquiry_t02_transmit_enquiry_yes_actions,
+            data_link_subroutines_transmit_enquiry_t02_transmit_enquiry_no_actions,
         .actions_len = 5,
         .notes = "",
         .references = NULL,

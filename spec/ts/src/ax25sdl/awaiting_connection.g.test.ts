@@ -61,18 +61,6 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.actions).toHaveLength(0);
   });
 
-  it("t04_ua_received_no", () => {
-    const t = DataLinkAwaitingConnection.transitions.find((x) => x.id === "t04_ua_received_no");
-    expect(t, "transition t04_ua_received_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("UA_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: true }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("DL_ERROR_indication_D");
-    expect(t.actions[0].kind).toBe("signal_upper");
-  });
-
   it("t04_ua_received_yes_yes", () => {
     const t = DataLinkAwaitingConnection.transitions.find((x) => x.id === "t04_ua_received_yes_yes");
     expect(t, "transition t04_ua_received_yes_yes not found").toBeDefined();
@@ -147,6 +135,18 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.actions[8].kind).toBe("processing");
     expect(t.actions[9].verb).toBe("Select_T1_Value");
     expect(t.actions[9].kind).toBe("subroutine");
+  });
+
+  it("t04_ua_received_no", () => {
+    const t = DataLinkAwaitingConnection.transitions.find((x) => x.id === "t04_ua_received_no");
+    expect(t, "transition t04_ua_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("UA_received");
+    expect(t.next).toBe("AwaitingConnection");
+    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("DL_ERROR_indication_D");
+    expect(t.actions[0].kind).toBe("signal_upper");
   });
 
   it("t05_t1_expiry_yes", () => {

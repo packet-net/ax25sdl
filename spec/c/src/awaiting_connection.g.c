@@ -19,11 +19,6 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_awaiting_connection_t04_ua_received_no_actions[] = {
-        {.verb = "DL_ERROR_indication_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-};
-
-static const ActionStep
     data_link_awaiting_connection_t04_ua_received_yes_yes_actions[] = {
         {.verb = "DL_CONNECT_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
@@ -56,6 +51,11 @@ static const ActionStep
         {.verb = "V(a) := 0", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "V(r) := 0", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_awaiting_connection_t04_ua_received_no_actions[] = {
+        {.verb = "DL_ERROR_indication_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const ActionStep
@@ -190,20 +190,6 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t04_ua_received_no",
-        .from = "AwaitingConnection",
-        .on = "UA_received",
-        .guard = "not F_eq_1",
-        .actions = data_link_awaiting_connection_t04_ua_received_no_actions,
-        .actions_len = 1,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t04_ua_received_yes_yes",
         .from = "AwaitingConnection",
         .on = "UA_received",
@@ -242,6 +228,20 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
             data_link_awaiting_connection_t04_ua_received_yes_no_no_actions,
         .actions_len = 10,
         .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t04_ua_received_no",
+        .from = "AwaitingConnection",
+        .on = "UA_received",
+        .guard = "not F_eq_1",
+        .actions = data_link_awaiting_connection_t04_ua_received_no_actions,
+        .actions_len = 1,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
