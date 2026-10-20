@@ -5,6 +5,7 @@ using Packet.Sdl.CodeGen.Go;
 using Packet.Sdl.CodeGen.Json;
 using Packet.Sdl.CodeGen.Python;
 using Packet.Sdl.CodeGen.Rust;
+using Packet.Sdl.CodeGen.Tla;
 using Packet.Sdl.CodeGen.Ts;
 using Packet.Sdl.IR;
 using Packet.Sdl.IR.Totality;
@@ -16,7 +17,8 @@ namespace Packet.Sdl.CodeGen;
 /// <c>spec-sdl/</c>, validates them, resolves into the language-neutral
 /// IR (<see cref="ResolvedPage"/> / <see cref="ResolvedSubroutinesPage"/>),
 /// and hands them to one or more language backends
-/// (C# / Go / TS / JSON / Rust / C / Python).
+/// (C# / Go / TS / JSON / Rust / C / Python), plus the TLA+ module, which
+/// is rendered from the emitted JSON tables rather than from the IR.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -98,6 +100,10 @@ internal static class Program
         if (plan.EmitPython)
         {
             Directory.CreateDirectory(plan.PythonOut);
+        }
+        if (plan.EmitTla)
+        {
+            Directory.CreateDirectory(plan.TlaOut);
         }
 
         var events     = EventCatalog.Load(Path.Combine(plan.InDir, "events.yaml"));
@@ -687,6 +693,18 @@ internal static class Program
             CleanStaleFiles(plan.PythonOut, "*_g_test.py", writtenPython);
         }
 
+        // TLA+ (docs/tla.md): rendered from the JSON tables, the bytes the
+        // reference interpreter and the explorer execute, so it runs after the
+        // JSON backend has written them (or reads a committed/fixture copy).
+        // Only the generated module is written; Ax25Semantics.tla beside it is
+        // hand-written.
+        if (plan.EmitTla)
+        {
+            var tlaPath = Path.Combine(plan.TlaOut, TlaEmitter.FileName);
+            WriteIfChanged(tlaPath, TlaEmitter.EmitFromJsonDir(plan.TlaTables));
+            Console.WriteLine($"  ok  {plan.TlaTables}  →  {tlaPath}");
+        }
+
         var which = string.Join(" + ", new[] {
             plan.EmitCsharp ? "C#"     : null,
             plan.EmitGo     ? "Go"     : null,
@@ -695,6 +713,7 @@ internal static class Program
             plan.EmitRust   ? "Rust"   : null,
             plan.EmitC      ? "C"      : null,
             plan.EmitPython ? "Python" : null,
+            plan.EmitTla    ? "TLA+"   : null,
         }.Where(s => s is not null));
         Console.WriteLine($"generated {pages.Count} state machine page(s), {subroutinePages.Count} subroutine page(s) [{which}]");
         return 0;
@@ -1245,6 +1264,16 @@ internal sealed class CodegenOptions
 
     [Option("python-out", Default = "", HelpText = "Python output directory. Implies --python. Defaults to spec/python/ax25sdl.")]
     public string PythonOut { get; set; } = "";
+
+    // ─── TLA+ ──────────────────────────────────────────────────────────
+    [Option("tla", Default = false, HelpText = "Emit the TLA+ tables module (defaults to spec/tla), rendered from the JSON tables.")]
+    public bool Tla { get; set; }
+
+    [Option("tla-out", Default = "", HelpText = "TLA+ output directory. Implies --tla. Defaults to spec/tla.")]
+    public string TlaOut { get; set; } = "";
+
+    [Option("tla-tables", Default = "", HelpText = "JSON tables directory the TLA+ module is rendered from. Implies --tla. Defaults to the JSON output directory (spec/json), so a run that also emits JSON renders what it just wrote; point it at a fixture copy to render that instead.")]
+    public string TlaTables { get; set; } = "";
 }
 
 /// <summary>
@@ -1267,6 +1296,7 @@ internal sealed class CodegenPlan
     public required bool EmitRust { get; init; }
     public required bool EmitC { get; init; }
     public required bool EmitPython { get; init; }
+    public required bool EmitTla { get; init; }
     public required string CsharpOut { get; init; }
     public required string CsharpTests { get; init; }
     public required string GoOut { get; init; }
@@ -1275,6 +1305,8 @@ internal sealed class CodegenPlan
     public required string RustOut { get; init; }
     public required string COut { get; init; }
     public required string PythonOut { get; init; }
+    public required string TlaOut { get; init; }
+    public required string TlaTables { get; init; }
     public required string? MermaidOut { get; init; }
 
     private const string DefaultCsharpOut   = "spec/csharp";
@@ -1285,6 +1317,7 @@ internal sealed class CodegenPlan
     private const string DefaultRustOut     = "spec/rust/src";
     private const string DefaultCOut        = "spec/c/src";
     private const string DefaultPythonOut   = "spec/python/ax25sdl";
+    private const string DefaultTlaOut      = "spec/tla";
     private const string DefaultKnownFindings = "codegen/lint-known-findings.yaml";
 
     public static CodegenPlan From(CodegenOptions opt)
@@ -1300,8 +1333,9 @@ internal sealed class CodegenPlan
         bool rustExplicit   = opt.Rust   || opt.RustOut.Length > 0;
         bool cExplicit      = opt.C      || opt.COut.Length > 0;
         bool pythonExplicit = opt.Python || opt.PythonOut.Length > 0;
+        bool tlaExplicit    = opt.Tla    || opt.TlaOut.Length > 0 || opt.TlaTables.Length > 0;
         bool anyExplicit    = csharpExplicit || goExplicit || tsExplicit || jsonExplicit
-                              || rustExplicit || cExplicit || pythonExplicit;
+                              || rustExplicit || cExplicit || pythonExplicit || tlaExplicit;
 
         // Default rule: no language flags at all → emit every backend.
         bool emitCsharp = anyExplicit ? csharpExplicit : true;
@@ -1311,6 +1345,8 @@ internal sealed class CodegenPlan
         bool emitRust   = anyExplicit ? rustExplicit   : true;
         bool emitC      = anyExplicit ? cExplicit      : true;
         bool emitPython = anyExplicit ? pythonExplicit : true;
+        bool emitTla    = anyExplicit ? tlaExplicit    : true;
+        var jsonOut     = opt.JsonOut.Length > 0 ? opt.JsonOut : DefaultJsonOut;
 
         return new CodegenPlan
         {
@@ -1324,14 +1360,17 @@ internal sealed class CodegenPlan
             EmitRust    = emitRust,
             EmitC       = emitC,
             EmitPython  = emitPython,
+            EmitTla     = emitTla,
             CsharpOut   = opt.CsharpOut.Length > 0 ? opt.CsharpOut : DefaultCsharpOut,
             CsharpTests = opt.CsharpTests.Length > 0 ? opt.CsharpTests : DefaultCsharpTests,
             GoOut       = opt.GoOut.Length > 0 ? opt.GoOut : DefaultGoOut,
             TsOut       = opt.TsOut.Length > 0 ? opt.TsOut : DefaultTsOut,
-            JsonOut     = opt.JsonOut.Length > 0 ? opt.JsonOut : DefaultJsonOut,
+            JsonOut     = jsonOut,
             RustOut     = opt.RustOut.Length > 0 ? opt.RustOut : DefaultRustOut,
             COut        = opt.COut.Length > 0 ? opt.COut : DefaultCOut,
             PythonOut   = opt.PythonOut.Length > 0 ? opt.PythonOut : DefaultPythonOut,
+            TlaOut      = opt.TlaOut.Length > 0 ? opt.TlaOut : DefaultTlaOut,
+            TlaTables   = opt.TlaTables.Length > 0 ? opt.TlaTables : jsonOut,
             MermaidOut  = opt.MermaidOut.Length > 0 ? opt.MermaidOut : null,
         };
     }
