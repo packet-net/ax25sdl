@@ -180,7 +180,8 @@ internal static class Program
         // Annex C draws for the machine but that has no page yet is not a
         // typo: it marks the machine as partly transcribed, and the machine
         // is withheld from generation (below) instead of failing the build.
-        var withheld = LintStateTargets(pages, errors);
+        var knownDefects = KnownFigureDefects.Load(plan.InDir, errors);
+        var withheld = LintStateTargets(pages, knownDefects, errors);
 
         // Published machines are never withheld: a missing page there is a
         // broken checkout or a deleted yaml, and withholding would quietly
@@ -222,7 +223,9 @@ internal static class Program
         {
             foreach (var (machine, missing) in withheld.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
-                Console.WriteLine($"  withheld  {machine}: partly transcribed, no page yet for {string.Join(", ", missing.Order(StringComparer.Ordinal))}. " +
+                var reasons = missing.Order(StringComparer.Ordinal)
+                    .Select(m => m.Contains("known figure defect", StringComparison.Ordinal) ? m : "no page yet for " + m);
+                Console.WriteLine($"  withheld  {machine}: {string.Join("; ", reasons)}. " +
                                   "Its pages are checked, but nothing is generated from them.");
             }
             var keptEvents = pages.Where(p => !withheld.ContainsKey(p.Machine))
@@ -1018,8 +1021,10 @@ internal static class Program
     /// marked <c>coverage: partial</c> are skipped, as before: their
     /// cross-page consistency is knowingly incomplete.
     /// </remarks>
-    private static Dictionary<string, HashSet<string>> LintStateTargets(List<SdlPage> pages, List<string> errors)
+    private static Dictionary<string, HashSet<string>> LintStateTargets(
+        List<SdlPage> pages, List<KnownFigureDefect> knownDefects, List<string> errors)
     {
+        var matchedDefects = new HashSet<KnownFigureDefect>();
         var statesByMachine = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var page in pages)
         {
@@ -1058,12 +1063,41 @@ internal static class Program
                     missing.Add(t.Next);
                     continue;
                 }
+                // A defect the figure really draws, recorded in
+                // spec-sdl/known-figure-defects.yaml: warn, and keep the
+                // machine withheld while the entry is present.
+                var known = knownDefects.FirstOrDefault(d =>
+                    d.Machine == page.Machine && d.State == page.State && d.Transition == t.Id && d.Next == t.Next);
+                if (known is not null)
+                {
+                    matchedDefects.Add(known);
+                    Console.Error.WriteLine($"::warning::{page.SourcePath}: known figure defect: {known.Describe()}. " +
+                                            $"`{page.Machine}` is withheld from generation while it is listed in {KnownFigureDefects.FileName}.");
+                    if (!partly.TryGetValue(page.Machine, out var missingKnown))
+                    {
+                        missingKnown = new HashSet<string>(StringComparer.Ordinal);
+                        partly[page.Machine] = missingKnown;
+                    }
+                    missingKnown.Add($"{t.Next} (known figure defect, {known.Issue})");
+                    continue;
+                }
                 errors.Add(
                     $"{page.SourcePath}: transition `{t.Id}` targets state `{t.Next}` which is not " +
                     $"a known state in machine `{page.Machine}` (transcribed: {string.Join(", ", validStates.OrderBy(x => x, StringComparer.Ordinal))}; " +
                     $"Annex C: {string.Join(", ", annexStates)}). " +
-                    "Typo, OR the figure names a state Annex C does not have: raise it as an issue against the figure.");
+                    "Typo, OR the figure names a state Annex C does not have: raise it as an issue against the figure, " +
+                    $"and list it in spec-sdl/{KnownFigureDefects.FileName} with the issue URL.");
             }
+        }
+
+        // Like a strict xfail: an entry whose defect no longer occurs (the
+        // figure was fixed, or the transition id changed) fails the run, so
+        // the list can't go stale and can't keep a fixed machine withheld.
+        foreach (var d in knownDefects.Where(d => !matchedDefects.Contains(d)))
+        {
+            errors.Add(
+                $"spec-sdl/{KnownFigureDefects.FileName}: {d.Describe()} no longer occurs. " +
+                "If the figure was fixed, remove the entry; if the transition id changed, update it.");
         }
         return partly;
     }

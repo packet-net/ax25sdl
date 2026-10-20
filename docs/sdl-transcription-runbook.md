@@ -136,7 +136,7 @@ cd <ax25sdl>/.claude/worktrees/tooling && dotnet run --project codegen/src/Packe
   --in <ax25spec-wt>/spec-sdl --json --json-out /tmp/codegen-check
 ```
 
-This runs every lint over every page: unknown events and predicates, decision completeness, guard overlap, state targets and totality. For a machine whose other pages are not done yet you will see `withheld <machine>: partly transcribed`; that is expected (see "Partly transcribed machines"). A `next:` state that is not an Annex C state of the machine is an error: either a drawing slip, or a figure defect for rule 2.
+This runs every lint over every page: unknown events and predicates, decision completeness, guard overlap, state targets and totality. For a machine whose other pages are not done yet you will see `withheld <machine>: no page yet for <State>`; that is expected (see "Partly transcribed machines"). A `next:` state that is not an Annex C state of the machine is an error: either a drawing slip, or a figure defect for rule 2 (see "Known figure defects").
 
 ### 8. Compare with the second transcription
 
@@ -196,6 +196,21 @@ Machines are transcribed a page at a time, so a page often leads to a state that
 - `coverage: partial` (used by the prose-derived Management Data Link bootstrap) still skips the state-target check for that page.
 - Data Link and Management Data Link are already published, so they are never withheld: a transition of theirs that leads to a missing page is an error. A deleted yaml can't quietly remove their generated code.
 - Generated files are named per machine (`link_mux_idle.g.go`, `segmenter_ready.g.json`), because states such as Ready recur across machines. The published machines keep their existing names (`connected.g.go`, `ready.g.json`). Two pages that would still share a name fail codegen.
+
+## Known figure defects
+
+Sometimes a figure leads to a state that doesn't exist (C3.2's PH-SIEZE Confirm column ends in "2 Sized"; the state is Seized). The transcription keeps what is drawn, and codegen would reject the page. Once the defect is confirmed and raised as an issue (rule 2), list it in `spec-sdl/known-figure-defects.yaml` in ax25spec:
+
+```yaml
+defects:
+  - machine: link_mux
+    state: SiezePending
+    transition: t07_ph_seize_confirm
+    next: Sized
+    issue: https://github.com/packethacking/ax25spec/issues/121
+```
+
+A listed defect is reported as a warning, and its machine stays withheld from generation while the entry is present. It works like a strict xfail: an entry whose defect no longer occurs (the figure was fixed, or the transition id changed) fails the run, so fix the figure and remove the entry in the same PR. A defect on a published machine (Data Link, Management Data Link) still fails, because they are never withheld. ax25spec's `codegen-lint` CI job runs these checks on every PR.
 
 ## After the transcription
 
