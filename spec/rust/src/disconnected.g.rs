@@ -172,23 +172,6 @@ pub static DATA_LINK_DISCONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t11_ui_received_no",
-            from: "Disconnected",
-            on: Ax25Event::UIReceived,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::PEq1,
-                negate: true,
-            }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::UICheck,
-                kind: ActionKind::Subroutine,
-            }],
-            next: "Disconnected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t11_ui_received_yes",
             from: "Disconnected",
             on: Ax25Event::UIReceived,
@@ -216,33 +199,27 @@ pub static DATA_LINK_DISCONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t12_disc_received",
+            id: "t11_ui_received_no",
             from: "Disconnected",
-            on: Ax25Event::DISCReceived,
-            guard: &[],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::FAssignP,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::DM,
-                    kind: ActionKind::SignalLower,
-                },
-            ],
+            on: Ax25Event::UIReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: true,
+            }],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::UICheck,
+                kind: ActionKind::Subroutine,
+            }],
             next: "Disconnected",
             notes: "",
             references: &[],
             loops: &[],
         },
         TransitionSpec {
-            id: "t13_sabm_received_no",
+            id: "t12_disc_received",
             from: "Disconnected",
-            on: Ax25Event::SABMReceived,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::AbleToEstablish,
-                negate: true,
-            }],
+            on: Ax25Event::DISCReceived,
+            guard: &[],
             actions: &[
                 ActionStep {
                     verb: Ax25ActionVerb::FAssignP,
@@ -322,9 +299,9 @@ pub static DATA_LINK_DISCONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t14_sabme_received_no",
+            id: "t13_sabm_received_no",
             from: "Disconnected",
-            on: Ax25Event::SABMEReceived,
+            on: Ax25Event::SABMReceived,
             guard: &[GuardTerm {
                 atom: Ax25Guard::AbleToEstablish,
                 negate: true,
@@ -403,6 +380,29 @@ pub static DATA_LINK_DISCONNECTED: StatePage = StatePage {
                 },
             ],
             next: "Connected",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t14_sabme_received_no",
+            from: "Disconnected",
+            on: Ax25Event::SABMEReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::AbleToEstablish,
+                negate: true,
+            }],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::FAssignP,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DM,
+                    kind: ActionKind::SignalLower,
+                },
+            ],
+            next: "Disconnected",
             notes: "",
             references: &[],
             loops: &[],
@@ -571,27 +571,6 @@ mod tests {
     }
 
     #[test]
-    fn t11_ui_received_no() {
-        let tx = DATA_LINK_DISCONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t11_ui_received_no")
-            .expect("transition t11_ui_received_no not found");
-        assert_eq!(tx.on, Ax25Event::UIReceived);
-        assert_eq!(tx.next, "Disconnected");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::PEq1,
-                negate: true
-            },]
-        );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::UICheck);
-        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
     fn t11_ui_received_yes() {
         let tx = DATA_LINK_DISCONNECTED
             .transitions
@@ -617,6 +596,27 @@ mod tests {
     }
 
     #[test]
+    fn t11_ui_received_no() {
+        let tx = DATA_LINK_DISCONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t11_ui_received_no")
+            .expect("transition t11_ui_received_no not found");
+        assert_eq!(tx.on, Ax25Event::UIReceived);
+        assert_eq!(tx.next, "Disconnected");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: true
+            },]
+        );
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::UICheck);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
     fn t12_disc_received() {
         let tx = DATA_LINK_DISCONNECTED
             .transitions
@@ -625,29 +625,6 @@ mod tests {
             .expect("transition t12_disc_received not found");
         assert_eq!(tx.on, Ax25Event::DISCReceived);
         assert_eq!(tx.next, "Disconnected");
-        assert_eq!(tx.actions.len(), 2);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::FAssignP);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DM);
-        assert_eq!(tx.actions[1].kind, ActionKind::SignalLower);
-    }
-
-    #[test]
-    fn t13_sabm_received_no() {
-        let tx = DATA_LINK_DISCONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t13_sabm_received_no")
-            .expect("transition t13_sabm_received_no not found");
-        assert_eq!(tx.on, Ax25Event::SABMReceived);
-        assert_eq!(tx.next, "Disconnected");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::AbleToEstablish,
-                negate: true
-            },]
-        );
         assert_eq!(tx.actions.len(), 2);
         assert_eq!(tx.actions[0].verb, Ax25ActionVerb::FAssignP);
         assert_eq!(tx.actions[0].kind, ActionKind::Processing);
@@ -699,13 +676,13 @@ mod tests {
     }
 
     #[test]
-    fn t14_sabme_received_no() {
+    fn t13_sabm_received_no() {
         let tx = DATA_LINK_DISCONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t14_sabme_received_no")
-            .expect("transition t14_sabme_received_no not found");
-        assert_eq!(tx.on, Ax25Event::SABMEReceived);
+            .find(|x| x.id == "t13_sabm_received_no")
+            .expect("transition t13_sabm_received_no not found");
+        assert_eq!(tx.on, Ax25Event::SABMReceived);
         assert_eq!(tx.next, "Disconnected");
         assert_eq!(
             tx.guard,
@@ -762,5 +739,28 @@ mod tests {
         assert_eq!(tx.actions[10].kind, ActionKind::Processing);
         assert_eq!(tx.actions[11].verb, Ax25ActionVerb::RCAssign0);
         assert_eq!(tx.actions[11].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t14_sabme_received_no() {
+        let tx = DATA_LINK_DISCONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t14_sabme_received_no")
+            .expect("transition t14_sabme_received_no not found");
+        assert_eq!(tx.on, Ax25Event::SABMEReceived);
+        assert_eq!(tx.next, "Disconnected");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::AbleToEstablish,
+                negate: true
+            },]
+        );
+        assert_eq!(tx.actions.len(), 2);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::FAssignP);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DM);
+        assert_eq!(tx.actions[1].kind, ActionKind::SignalLower);
     }
 }

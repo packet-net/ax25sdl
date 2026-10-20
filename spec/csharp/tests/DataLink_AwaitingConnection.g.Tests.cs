@@ -60,17 +60,6 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.Actions.Count.Should().Be(0);
     }
 
-    [Fact] public void t04_ua_received_no()
-    {
-        var t = DataLink_AwaitingConnection.Transitions.Single(x => x.Id == "t04_ua_received_no");
-        t.On.Should().Be(Ax25Event.UAReceived);
-        t.Next.Should().Be("AwaitingConnection");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, true) });
-        t.Actions.Count.Should().Be(1);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationD);
-        t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
-    }
-
     [Fact] public void t04_ua_received_yes_yes()
     {
         var t = DataLink_AwaitingConnection.Transitions.Single(x => x.Id == "t04_ua_received_yes_yes");
@@ -142,6 +131,17 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.Actions[8].Kind.Should().Be(ActionKind.Processing);
         t.Actions[9].Verb.Should().Be(Ax25ActionVerb.SelectT1Value);
         t.Actions[9].Kind.Should().Be(ActionKind.Subroutine);
+    }
+
+    [Fact] public void t04_ua_received_no()
+    {
+        var t = DataLink_AwaitingConnection.Transitions.Single(x => x.Id == "t04_ua_received_no");
+        t.On.Should().Be(Ax25Event.UAReceived);
+        t.Next.Should().Be("AwaitingConnection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, true) });
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationD);
+        t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
     }
 
     [Fact] public void t05_t1_expiry_yes()

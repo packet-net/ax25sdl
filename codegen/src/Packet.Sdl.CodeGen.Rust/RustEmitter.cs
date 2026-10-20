@@ -31,8 +31,7 @@ public static class RustEmitter
 
     public static Emission EmitStatePage(ResolvedPage page)
     {
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.rs";
 
         // Rust convention: SCREAMING_SNAKE_CASE for `pub static` items.
@@ -128,7 +127,7 @@ public static class RustEmitter
         var fileStem = Path.GetFileNameWithoutExtension(page.SourcePath)
             .Replace(".sdl", string.Empty, StringComparison.Ordinal);
         var staticName = (ScreamingSnake(page.Machine) + "_" + ScreamingSnake(fileStem)).ToUpperInvariant();
-        var fileName = fileStem + ".g.rs";
+        var fileName = AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.rs";
 
         var sb = new StringBuilder();
         EmitHeader(sb, page.SourcePath);
@@ -204,13 +203,11 @@ public static class RustEmitter
         var stems = new List<string>();
         foreach (var page in pages.OrderBy(p => p.SourcePath, StringComparer.Ordinal))
         {
-            stems.Add(Path.GetFileNameWithoutExtension(page.SourcePath)
-                .Replace(".sdl", string.Empty, StringComparison.Ordinal));
+            stems.Add(AnnexC.OutputStem(page.Machine, page.SourcePath));
         }
         foreach (var page in subPages.OrderBy(p => p.SourcePath, StringComparer.Ordinal))
         {
-            stems.Add(Path.GetFileNameWithoutExtension(page.SourcePath)
-                .Replace(".sdl", string.Empty, StringComparison.Ordinal));
+            stems.Add(AnnexC.OutputStem(page.Machine, page.SourcePath));
         }
 
         foreach (var stem in stems)

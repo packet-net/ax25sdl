@@ -123,20 +123,6 @@ describe("DataLinkAwaitingV22Connection", () => {
     expect(t.actions[0].kind).toBe("signal_upper");
   });
 
-  it("t10_ui_received_no", () => {
-    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t10_ui_received_no");
-    expect(t, "transition t10_ui_received_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("UI_received");
-    expect(t.next).toBe("AwaitingV22Connection");
-    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: true }]);
-    expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("UI Check");
-    expect(t.actions[0].kind).toBe("subroutine");
-    expect(t.actions[1].verb).toBe("DM (F = 1)");
-    expect(t.actions[1].kind).toBe("signal_lower");
-  });
-
   it("t10_ui_received_yes", () => {
     const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t10_ui_received_yes");
     expect(t, "transition t10_ui_received_yes not found").toBeDefined();
@@ -149,14 +135,18 @@ describe("DataLinkAwaitingV22Connection", () => {
     expect(t.actions[0].kind).toBe("subroutine");
   });
 
-  it("t11_dm_received_no", () => {
-    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t11_dm_received_no");
-    expect(t, "transition t11_dm_received_no not found").toBeDefined();
+  it("t10_ui_received_no", () => {
+    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t10_ui_received_no");
+    expect(t, "transition t10_ui_received_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("DM_received");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: true }]);
-    expect(t.actions).toHaveLength(0);
+    expect(t.on).toBe("UI_received");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("UI Check");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("DM (F = 1)");
+    expect(t.actions[1].kind).toBe("signal_lower");
   });
 
   it("t11_dm_received_yes", () => {
@@ -175,16 +165,14 @@ describe("DataLinkAwaitingV22Connection", () => {
     expect(t.actions[2].kind).toBe("processing");
   });
 
-  it("t12_ua_received_no", () => {
-    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t12_ua_received_no");
-    expect(t, "transition t12_ua_received_no not found").toBeDefined();
+  it("t11_dm_received_no", () => {
+    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t11_dm_received_no");
+    expect(t, "transition t11_dm_received_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("UA_received");
-    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.on).toBe("DM_received");
+    expect(t.next).toBe("AwaitingConnection");
     expect(t.guard).toEqual([{ atom: "F_eq_1", negate: true }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("DL_ERROR_indication_D");
-    expect(t.actions[0].kind).toBe("signal_upper");
+    expect(t.actions).toHaveLength(0);
   });
 
   it("t12_ua_received_yes_yes", () => {
@@ -211,6 +199,30 @@ describe("DataLinkAwaitingV22Connection", () => {
     expect(t.actions[6].kind).toBe("subroutine");
     expect(t.actions[7].verb).toBe("MDL-NEGOTIATE Request");
     expect(t.actions[7].kind).toBe("internal_out");
+  });
+
+  it("t12_ua_received_yes_no_yes", () => {
+    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t12_ua_received_yes_no_yes");
+    expect(t, "transition t12_ua_received_yes_no_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("UA_received");
+    expect(t.next).toBe("Connected");
+    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: false }, { atom: "layer_3_initiated", negate: true }, { atom: "vs_eq_va", negate: false }]);
+    expect(t.actions).toHaveLength(7);
+    expect(t.actions[0].verb).toBe("Stop T1");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("Start T3");
+    expect(t.actions[1].kind).toBe("processing");
+    expect(t.actions[2].verb).toBe("V(s) := 0");
+    expect(t.actions[2].kind).toBe("processing");
+    expect(t.actions[3].verb).toBe("V(a) := 0");
+    expect(t.actions[3].kind).toBe("processing");
+    expect(t.actions[4].verb).toBe("V(r) := 0");
+    expect(t.actions[4].kind).toBe("processing");
+    expect(t.actions[5].verb).toBe("Select_T1_Value");
+    expect(t.actions[5].kind).toBe("subroutine");
+    expect(t.actions[6].verb).toBe("MDL-NEGOTIATE Request");
+    expect(t.actions[6].kind).toBe("internal_out");
   });
 
   it("t12_ua_received_yes_no_no", () => {
@@ -245,28 +257,16 @@ describe("DataLinkAwaitingV22Connection", () => {
     expect(t.actions[10].kind).toBe("internal_out");
   });
 
-  it("t12_ua_received_yes_no_yes", () => {
-    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t12_ua_received_yes_no_yes");
-    expect(t, "transition t12_ua_received_yes_no_yes not found").toBeDefined();
+  it("t12_ua_received_no", () => {
+    const t = DataLinkAwaitingV22Connection.transitions.find((x) => x.id === "t12_ua_received_no");
+    expect(t, "transition t12_ua_received_no not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("UA_received");
-    expect(t.next).toBe("Connected");
-    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: false }, { atom: "layer_3_initiated", negate: true }, { atom: "vs_eq_va", negate: false }]);
-    expect(t.actions).toHaveLength(7);
-    expect(t.actions[0].verb).toBe("Stop T1");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("Start T3");
-    expect(t.actions[1].kind).toBe("processing");
-    expect(t.actions[2].verb).toBe("V(s) := 0");
-    expect(t.actions[2].kind).toBe("processing");
-    expect(t.actions[3].verb).toBe("V(a) := 0");
-    expect(t.actions[3].kind).toBe("processing");
-    expect(t.actions[4].verb).toBe("V(r) := 0");
-    expect(t.actions[4].kind).toBe("processing");
-    expect(t.actions[5].verb).toBe("Select_T1_Value");
-    expect(t.actions[5].kind).toBe("subroutine");
-    expect(t.actions[6].verb).toBe("MDL-NEGOTIATE Request");
-    expect(t.actions[6].kind).toBe("internal_out");
+    expect(t.next).toBe("AwaitingV22Connection");
+    expect(t.guard).toEqual([{ atom: "F_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("DL_ERROR_indication_D");
+    expect(t.actions[0].kind).toBe("signal_upper");
   });
 
   it("t13_t1_expiry_yes", () => {

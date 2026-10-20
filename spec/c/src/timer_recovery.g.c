@@ -63,19 +63,19 @@ static const ActionStep
 };
 
 static const ActionStep
+    data_link_timer_recovery_t06_dl_flow_on_request_yes_yes_actions[] = {
+        {.verb = "Clear Own Receiver Busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "RR Command (P = 0)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
     data_link_timer_recovery_t06_dl_flow_on_request_yes_no_actions[] = {
         {.verb = "Clear Own Receiver Busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "RR Command (P = 0)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
         {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t06_dl_flow_on_request_yes_yes_actions[] = {
-        {.verb = "Clear Own Receiver Busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "RR Command (P = 0)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
@@ -124,22 +124,6 @@ static const ActionStep data_link_timer_recovery_t12_dm_received_actions[] = {
 };
 
 static const ActionStep
-    data_link_timer_recovery_t13_sabm_received_no_actions[] = {
-        {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "set_version_2_0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "UA", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-        {.verb = "Clear Exception Conditions", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "DL-ERROR Indication (F)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-        {.verb = "discard_I_frame_queue", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "DL_CONNECT_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(s) := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(a) := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(r) := 0", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
     data_link_timer_recovery_t13_sabm_received_yes_actions[] = {
         {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "set_version_2_0", .kind = AX25SDL_KIND_PROCESSING},
@@ -149,9 +133,9 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t14_sabme_received_no_actions[] = {
+    data_link_timer_recovery_t13_sabm_received_no_actions[] = {
         {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Set Version 2.2", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "set_version_2_0", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "UA", .kind = AX25SDL_KIND_SIGNAL_LOWER},
         {.verb = "Clear Exception Conditions", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "DL-ERROR Indication (F)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
@@ -171,6 +155,22 @@ static const ActionStep
         {.verb = "UA", .kind = AX25SDL_KIND_SIGNAL_LOWER},
         {.verb = "Clear Exception Conditions", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "DL-ERROR Indication (F)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t14_sabme_received_no_actions[] = {
+        {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Set Version 2.2", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "UA", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Clear Exception Conditions", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "DL-ERROR Indication (F)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+        {.verb = "discard_I_frame_queue", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "DL_CONNECT_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(s) := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(a) := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(r) := 0", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep data_link_timer_recovery_t15_frmr_received_actions[] = {
@@ -201,6 +201,44 @@ static const ActionStep data_link_timer_recovery_t17_disc_received_actions[] = {
 };
 
 static const ActionStep
+    data_link_timer_recovery_t18_rr_received_yes_yes_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t18_rr_received_yes_yes_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Invoke Retransmission", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "set_acknowledge_pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t18_rr_received_yes_no_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t18_rr_received_yes_no_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
     data_link_timer_recovery_t18_rr_received_no_yes_yes_actions[] = {
         {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry_Response_F_1", .kind = AX25SDL_KIND_SUBROUTINE},
@@ -208,14 +246,14 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t18_rr_received_no_yes_no_no_actions[] = {
+    data_link_timer_recovery_t18_rr_received_no_yes_no_yes_actions[] = {
         {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry_Response_F_1", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
 };
 
 static const ActionStep
-    data_link_timer_recovery_t18_rr_received_no_yes_no_yes_actions[] = {
+    data_link_timer_recovery_t18_rr_received_no_yes_no_no_actions[] = {
         {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry_Response_F_1", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
@@ -234,24 +272,18 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t18_rr_received_yes_no_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+    data_link_timer_recovery_t19_rnr_received_yes_yes_yes_actions[] = {
+        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
-    data_link_timer_recovery_t18_rr_received_yes_no_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t18_rr_received_yes_yes_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+    data_link_timer_recovery_t19_rnr_received_yes_yes_no_actions[] = {
+        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
@@ -262,13 +294,19 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t18_rr_received_yes_yes_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+    data_link_timer_recovery_t19_rnr_received_yes_no_yes_actions[] = {
+        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t19_rnr_received_yes_no_no_actions[] = {
+        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
 };
 
 static const ActionStep
@@ -279,14 +317,14 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_no_yes_no_no_actions[] = {
+    data_link_timer_recovery_t19_rnr_received_no_yes_no_yes_actions[] = {
         {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry_Response_F_1", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
 };
 
 static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_no_yes_no_yes_actions[] = {
+    data_link_timer_recovery_t19_rnr_received_no_yes_no_no_actions[] = {
         {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry_Response_F_1", .kind = AX25SDL_KIND_SUBROUTINE},
         {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
@@ -305,44 +343,6 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_yes_no_no_actions[] = {
-        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_yes_no_yes_actions[] = {
-        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_yes_yes_no_actions[] = {
-        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Invoke Retransmission", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "set_acknowledge_pending", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t19_rnr_received_yes_yes_yes_actions[] = {
-        {.verb = "set_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
     data_link_timer_recovery_t20_lm_seize_confirm_yes_actions[] = {
         {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Enquiry Response (F = 0)", .kind = AX25SDL_KIND_SUBROUTINE},
@@ -352,11 +352,6 @@ static const ActionStep
 static const ActionStep
     data_link_timer_recovery_t20_lm_seize_confirm_no_actions[] = {
         {.verb = "LM_release_request", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-};
-
-static const ActionStep data_link_timer_recovery_t21_t1_expiry_no_actions[] = {
-    {.verb = "Transmit Enquiry", .kind = AX25SDL_KIND_SUBROUTINE},
-    {.verb = "RC := RC + 1", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
@@ -383,21 +378,9 @@ static const ActionStep
         {.verb = "DM Response (F = 0)", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
-static const ActionStep data_link_timer_recovery_t22_i_received_no_actions[] = {
-    {.verb = "DL-ERROR Indication (O)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-    {.verb = "Discard I Frame", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t22_i_received_yes_no_actions[] = {
-        {.verb = "DL-ERROR Indication (O)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-        {.verb = "Establish_Data_Link", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "Clear Layer 3 Initiated", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t22_i_received_yes_yes_no_actions[] = {
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+static const ActionStep data_link_timer_recovery_t21_t1_expiry_no_actions[] = {
+    {.verb = "Transmit Enquiry", .kind = AX25SDL_KIND_SUBROUTINE},
+    {.verb = "RC := RC + 1", .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
@@ -445,6 +428,31 @@ static const LoopRange
 };
 
 static const ActionStep
+    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_yes_actions
+        [] = {
+            {.verb = "Check_I_Frame_Acknowledged",
+             .kind = AX25SDL_KIND_SUBROUTINE},
+            {.verb = "V(r) := V(r) + 1", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Clear Reject Exception", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Decrement Sreject Exception if > 0",
+             .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "DL_DATA_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+            {.verb = "Retrieve Stored V(r) I Frame",
+             .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "DL_DATA_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+            {.verb = "V(r) := V(r) - 1", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const LoopRange
+    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_yes_loops[] =
+        {
+            {.start = 5,
+             .length = 3,
+             .predicate = "vr_I_frame_stored",
+             .test_at_end = false},
+};
+
+static const ActionStep
     data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_no_actions[] =
         {
             {.verb = "Check_I_Frame_Acknowledged",
@@ -472,31 +480,6 @@ static const LoopRange
 };
 
 static const ActionStep
-    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_yes_actions
-        [] = {
-            {.verb = "Check_I_Frame_Acknowledged",
-             .kind = AX25SDL_KIND_SUBROUTINE},
-            {.verb = "V(r) := V(r) + 1", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "Clear Reject Exception", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "Decrement Sreject Exception if > 0",
-             .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "DL_DATA_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-            {.verb = "Retrieve Stored V(r) I Frame",
-             .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "DL_DATA_indication", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-            {.verb = "V(r) := V(r) - 1", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const LoopRange
-    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_yes_loops[] =
-        {
-            {.start = 5,
-             .length = 3,
-             .predicate = "vr_I_frame_stored",
-             .test_at_end = false},
-};
-
-static const ActionStep
     data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_yes_yes_actions
         [] = {
             {.verb = "Check_I_Frame_Acknowledged",
@@ -520,18 +503,16 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_no_actions
+    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes_actions
         [] = {
             {.verb = "Check_I_Frame_Acknowledged",
              .kind = AX25SDL_KIND_SUBROUTINE},
-            {.verb = "Discard Contents of I Frame",
+            {.verb = "Save Contents of I Frame",
              .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "Set Reject Exception", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "N(r) := V(r)", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "REJ", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-            {.verb = "set_acknowledge_pending",
-             .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "F := 0", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Sreject := Sreject + 1", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "SREJ", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const ActionStep
@@ -565,16 +546,18 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes_actions
+    data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_no_actions
         [] = {
             {.verb = "Check_I_Frame_Acknowledged",
              .kind = AX25SDL_KIND_SUBROUTINE},
-            {.verb = "Save Contents of I Frame",
+            {.verb = "Discard Contents of I Frame",
              .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Set Reject Exception", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
             {.verb = "N(r) := V(r)", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "F := 0", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "Sreject := Sreject + 1", .kind = AX25SDL_KIND_PROCESSING},
-            {.verb = "SREJ", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+            {.verb = "REJ", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+            {.verb = "set_acknowledge_pending",
+             .kind = AX25SDL_KIND_PROCESSING},
 };
 
 static const ActionStep
@@ -598,6 +581,61 @@ static const ActionStep
              .kind = AX25SDL_KIND_SUBROUTINE},
             {.verb = "Discard Contents of I Frame",
              .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t22_i_received_yes_yes_no_actions[] = {
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t22_i_received_yes_no_actions[] = {
+        {.verb = "DL-ERROR Indication (O)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+        {.verb = "Establish_Data_Link", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Clear Layer 3 Initiated", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep data_link_timer_recovery_t22_i_received_no_actions[] = {
+    {.verb = "DL-ERROR Indication (O)", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+    {.verb = "Discard I Frame", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t23_rej_received_yes_yes_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t23_rej_received_yes_yes_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Invoke Retransmission", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t23_rej_received_yes_no_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t23_rej_received_yes_no_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
 };
 
 static const ActionStep
@@ -661,108 +699,6 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_timer_recovery_t23_rej_received_yes_no_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t23_rej_received_yes_no_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t23_rej_received_yes_yes_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t23_rej_received_yes_yes_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Invoke Retransmission", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_yes_yes_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Check_I_Frame_Acknowledged", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_yes_yes_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Check_I_Frame_Acknowledged", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "Push Old I Frame N(r) on Queue",
-         .kind = AX25SDL_KIND_INTERNAL_OUT},
-        {.verb = "LM_data_request", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_yes_no_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_yes_no_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Push Old I Frame N(r) on Queue",
-         .kind = AX25SDL_KIND_INTERNAL_OUT},
-        {.verb = "LM_data_request", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_no_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_no_no_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_yes_no_no_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
-    data_link_timer_recovery_t24_srej_received_yes_no_yes_actions[] = {
-        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
-static const ActionStep
     data_link_timer_recovery_t24_srej_received_yes_yes_yes_yes_actions[] = {
         {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
@@ -808,6 +744,70 @@ static const ActionStep
         {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_yes_no_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_yes_no_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Stop T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Select_T1_Value", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_yes_yes_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Check_I_Frame_Acknowledged", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_yes_yes_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "V(a) := N(r)", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Check_I_Frame_Acknowledged", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Push Old I Frame N(r) on Queue",
+         .kind = AX25SDL_KIND_INTERNAL_OUT},
+        {.verb = "LM_data_request", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_yes_no_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_yes_no_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Push Old I Frame N(r) on Queue",
+         .kind = AX25SDL_KIND_INTERNAL_OUT},
+        {.verb = "LM_data_request", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Stop T3", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Start T1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "Clear Acknowledge Pending", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_no_yes_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
+static const ActionStep
+    data_link_timer_recovery_t24_srej_received_no_no_no_actions[] = {
+        {.verb = "clear_peer_receiver_busy", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "N(r) Recovery", .kind = AX25SDL_KIND_SUBROUTINE},
 };
 
 static const TransitionSpec data_link_timer_recovery_transitions[] = {
@@ -944,13 +944,13 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t06_dl_flow_on_request_yes_no",
+        .id = "t06_dl_flow_on_request_yes_yes",
         .from = "TimerRecovery",
         .on = "DL_FLOW_ON_request",
-        .guard = "own_receiver_busy and not T1_running",
+        .guard = "own_receiver_busy and T1_running",
         .actions =
-            data_link_timer_recovery_t06_dl_flow_on_request_yes_no_actions,
-        .actions_len = 5,
+            data_link_timer_recovery_t06_dl_flow_on_request_yes_yes_actions,
+        .actions_len = 3,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -959,13 +959,13 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t06_dl_flow_on_request_yes_yes",
+        .id = "t06_dl_flow_on_request_yes_no",
         .from = "TimerRecovery",
         .on = "DL_FLOW_ON_request",
-        .guard = "own_receiver_busy and T1_running",
+        .guard = "own_receiver_busy and not T1_running",
         .actions =
-            data_link_timer_recovery_t06_dl_flow_on_request_yes_yes_actions,
-        .actions_len = 3,
+            data_link_timer_recovery_t06_dl_flow_on_request_yes_no_actions,
+        .actions_len = 5,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -1074,20 +1074,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t13_sabm_received_no",
-        .from = "TimerRecovery",
-        .on = "SABM_received",
-        .guard = "not vs_eq_va",
-        .actions = data_link_timer_recovery_t13_sabm_received_no_actions,
-        .actions_len = 12,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t13_sabm_received_yes",
         .from = "TimerRecovery",
         .on = "SABM_received",
@@ -1102,11 +1088,11 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t14_sabme_received_no",
+        .id = "t13_sabm_received_no",
         .from = "TimerRecovery",
-        .on = "SABME_received",
+        .on = "SABM_received",
         .guard = "not vs_eq_va",
-        .actions = data_link_timer_recovery_t14_sabme_received_no_actions,
+        .actions = data_link_timer_recovery_t13_sabm_received_no_actions,
         .actions_len = 12,
         .next = "Connected",
         .notes = "",
@@ -1122,6 +1108,20 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .guard = "vs_eq_va",
         .actions = data_link_timer_recovery_t14_sabme_received_yes_actions,
         .actions_len = 5,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t14_sabme_received_no",
+        .from = "TimerRecovery",
+        .on = "SABME_received",
+        .guard = "not vs_eq_va",
+        .actions = data_link_timer_recovery_t14_sabme_received_no_actions,
+        .actions_len = 12,
         .next = "Connected",
         .notes = "",
         .references = NULL,
@@ -1186,13 +1186,26 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t18_rr_received_no_yes_yes",
+        .id = "t18_rr_received_yes_yes_yes",
         .from = "TimerRecovery",
         .on = "RR_received",
-        .guard =
-            "not response_and_F_eq_1 and command_and_P_eq_1 and va_le_nr_le_vs",
-        .actions = data_link_timer_recovery_t18_rr_received_no_yes_yes_actions,
-        .actions_len = 3,
+        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
+        .actions = data_link_timer_recovery_t18_rr_received_yes_yes_yes_actions,
+        .actions_len = 6,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t18_rr_received_yes_yes_no",
+        .from = "TimerRecovery",
+        .on = "RR_received",
+        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and not vs_eq_nr",
+        .actions = data_link_timer_recovery_t18_rr_received_yes_yes_no_actions,
+        .actions_len = 8,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -1201,15 +1214,43 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t18_rr_received_no_yes_no_no",
+        .id = "t18_rr_received_yes_no_yes",
         .from = "TimerRecovery",
         .on = "RR_received",
-        .guard = "not response_and_F_eq_1 and command_and_P_eq_1 and not "
-                 "va_le_nr_le_vs and not version_2_2",
-        .actions =
-            data_link_timer_recovery_t18_rr_received_no_yes_no_no_actions,
-        .actions_len = 3,
+        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
+        .actions = data_link_timer_recovery_t18_rr_received_yes_no_yes_actions,
+        .actions_len = 4,
+        .next = "AwaitingV22Connection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t18_rr_received_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "RR_received",
+        .guard =
+            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
+        .actions = data_link_timer_recovery_t18_rr_received_yes_no_no_actions,
+        .actions_len = 4,
         .next = "AwaitingConnection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t18_rr_received_no_yes_yes",
+        .from = "TimerRecovery",
+        .on = "RR_received",
+        .guard =
+            "not response_and_F_eq_1 and command_and_P_eq_1 and va_le_nr_le_vs",
+        .actions = data_link_timer_recovery_t18_rr_received_no_yes_yes_actions,
+        .actions_len = 3,
+        .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1226,6 +1267,22 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
             data_link_timer_recovery_t18_rr_received_no_yes_no_yes_actions,
         .actions_len = 3,
         .next = "AwaitingV22Connection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t18_rr_received_no_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "RR_received",
+        .guard = "not response_and_F_eq_1 and command_and_P_eq_1 and not "
+                 "va_le_nr_le_vs and not version_2_2",
+        .actions =
+            data_link_timer_recovery_t18_rr_received_no_yes_no_no_actions,
+        .actions_len = 3,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1263,14 +1320,14 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t18_rr_received_yes_no_no",
+        .id = "t19_rnr_received_yes_yes_yes",
         .from = "TimerRecovery",
-        .on = "RR_received",
-        .guard =
-            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
-        .actions = data_link_timer_recovery_t18_rr_received_yes_no_no_actions,
-        .actions_len = 4,
-        .next = "AwaitingConnection",
+        .on = "RNR_received",
+        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
+        .actions =
+            data_link_timer_recovery_t19_rnr_received_yes_yes_yes_actions,
+        .actions_len = 6,
+        .next = "Connected",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1278,25 +1335,11 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t18_rr_received_yes_no_yes",
+        .id = "t19_rnr_received_yes_yes_no",
         .from = "TimerRecovery",
-        .on = "RR_received",
-        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
-        .actions = data_link_timer_recovery_t18_rr_received_yes_no_yes_actions,
-        .actions_len = 4,
-        .next = "AwaitingV22Connection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t18_rr_received_yes_yes_no",
-        .from = "TimerRecovery",
-        .on = "RR_received",
+        .on = "RNR_received",
         .guard = "response_and_F_eq_1 and va_le_nr_le_vs and not vs_eq_nr",
-        .actions = data_link_timer_recovery_t18_rr_received_yes_yes_no_actions,
+        .actions = data_link_timer_recovery_t19_rnr_received_yes_yes_no_actions,
         .actions_len = 8,
         .next = "TimerRecovery",
         .notes = "",
@@ -1306,13 +1349,28 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t18_rr_received_yes_yes_yes",
+        .id = "t19_rnr_received_yes_no_yes",
         .from = "TimerRecovery",
-        .on = "RR_received",
-        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
-        .actions = data_link_timer_recovery_t18_rr_received_yes_yes_yes_actions,
-        .actions_len = 6,
-        .next = "Connected",
+        .on = "RNR_received",
+        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
+        .actions = data_link_timer_recovery_t19_rnr_received_yes_no_yes_actions,
+        .actions_len = 4,
+        .next = "AwaitingV22Connection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t19_rnr_received_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "RNR_received",
+        .guard =
+            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
+        .actions = data_link_timer_recovery_t19_rnr_received_yes_no_no_actions,
+        .actions_len = 4,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1335,22 +1393,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t19_rnr_received_no_yes_no_no",
-        .from = "TimerRecovery",
-        .on = "RNR_received",
-        .guard = "not response_and_F_eq_1 and command_and_P_eq_1 and not "
-                 "va_le_nr_le_vs and not version_2_2",
-        .actions =
-            data_link_timer_recovery_t19_rnr_received_no_yes_no_no_actions,
-        .actions_len = 3,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t19_rnr_received_no_yes_no_yes",
         .from = "TimerRecovery",
         .on = "RNR_received",
@@ -1360,6 +1402,22 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
             data_link_timer_recovery_t19_rnr_received_no_yes_no_yes_actions,
         .actions_len = 3,
         .next = "AwaitingV22Connection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t19_rnr_received_no_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "RNR_received",
+        .guard = "not response_and_F_eq_1 and command_and_P_eq_1 and not "
+                 "va_le_nr_le_vs and not version_2_2",
+        .actions =
+            data_link_timer_recovery_t19_rnr_received_no_yes_no_no_actions,
+        .actions_len = 3,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1397,64 +1455,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t19_rnr_received_yes_no_no",
-        .from = "TimerRecovery",
-        .on = "RNR_received",
-        .guard =
-            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
-        .actions = data_link_timer_recovery_t19_rnr_received_yes_no_no_actions,
-        .actions_len = 4,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t19_rnr_received_yes_no_yes",
-        .from = "TimerRecovery",
-        .on = "RNR_received",
-        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
-        .actions = data_link_timer_recovery_t19_rnr_received_yes_no_yes_actions,
-        .actions_len = 4,
-        .next = "AwaitingV22Connection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t19_rnr_received_yes_yes_no",
-        .from = "TimerRecovery",
-        .on = "RNR_received",
-        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and not vs_eq_nr",
-        .actions = data_link_timer_recovery_t19_rnr_received_yes_yes_no_actions,
-        .actions_len = 8,
-        .next = "TimerRecovery",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t19_rnr_received_yes_yes_yes",
-        .from = "TimerRecovery",
-        .on = "RNR_received",
-        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
-        .actions =
-            data_link_timer_recovery_t19_rnr_received_yes_yes_yes_actions,
-        .actions_len = 6,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t20_lm_seize_confirm_yes",
         .from = "TimerRecovery",
         .on = "LM_SEIZE_confirm",
@@ -1475,20 +1475,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .guard = "not ack_pending",
         .actions = data_link_timer_recovery_t20_lm_seize_confirm_no_actions,
         .actions_len = 1,
-        .next = "TimerRecovery",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t21_t1_expiry_no",
-        .from = "TimerRecovery",
-        .on = "T1_expiry",
-        .guard = "not RC_eq_N2",
-        .actions = data_link_timer_recovery_t21_t1_expiry_no_actions,
-        .actions_len = 2,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -1539,44 +1525,13 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t22_i_received_no",
+        .id = "t21_t1_expiry_no",
         .from = "TimerRecovery",
-        .on = "I_received",
-        .guard = "not command",
-        .actions = data_link_timer_recovery_t22_i_received_no_actions,
+        .on = "T1_expiry",
+        .guard = "not RC_eq_N2",
+        .actions = data_link_timer_recovery_t21_t1_expiry_no_actions,
         .actions_len = 2,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t22_i_received_yes_no",
-        .from = "TimerRecovery",
-        .on = "I_received",
-        .guard = "command and not "
-                 "info_field_length_le_N1_and_content_is_octet_aligned",
-        .actions = data_link_timer_recovery_t22_i_received_yes_no_actions,
-        .actions_len = 3,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t22_i_received_yes_yes_no",
-        .from = "TimerRecovery",
-        .on = "I_received",
-        .guard =
-            "command and info_field_length_le_N1_and_content_is_octet_aligned "
-            "and not va_le_nr_le_vs",
-        .actions = data_link_timer_recovery_t22_i_received_yes_yes_no_actions,
-        .actions_len = 1,
-        .next = "AwaitingConnection",
+        .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1637,25 +1592,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 1,
     },
     {
-        .id = "t22_i_received_yes_yes_yes_no_yes_no_no",
-        .from = "TimerRecovery",
-        .on = "I_received",
-        .guard =
-            "command and info_field_length_le_N1_and_content_is_octet_aligned "
-            "and va_le_nr_le_vs and not own_receiver_busy and ns_eq_vr and not "
-            "P_eq_1 and not ack_pending",
-        .actions =
-            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_no_actions,
-        .actions_len = 10,
-        .next = "TimerRecovery",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops =
-            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_no_loops,
-        .loops_len = 1,
-    },
-    {
         .id = "t22_i_received_yes_yes_yes_no_yes_no_yes",
         .from = "TimerRecovery",
         .on = "I_received",
@@ -1672,6 +1608,25 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .references_len = 0,
         .loops =
             data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_yes_loops,
+        .loops_len = 1,
+    },
+    {
+        .id = "t22_i_received_yes_yes_yes_no_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "I_received",
+        .guard =
+            "command and info_field_length_le_N1_and_content_is_octet_aligned "
+            "and va_le_nr_le_vs and not own_receiver_busy and ns_eq_vr and not "
+            "P_eq_1 and not ack_pending",
+        .actions =
+            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_no_actions,
+        .actions_len = 10,
+        .next = "TimerRecovery",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops =
+            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_yes_no_no_loops,
         .loops_len = 1,
     },
     {
@@ -1711,17 +1666,17 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t22_i_received_yes_yes_yes_no_no_yes_no_no",
+        .id = "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
         .from = "TimerRecovery",
         .on = "I_received",
         .guard =
             "command and info_field_length_le_N1_and_content_is_octet_aligned "
             "and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and "
-            "vr_lt_ns_lt_vr_plus_k and not reject_exception and not "
-            "SREJ_enabled",
+            "vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled "
+            "and sreject_exception_gt_0",
         .actions =
-            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_no_actions,
-        .actions_len = 7,
+            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes_actions,
+        .actions_len = 6,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -1768,17 +1723,17 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes",
+        .id = "t22_i_received_yes_yes_yes_no_no_yes_no_no",
         .from = "TimerRecovery",
         .on = "I_received",
         .guard =
             "command and info_field_length_le_N1_and_content_is_octet_aligned "
             "and va_le_nr_le_vs and not own_receiver_busy and not ns_eq_vr and "
-            "vr_lt_ns_lt_vr_plus_k and not reject_exception and SREJ_enabled "
-            "and sreject_exception_gt_0",
+            "vr_lt_ns_lt_vr_plus_k and not reject_exception and not "
+            "SREJ_enabled",
         .actions =
-            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes_actions,
-        .actions_len = 6,
+            data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_yes_no_no_actions,
+        .actions_len = 7,
         .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
@@ -1816,6 +1771,109 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
             data_link_timer_recovery_t22_i_received_yes_yes_yes_no_no_no_no_actions,
         .actions_len = 2,
         .next = "TimerRecovery",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t22_i_received_yes_yes_no",
+        .from = "TimerRecovery",
+        .on = "I_received",
+        .guard =
+            "command and info_field_length_le_N1_and_content_is_octet_aligned "
+            "and not va_le_nr_le_vs",
+        .actions = data_link_timer_recovery_t22_i_received_yes_yes_no_actions,
+        .actions_len = 1,
+        .next = "AwaitingConnection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t22_i_received_yes_no",
+        .from = "TimerRecovery",
+        .on = "I_received",
+        .guard = "command and not "
+                 "info_field_length_le_N1_and_content_is_octet_aligned",
+        .actions = data_link_timer_recovery_t22_i_received_yes_no_actions,
+        .actions_len = 3,
+        .next = "AwaitingConnection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t22_i_received_no",
+        .from = "TimerRecovery",
+        .on = "I_received",
+        .guard = "not command",
+        .actions = data_link_timer_recovery_t22_i_received_no_actions,
+        .actions_len = 2,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t23_rej_received_yes_yes_yes",
+        .from = "TimerRecovery",
+        .on = "REJ_received",
+        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
+        .actions =
+            data_link_timer_recovery_t23_rej_received_yes_yes_yes_actions,
+        .actions_len = 6,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t23_rej_received_yes_yes_no",
+        .from = "TimerRecovery",
+        .on = "REJ_received",
+        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and not vs_eq_nr",
+        .actions = data_link_timer_recovery_t23_rej_received_yes_yes_no_actions,
+        .actions_len = 8,
+        .next = "TimerRecovery",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t23_rej_received_yes_no_yes",
+        .from = "TimerRecovery",
+        .on = "REJ_received",
+        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
+        .actions = data_link_timer_recovery_t23_rej_received_yes_no_yes_actions,
+        .actions_len = 4,
+        .next = "AwaitingV22Connection",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t23_rej_received_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "REJ_received",
+        .guard =
+            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
+        .actions = data_link_timer_recovery_t23_rej_received_yes_no_no_actions,
+        .actions_len = 4,
+        .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -1951,11 +2009,72 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t23_rej_received_yes_no_yes",
+        .id = "t24_srej_received_yes_yes_yes_yes",
         .from = "TimerRecovery",
-        .on = "REJ_received",
-        .guard = "response_and_F_eq_1 and not va_le_nr_le_vs and version_2_2",
-        .actions = data_link_timer_recovery_t23_rej_received_yes_no_yes_actions,
+        .on = "SREJ_received",
+        .guard = "response and va_le_nr_le_vs and F_eq_1 and vs_eq_nr",
+        .actions =
+            data_link_timer_recovery_t24_srej_received_yes_yes_yes_yes_actions,
+        .actions_len = 7,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t24_srej_received_yes_yes_yes_no",
+        .from = "TimerRecovery",
+        .on = "SREJ_received",
+        .guard = "response and va_le_nr_le_vs and F_eq_1 and not vs_eq_nr",
+        .actions =
+            data_link_timer_recovery_t24_srej_received_yes_yes_yes_no_actions,
+        .actions_len = 10,
+        .next = "TimerRecovery",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t24_srej_received_yes_yes_no_yes",
+        .from = "TimerRecovery",
+        .on = "SREJ_received",
+        .guard = "response and va_le_nr_le_vs and not F_eq_1 and vs_eq_va",
+        .actions =
+            data_link_timer_recovery_t24_srej_received_yes_yes_no_yes_actions,
+        .actions_len = 5,
+        .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t24_srej_received_yes_yes_no_no",
+        .from = "TimerRecovery",
+        .on = "SREJ_received",
+        .guard = "response and va_le_nr_le_vs and not F_eq_1 and not vs_eq_va",
+        .actions =
+            data_link_timer_recovery_t24_srej_received_yes_yes_no_no_actions,
+        .actions_len = 8,
+        .next = "TimerRecovery",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t24_srej_received_yes_no_yes",
+        .from = "TimerRecovery",
+        .on = "SREJ_received",
+        .guard = "response and not va_le_nr_le_vs and version_2_2",
+        .actions =
+            data_link_timer_recovery_t24_srej_received_yes_no_yes_actions,
         .actions_len = 4,
         .next = "AwaitingV22Connection",
         .notes = "",
@@ -1965,43 +2084,13 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t23_rej_received_yes_no_no",
+        .id = "t24_srej_received_yes_no_no",
         .from = "TimerRecovery",
-        .on = "REJ_received",
-        .guard =
-            "response_and_F_eq_1 and not va_le_nr_le_vs and not version_2_2",
-        .actions = data_link_timer_recovery_t23_rej_received_yes_no_no_actions,
+        .on = "SREJ_received",
+        .guard = "response and not va_le_nr_le_vs and not version_2_2",
+        .actions = data_link_timer_recovery_t24_srej_received_yes_no_no_actions,
         .actions_len = 4,
         .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t23_rej_received_yes_yes_yes",
-        .from = "TimerRecovery",
-        .on = "REJ_received",
-        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and vs_eq_nr",
-        .actions =
-            data_link_timer_recovery_t23_rej_received_yes_yes_yes_actions,
-        .actions_len = 6,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t23_rej_received_yes_yes_no",
-        .from = "TimerRecovery",
-        .on = "REJ_received",
-        .guard = "response_and_F_eq_1 and va_le_nr_le_vs and not vs_eq_nr",
-        .actions = data_link_timer_recovery_t23_rej_received_yes_yes_no_actions,
-        .actions_len = 8,
-        .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
         .references_len = 0,
@@ -2070,20 +2159,6 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t24_srej_received_no_no_no",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "not response and not va_le_nr_le_vs and not version_2_2",
-        .actions = data_link_timer_recovery_t24_srej_received_no_no_no_actions,
-        .actions_len = 2,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t24_srej_received_no_no_yes",
         .from = "TimerRecovery",
         .on = "SREJ_received",
@@ -2098,88 +2173,13 @@ static const TransitionSpec data_link_timer_recovery_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t24_srej_received_yes_no_no",
+        .id = "t24_srej_received_no_no_no",
         .from = "TimerRecovery",
         .on = "SREJ_received",
-        .guard = "response and not va_le_nr_le_vs and not version_2_2",
-        .actions = data_link_timer_recovery_t24_srej_received_yes_no_no_actions,
-        .actions_len = 4,
+        .guard = "not response and not va_le_nr_le_vs and not version_2_2",
+        .actions = data_link_timer_recovery_t24_srej_received_no_no_no_actions,
+        .actions_len = 2,
         .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t24_srej_received_yes_no_yes",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "response and not va_le_nr_le_vs and version_2_2",
-        .actions =
-            data_link_timer_recovery_t24_srej_received_yes_no_yes_actions,
-        .actions_len = 4,
-        .next = "AwaitingV22Connection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t24_srej_received_yes_yes_yes_yes",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "response and va_le_nr_le_vs and F_eq_1 and vs_eq_nr",
-        .actions =
-            data_link_timer_recovery_t24_srej_received_yes_yes_yes_yes_actions,
-        .actions_len = 7,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t24_srej_received_yes_yes_yes_no",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "response and va_le_nr_le_vs and F_eq_1 and not vs_eq_nr",
-        .actions =
-            data_link_timer_recovery_t24_srej_received_yes_yes_yes_no_actions,
-        .actions_len = 10,
-        .next = "TimerRecovery",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t24_srej_received_yes_yes_no_yes",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "response and va_le_nr_le_vs and not F_eq_1 and vs_eq_va",
-        .actions =
-            data_link_timer_recovery_t24_srej_received_yes_yes_no_yes_actions,
-        .actions_len = 5,
-        .next = "Connected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t24_srej_received_yes_yes_no_no",
-        .from = "TimerRecovery",
-        .on = "SREJ_received",
-        .guard = "response and va_le_nr_le_vs and not F_eq_1 and not vs_eq_va",
-        .actions =
-            data_link_timer_recovery_t24_srej_received_yes_yes_no_no_actions,
-        .actions_len = 8,
-        .next = "TimerRecovery",
         .notes = "",
         .references = NULL,
         .references_len = 0,

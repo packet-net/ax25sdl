@@ -25,8 +25,7 @@ public static class GoEmitter
         // File name: derive from the source file stem so the on-disk
         // layout stays snake_case regardless of how the state is named
         // in the YAML.
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.go";
 
         var sb = new StringBuilder();
@@ -73,8 +72,7 @@ public static class GoEmitter
     public static Emission EmitStatePageTests(ResolvedPage page)
     {
         var varName = Pascal(page.Machine) + page.State;
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g_test.go";
 
         var sb = new StringBuilder();
@@ -159,7 +157,7 @@ public static class GoEmitter
         var fileStem = Path.GetFileNameWithoutExtension(page.SourcePath)
             .Replace(".sdl", string.Empty, StringComparison.Ordinal);
         var varName = Pascal(page.Machine) + Pascal(fileStem);
-        var fileName = fileStem + ".g.go";
+        var fileName = AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.go";
 
         var sb = new StringBuilder();
         EmitHeader(sb, page.SourcePath);

@@ -223,28 +223,6 @@ static int test_t09_u_or_s_frame_length_error(void) {
   return 0;
 }
 
-static int test_t10_ui_received_no(void) {
-  const TransitionSpec *t = NULL;
-  for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
-       i++) {
-    if (strcmp(data_link_awaiting_v22_connection.transitions[i].id,
-               "t10_ui_received_no") == 0) {
-      t = &data_link_awaiting_v22_connection.transitions[i];
-      break;
-    }
-  }
-  ASSERT(t != NULL, "t10_ui_received_no not found");
-  ASSERT_STREQ(t->on, "UI_received", "on");
-  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
-  ASSERT_STREQ(t->guard, "not P_eq_1", "guard");
-  ASSERT(t->actions_len == 2, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "UI Check", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "DM (F = 1)", "actions[1].verb");
-  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[1].kind");
-  return 0;
-}
-
 static int test_t10_ui_received_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
@@ -265,21 +243,25 @@ static int test_t10_ui_received_yes(void) {
   return 0;
 }
 
-static int test_t11_dm_received_no(void) {
+static int test_t10_ui_received_no(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
        i++) {
     if (strcmp(data_link_awaiting_v22_connection.transitions[i].id,
-               "t11_dm_received_no") == 0) {
+               "t10_ui_received_no") == 0) {
       t = &data_link_awaiting_v22_connection.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t11_dm_received_no not found");
-  ASSERT_STREQ(t->on, "DM_received", "on");
-  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
-  ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
-  ASSERT(t->actions_len == 0, "actions count");
+  ASSERT(t != NULL, "t10_ui_received_no not found");
+  ASSERT_STREQ(t->on, "UI_received", "on");
+  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
+  ASSERT_STREQ(t->guard, "not P_eq_1", "guard");
+  ASSERT(t->actions_len == 2, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "UI Check", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "DM (F = 1)", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[1].kind");
   return 0;
 }
 
@@ -308,23 +290,21 @@ static int test_t11_dm_received_yes(void) {
   return 0;
 }
 
-static int test_t12_ua_received_no(void) {
+static int test_t11_dm_received_no(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
        i++) {
     if (strcmp(data_link_awaiting_v22_connection.transitions[i].id,
-               "t12_ua_received_no") == 0) {
+               "t11_dm_received_no") == 0) {
       t = &data_link_awaiting_v22_connection.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t12_ua_received_no not found");
-  ASSERT_STREQ(t->on, "UA_received", "on");
-  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
+  ASSERT(t != NULL, "t11_dm_received_no not found");
+  ASSERT_STREQ(t->on, "DM_received", "on");
+  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "DL_ERROR_indication_D", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -359,6 +339,39 @@ static int test_t12_ua_received_yes_yes(void) {
   ASSERT(t->actions[6].kind == AX25SDL_KIND_SUBROUTINE, "actions[6].kind");
   ASSERT_STREQ(t->actions[7].verb, "MDL-NEGOTIATE Request", "actions[7].verb");
   ASSERT(t->actions[7].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[7].kind");
+  return 0;
+}
+
+static int test_t12_ua_received_yes_no_yes(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
+       i++) {
+    if (strcmp(data_link_awaiting_v22_connection.transitions[i].id,
+               "t12_ua_received_yes_no_yes") == 0) {
+      t = &data_link_awaiting_v22_connection.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t12_ua_received_yes_no_yes not found");
+  ASSERT_STREQ(t->on, "UA_received", "on");
+  ASSERT_STREQ(t->next, "Connected", "next");
+  ASSERT_STREQ(t->guard, "F_eq_1 and not layer_3_initiated and vs_eq_va",
+               "guard");
+  ASSERT(t->actions_len == 7, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "Stop T1", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "Start T3", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_PROCESSING, "actions[1].kind");
+  ASSERT_STREQ(t->actions[2].verb, "V(s) := 0", "actions[2].verb");
+  ASSERT(t->actions[2].kind == AX25SDL_KIND_PROCESSING, "actions[2].kind");
+  ASSERT_STREQ(t->actions[3].verb, "V(a) := 0", "actions[3].verb");
+  ASSERT(t->actions[3].kind == AX25SDL_KIND_PROCESSING, "actions[3].kind");
+  ASSERT_STREQ(t->actions[4].verb, "V(r) := 0", "actions[4].verb");
+  ASSERT(t->actions[4].kind == AX25SDL_KIND_PROCESSING, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "Select_T1_Value", "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_SUBROUTINE, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "MDL-NEGOTIATE Request", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[6].kind");
   return 0;
 }
 
@@ -404,36 +417,23 @@ static int test_t12_ua_received_yes_no_no(void) {
   return 0;
 }
 
-static int test_t12_ua_received_yes_no_yes(void) {
+static int test_t12_ua_received_no(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_awaiting_v22_connection.transitions_len;
        i++) {
     if (strcmp(data_link_awaiting_v22_connection.transitions[i].id,
-               "t12_ua_received_yes_no_yes") == 0) {
+               "t12_ua_received_no") == 0) {
       t = &data_link_awaiting_v22_connection.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t12_ua_received_yes_no_yes not found");
+  ASSERT(t != NULL, "t12_ua_received_no not found");
   ASSERT_STREQ(t->on, "UA_received", "on");
-  ASSERT_STREQ(t->next, "Connected", "next");
-  ASSERT_STREQ(t->guard, "F_eq_1 and not layer_3_initiated and vs_eq_va",
-               "guard");
-  ASSERT(t->actions_len == 7, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "Stop T1", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "Start T3", "actions[1].verb");
-  ASSERT(t->actions[1].kind == AX25SDL_KIND_PROCESSING, "actions[1].kind");
-  ASSERT_STREQ(t->actions[2].verb, "V(s) := 0", "actions[2].verb");
-  ASSERT(t->actions[2].kind == AX25SDL_KIND_PROCESSING, "actions[2].kind");
-  ASSERT_STREQ(t->actions[3].verb, "V(a) := 0", "actions[3].verb");
-  ASSERT(t->actions[3].kind == AX25SDL_KIND_PROCESSING, "actions[3].kind");
-  ASSERT_STREQ(t->actions[4].verb, "V(r) := 0", "actions[4].verb");
-  ASSERT(t->actions[4].kind == AX25SDL_KIND_PROCESSING, "actions[4].kind");
-  ASSERT_STREQ(t->actions[5].verb, "Select_T1_Value", "actions[5].verb");
-  ASSERT(t->actions[5].kind == AX25SDL_KIND_SUBROUTINE, "actions[5].kind");
-  ASSERT_STREQ(t->actions[6].verb, "MDL-NEGOTIATE Request", "actions[6].verb");
-  ASSERT(t->actions[6].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[6].kind");
+  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
+  ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "DL_ERROR_indication_D", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
   return 0;
 }
 
@@ -612,14 +612,14 @@ int main(void) {
   rc |= test_t07_control_field_error();
   rc |= test_t08_info_not_permitted_in_frame();
   rc |= test_t09_u_or_s_frame_length_error();
-  rc |= test_t10_ui_received_no();
   rc |= test_t10_ui_received_yes();
-  rc |= test_t11_dm_received_no();
+  rc |= test_t10_ui_received_no();
   rc |= test_t11_dm_received_yes();
-  rc |= test_t12_ua_received_no();
+  rc |= test_t11_dm_received_no();
   rc |= test_t12_ua_received_yes_yes();
-  rc |= test_t12_ua_received_yes_no_no();
   rc |= test_t12_ua_received_yes_no_yes();
+  rc |= test_t12_ua_received_yes_no_no();
+  rc |= test_t12_ua_received_no();
   rc |= test_t13_t1_expiry_yes();
   rc |= test_t13_t1_expiry_no();
   rc |= test_t14_frmr_received();

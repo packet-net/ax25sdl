@@ -129,18 +129,6 @@ describe("DataLinkDisconnected", () => {
     expect(t.actions[0].kind).toBe("signal_upper");
   });
 
-  it("t11_ui_received_no", () => {
-    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t11_ui_received_no");
-    expect(t, "transition t11_ui_received_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("UI_received");
-    expect(t.next).toBe("Disconnected");
-    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: true }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("UI Check");
-    expect(t.actions[0].kind).toBe("subroutine");
-  });
-
   it("t11_ui_received_yes", () => {
     const t = DataLinkDisconnected.transitions.find((x) => x.id === "t11_ui_received_yes");
     expect(t, "transition t11_ui_received_yes not found").toBeDefined();
@@ -157,26 +145,24 @@ describe("DataLinkDisconnected", () => {
     expect(t.actions[2].kind).toBe("signal_lower");
   });
 
+  it("t11_ui_received_no", () => {
+    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t11_ui_received_no");
+    expect(t, "transition t11_ui_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("UI_received");
+    expect(t.next).toBe("Disconnected");
+    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("UI Check");
+    expect(t.actions[0].kind).toBe("subroutine");
+  });
+
   it("t12_disc_received", () => {
     const t = DataLinkDisconnected.transitions.find((x) => x.id === "t12_disc_received");
     expect(t, "transition t12_disc_received not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("DISC_received");
     expect(t.next).toBe("Disconnected");
-    expect(t.actions).toHaveLength(2);
-    expect(t.actions[0].verb).toBe("F := P");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("DM");
-    expect(t.actions[1].kind).toBe("signal_lower");
-  });
-
-  it("t13_sabm_received_no", () => {
-    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t13_sabm_received_no");
-    expect(t, "transition t13_sabm_received_no not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("SABM_received");
-    expect(t.next).toBe("Disconnected");
-    expect(t.guard).toEqual([{ atom: "able_to_establish", negate: true }]);
     expect(t.actions).toHaveLength(2);
     expect(t.actions[0].verb).toBe("F := P");
     expect(t.actions[0].kind).toBe("processing");
@@ -218,11 +204,11 @@ describe("DataLinkDisconnected", () => {
     expect(t.actions[11].kind).toBe("processing");
   });
 
-  it("t14_sabme_received_no", () => {
-    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t14_sabme_received_no");
-    expect(t, "transition t14_sabme_received_no not found").toBeDefined();
+  it("t13_sabm_received_no", () => {
+    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t13_sabm_received_no");
+    expect(t, "transition t13_sabm_received_no not found").toBeDefined();
     if (!t) return;
-    expect(t.on).toBe("SABME_received");
+    expect(t.on).toBe("SABM_received");
     expect(t.next).toBe("Disconnected");
     expect(t.guard).toEqual([{ atom: "able_to_establish", negate: true }]);
     expect(t.actions).toHaveLength(2);
@@ -264,6 +250,20 @@ describe("DataLinkDisconnected", () => {
     expect(t.actions[10].kind).toBe("processing");
     expect(t.actions[11].verb).toBe("RC := 0");
     expect(t.actions[11].kind).toBe("processing");
+  });
+
+  it("t14_sabme_received_no", () => {
+    const t = DataLinkDisconnected.transitions.find((x) => x.id === "t14_sabme_received_no");
+    expect(t, "transition t14_sabme_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("SABME_received");
+    expect(t.next).toBe("Disconnected");
+    expect(t.guard).toEqual([{ atom: "able_to_establish", negate: true }]);
+    expect(t.actions).toHaveLength(2);
+    expect(t.actions[0].verb).toBe("F := P");
+    expect(t.actions[0].kind).toBe("processing");
+    expect(t.actions[1].verb).toBe("DM");
+    expect(t.actions[1].kind).toBe("signal_lower");
   });
 
 });
