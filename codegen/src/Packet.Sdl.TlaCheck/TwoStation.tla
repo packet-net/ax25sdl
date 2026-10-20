@@ -31,7 +31,8 @@ CONSTANTS
     StepChecks,        \* the per-step invariants switched on (see below)
     TimerRecoveryQuiescent, \* triage aid: count TimerRecovery as quiescent
     RejMayEqualVs,     \* receiver-side reject coherence accepts REJ N(r) = V(s)
-    ShowSteps          \* record each move in 'last' (off for liveness runs)
+    ShowSteps,         \* record each move in last (off for liveness runs)
+    MaxDepth           \* depth bound, used only through the WithinDepth constraint
 
 VARIABLES
     sys,   \* the composed system state (the explorer's SystemState)
@@ -280,9 +281,20 @@ DropAllowed(f, into) ==
     \/ LET sub == Submitted(Other(into))
        IN  f.type = "I" /\ f.data # "" /\ Len(sub) > 0 /\ f.data # sub[Len(sub)]
 
+\* The non-fault moves' guards, named so the liveness check can say when a
+\* move is enabled without TLC's ENABLED (see Liveness).
+CanDeliver(s) == viol = NoViol /\ sys.ch[s] # <<>>
+CanPop(s) == viol = NoViol /\ PopChanges(sys, s)
+CanSeize(s) == viol = NoViol /\ Table(s) /\ sys.owed[s] /\ SeizeEvent(sys.m[s]) # ""
+CanFlowOn(s) == viol = NoViol /\ Table(s) /\ s \in FlowAt /\ sys.off[s] /\ Handles(sys.m[s].st, "DL_FLOW_ON_request")
+CanFlowOff(s) ==
+    /\ viol = NoViol /\ Table(s) /\ s \in FlowAt /\ ~sys.off[s]
+    /\ sys.rounds[s] < FlowRounds /\ sys.deliv[s] >= FlowOffAfter
+    /\ Handles(sys.m[s].st, "DL_FLOW_OFF_request")
+CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
+
 Deliver(s) ==
-    /\ viol = NoViol
-    /\ sys.ch[s] # <<>>
+    /\ CanDeliver(s)
     /\ LET f == Head(sys.ch[s])
        IN  Take(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
                 ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), "deliver", s, f)
@@ -307,32 +319,23 @@ Reorder(s) ==
        IN  TakeChannel([sys EXCEPT !.ch[s] = <<q[2], q[1]>> \o SubSeq(q, 3, Len(q)), !.budget = @ - 1], "reorder", s, q[1])
 
 Pop(s) ==
-    /\ viol = NoViol
-    /\ PopChanges(sys, s)
+    /\ CanPop(s)
     /\ Take(Inject(sys, s, Event("I_frame_pops_off_queue"), sys.ch[s], sys.budget, FALSE), "pop", s, NoFrm)
 
 Seize(s) ==
-    /\ viol = NoViol
-    /\ Table(s) /\ sys.owed[s] /\ SeizeEvent(sys.m[s]) # ""
+    /\ CanSeize(s)
     /\ Take(Inject(sys, s, Event(SeizeEvent(sys.m[s])), sys.ch[s], sys.budget, TRUE), "seize-confirm", s, NoFrm)
 
 FlowOn(s) ==
-    /\ viol = NoViol
-    /\ Table(s) /\ s \in FlowAt /\ sys.off[s]
-    /\ Handles(sys.m[s].st, "DL_FLOW_ON_request")
+    /\ CanFlowOn(s)
     /\ Take(Inject(sys, s, Event("DL_FLOW_ON_request"), sys.ch[s], sys.budget, FALSE), "flow-on", s, NoFrm)
 
 FlowOff(s) ==
-    /\ viol = NoViol
-    /\ Table(s) /\ s \in FlowAt /\ ~sys.off[s]
-    /\ sys.rounds[s] < FlowRounds /\ sys.deliv[s] >= FlowOffAfter
-    /\ Handles(sys.m[s].st, "DL_FLOW_OFF_request")
+    /\ CanFlowOff(s)
     /\ Take(Inject(sys, s, Event("DL_FLOW_OFF_request"), sys.ch[s], sys.budget, FALSE), "flow-off", s, NoFrm)
 
 T1(s) ==
-    /\ viol = NoViol
-    /\ Quiet(sys)
-    /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
+    /\ CanT1(s)
     /\ Take(Inject(sys, s, Event("T1_expiry"), sys.ch[s], sys.budget, FALSE), "T1-expiry", s, NoFrm)
 
 (***************************************************************************)
@@ -396,26 +399,46 @@ SequenceSanity ==
 AckCoherence == \A s \in Stations : sys.acked[s] <= sys.deliv[Other(s)]
 
 (***************************************************************************)
+(* Bounds                                                                  *)
+(***************************************************************************)
+
+\* The explorer's depth bound, for the one calibration row that needs it.
+WithinDepth == TLCGet("level") <= MaxDepth
+
+(***************************************************************************)
 (* Liveness                                                                *)
 (***************************************************************************)
 
 \* The explorer checks "from every reachable state a fault-free path reaches
 \* quiescence" on its state graph (AG EF over the non-fault edges). TLC
-\* checks LTL, so it is stated as: under strong fairness of every non-fault
-\* move, quiescence recurs. A clean TLC verdict implies the explorer's
-\* property; a TLC counterexample can be spurious (docs/tla.md says why and
-\* how each was checked).
-ProgressFairness ==
-    /\ \A s \in Stations : SF_vars(Deliver(s)) /\ SF_vars(Pop(s)) /\ SF_vars(Seize(s))
-    /\ \A s \in FlowAt : SF_vars(FlowOn(s)) /\ SF_vars(FlowOff(s))
+\* checks LTL, so it is stated as: if some non-fault move keeps being taken
+\* whenever one is enabled (weak fairness on their disjunction), quiescence
+\* recurs. That is sound in the direction that matters: a state the explorer
+\* would report lets a fair behaviour circle in a part of the graph with no
+\* way to quiescence, so a clean TLC verdict implies the explorer's. A TLC
+\* counterexample can be spurious (a fair cycle that ignores a move which
+\* would have led out), so each one is compared with the explorer's verdict.
+\*
+\* Two TLC costs shape the formulation (docs/tla.md). Strong fairness per
+\* move would be tighter, but TLC expands n strong-fairness conjuncts into
+\* 2^n cases and did not finish on 42 states in ten minutes. And WF_vars(A)
+\* needs ENABLED <<A>>_vars, which TLC evaluates without its usual caching
+\* and did not finish on 3 states. So the fairness is written out: the
+\* enabledness is the moves' own guards, and "a progress move was taken" is
+\* read off the step's record in last (these runs set ShowSteps).
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off"}
 
-QuiescenceSpec == Spec /\ ProgressFairness /\ \A s \in Stations : SF_vars(T1(s))
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s)
 
-\* The timer-free variant (the explorer's SelectiveProgress): the same with
-\* no fairness for T1, so a path that only completes through a T1 expiry
-\* does not count.
-TimerFreeSpec == Spec /\ ProgressFairness
+CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s)
+TookProgress == last'.move \in ProgressKinds
+TookProgressOrT1 == last'.move \in ProgressKinds \cup {"T1-expiry"}
 
-QuiescenceRecurs == []<>Quiescent
+\* The explorer's Quiescence: T1 expiries count as progress.
+QuiescenceLive == (<>[]CanProgressOrT1 => []<><<TookProgressOrT1>>_vars) => []<>Quiescent
+
+\* The explorer's SelectiveProgress (timer-free): T1 is not progress, so a
+\* path that completes only through a T1 expiry does not count.
+TimerFreeLive == (<>[]CanProgress => []<><<TookProgress>>_vars) => []<>Quiescent
 
 =============================================================================

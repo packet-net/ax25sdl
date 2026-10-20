@@ -16,6 +16,7 @@
     <Project Path="src/Packet.Sdl.IR/Packet.Sdl.IR.csproj" />
     <Project Path="src/Packet.Sdl.Interpreter/Packet.Sdl.Interpreter.csproj" />
     <Project Path="src/Packet.Sdl.Lint/Packet.Sdl.Lint.csproj" />
+    <Project Path="src/Packet.Sdl.TlaCheck/Packet.Sdl.TlaCheck.csproj" />
     <Project Path="src/Packet.Sdl.Transcribe/Packet.Sdl.Transcribe.csproj" />
   </Folder>
   <Folder Name="/tests/">
