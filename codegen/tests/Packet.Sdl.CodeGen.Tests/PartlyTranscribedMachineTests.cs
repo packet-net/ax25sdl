@@ -251,6 +251,8 @@ public class PartlyTranscribedMachineTests
 
     [Theory]
     [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: 121", "needs `issue:`")]
+    [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: https://github.com/packet-net/ax25sdl/issues/121", "packethacking/ax25spec issue")]
+    [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: https://github.com/packethacking/ax25spec/pull/121", "packethacking/ax25spec issue")]
     [InlineData("next: Sized", "nxet: Sized", "known-figure-defects.yaml")]
     public void A_malformed_defect_entry_is_an_error(string from, string to, string expected)
     {
@@ -285,7 +287,26 @@ public class PartlyTranscribedMachineTests
         var result = r.Run();
 
         result.ExitCode.Should().NotBe(0);
-        result.Stderr.Should().Contain("`data_link` is published");
+        result.Stderr.Should().Contain("`data_link` is published and is never withheld, so a defect on it can't be allowlisted");
+        // Not reported as withheld, and not as missing pages.
+        result.Stderr.Should().NotContain("::warning::");
+        result.Stderr.Should().NotContain("submodule checkout");
+    }
+
+    [Fact]
+    public void A_withheld_machine_still_gets_the_totality_lint()
+    {
+        // Only generation is withheld: the totality / determinism lint
+        // checks the withheld page's three (state, event) arms.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", LinkMuxIdlePage);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}");
+        result.Stdout.Should().Contain("withheld  link_mux");
+        result.Stdout.Should().Contain("totality/determinism: 3 (state, event) arm(s)");
     }
 
     [Fact]

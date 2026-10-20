@@ -26,7 +26,7 @@ CI in ax25spec regenerates every `*.sdl.yaml` from its graphml with the ax25sdl 
 1. **Trust the figure.** Draw what the page shows, including its spelling ("SIEZE", "Sized") and anything that looks wrong. Don't fix a label, swap a Yes/No, or add a missing arrow. If a column surprises you, re-read the shapes, then draw it as drawn.
 2. **Contradictions become issues, not fixes.** If a figure contradicts the prose, or contradicts itself (a state drawn "1 Sieze Pending" on the Seized page), confirm it against both sources, then raise it as its own issue in ax25spec quoting the figure (page and column) and the prose (section and sentence). Link the issue from the PR. The transcription still records what is drawn.
 3. **Every page is transcribed twice.** Two transcribers work independently, in separate worktrees, and neither looks at the other's graphml or yaml until both are finished. Then compare the two generated yaml files (`cmp a/idle.sdl.yaml b/idle.sdl.yaml`; the graphml layouts will differ, the yaml must not). Identical means done. Every difference is resolved against the source figure, never by picking one side, and the PR says what differed and how it was settled. Only one graphml is committed.
-4. **Stay on the page.** One PR per page (a state drawn over several figures, such as C4.4a to C4.4c, is one page). Anything else you notice gets its own issue.
+4. **Stay on the pages.** One PR per page, or one PR per machine when its pages are transcribed together (a state drawn over several figures, such as C4.4a to C4.4c, is one page). Anything else you notice gets its own issue.
 
 ## Naming
 
@@ -190,7 +190,7 @@ A label that would give anything other than a plain identifier is rejected with 
 
 Machines are transcribed a page at a time, so a page often leads to a state that has no page yet (C3.1 Idle leads to Sieze Pending). Codegen in ax25sdl handles this without breaking the build:
 
-- If any transition targets a state that `AnnexC.cs` lists for that machine but that has no page, the machine is **withheld**. Its pages still go through every lint, but nothing is generated from them: no tables in any language, no verbs or guard atoms, no totality run, and none of the events only it uses appear in the generated event enums. Every other machine's output is unaffected.
+- If any transition targets a state that `AnnexC.cs` lists for that machine but that has no page, the machine is **withheld**. Its pages still go through every lint, including the totality and overlap lints, but nothing is generated from them: no tables in any language, no verbs or guard atoms, and none of the events only it uses appear in the generated event enums. Every other machine's output is unaffected.
 - When the last missing page lands, the machine starts generating and the closed sets (`Ax25Event` and the rest) grow. That shows up as a visible change in the ax25sdl pin-bump PR, as it should.
 - A target that is not an Annex C state of the machine at all is an error.
 - `coverage: partial` (used by the prose-derived Management Data Link bootstrap) still skips the state-target check for that page.
@@ -210,7 +210,7 @@ defects:
     issue: https://github.com/packethacking/ax25spec/issues/121
 ```
 
-A listed defect is reported as a warning, and its machine stays withheld from generation while the entry is present. It works like a strict xfail: an entry whose defect no longer occurs (the figure was fixed, or the transition id changed) fails the run, so fix the figure and remove the entry in the same PR. A defect on a published machine (Data Link, Management Data Link) still fails, because they are never withheld. ax25spec's `codegen-lint` CI job runs these checks on every PR.
+A listed defect is reported as a warning, and its machine stays withheld from generation while the entry is present; every lint, totality included, still runs on its pages. It works like a strict xfail: an entry whose defect no longer occurs (the figure was fixed, or the transition id changed) fails the run, so fix the figure and remove the entry in the same PR. A defect on a published machine (Data Link, Management Data Link) can't be listed and still fails, because those are never withheld. The `issue:` must be a packethacking/ax25spec issue URL. ax25spec's `codegen-lint` CI job runs these checks on every PR.
 
 ## After the transcription
 

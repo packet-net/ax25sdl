@@ -45,6 +45,10 @@ public static class KnownFigureDefects
 {
     public const string FileName = "known-figure-defects.yaml";
 
+    /// <summary>Figure defects are recorded in ax25spec, so the issue must be one there.</summary>
+    private static readonly System.Text.RegularExpressions.Regex IssueUrl =
+        new(@"^https://github\.com/packethacking/ax25spec/issues/[0-9]+$");
+
     /// <summary>
     /// Loads <c>&lt;spec-sdl&gt;/known-figure-defects.yaml</c>. A missing
     /// file is an empty list. Malformed entries (a missing field, or an
@@ -80,9 +84,10 @@ public static class KnownFigureDefects
                 errors.Add($"{path}: every entry needs machine, state, transition and next.");
                 continue;
             }
-            if (!d.Issue.StartsWith("https://github.com/", StringComparison.Ordinal))
+            if (!IssueUrl.IsMatch(d.Issue))
             {
-                errors.Add($"{path}: {d.Describe()} needs `issue:` set to the URL of the issue that records it.");
+                errors.Add($"{path}: {d.Describe()} needs `issue:` set to the packethacking/ax25spec issue that records it " +
+                           "(https://github.com/packethacking/ax25spec/issues/<number>).");
                 continue;
             }
             if (!seen.Add((d.Machine, d.State, d.Transition)))

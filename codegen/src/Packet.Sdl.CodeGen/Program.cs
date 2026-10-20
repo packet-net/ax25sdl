@@ -211,11 +211,11 @@ internal static class Program
         // Resolve every page up front. The totality lint needs the composed
         // guards (after the ax25sdl#53 stale-read substitution), i.e. exactly
         // what the backends emit, and the emit loops below reuse the same IR.
-        // A partly transcribed machine has been checked like any other (every
-        // lint above ran on its pages), but nothing is generated from it until
-        // every state its pages lead to has a page: no tables, no verbs or
-        // guard atoms, no totality run, and none of the events only it uses in
-        // the closed event sets. Data Link output is unchanged while, say, the
+        // A partly transcribed machine is checked like any other (every lint
+        // above ran on its pages, and the totality lint below runs on them
+        // too), but nothing is generated from it until every state its pages
+        // lead to has a page: no tables, no verbs or guard atoms, and none of
+        // the events only it uses in the closed event sets. Data Link output is unchanged while, say, the
         // Link Multiplexer is transcribed one figure at a time.
         // docs/sdl-transcription-runbook.md, "Partly transcribed machines".
         var withheldOnlyEvents = new HashSet<string>(StringComparer.Ordinal);
@@ -234,8 +234,6 @@ internal static class Program
             withheldOnlyEvents.UnionWith(pages.Where(p => withheld.ContainsKey(p.Machine))
                                               .SelectMany(p => p.Transitions).Select(t => t.On)
                                               .Where(e => !keptEvents.Contains(e)));
-            pages = pages.Where(p => !withheld.ContainsKey(p.Machine)).ToList();
-            subroutinePages = subroutinePages.Where(p => !withheld.ContainsKey(p.Machine)).ToList();
         }
         var emittedEvents = events.Where(e => !withheldOnlyEvents.Contains(e)).ToList();
 
@@ -267,6 +265,18 @@ internal static class Program
         {
             foreach (var e in errors) Console.Error.WriteLine($"::error::{e}");
             return 1;
+        }
+
+        // Withhold only now, after every lint has run on every page: from here
+        // on the lists are what gets generated.
+        if (withheld.Count > 0)
+        {
+            var keepPage = pages.Select(p => !withheld.ContainsKey(p.Machine)).ToList();
+            pages = pages.Where((_, i) => keepPage[i]).ToList();
+            resolvedPages = resolvedPages.Where((_, i) => keepPage[i]).ToList();
+            var keepSub = subroutinePages.Select(p => !withheld.ContainsKey(p.Machine)).ToList();
+            subroutinePages = subroutinePages.Where((_, i) => keepSub[i]).ToList();
+            resolvedSubPages = resolvedSubPages.Where((_, i) => keepSub[i]).ToList();
         }
 
         var writtenCsharpCode    = new HashSet<string>(StringComparer.Ordinal);
@@ -1068,6 +1078,17 @@ internal static class Program
                 // machine withheld while the entry is present.
                 var known = knownDefects.FirstOrDefault(d =>
                     d.Machine == page.Machine && d.State == page.State && d.Transition == t.Id && d.Next == t.Next);
+                if (known is not null && AnnexC.PublishedMachines.Contains(page.Machine))
+                {
+                    // Listing it would withhold a published machine, which is
+                    // never allowed. Say so, rather than report missing pages.
+                    matchedDefects.Add(known);
+                    errors.Add(
+                        $"{page.SourcePath}: {known.Describe()} is listed in spec-sdl/{KnownFigureDefects.FileName}, " +
+                        $"but `{page.Machine}` is published and is never withheld, so a defect on it can't be allowlisted. " +
+                        "Correct the published transcription instead (a figure fix in ax25spec), and remove the entry.");
+                    continue;
+                }
                 if (known is not null)
                 {
                     matchedDefects.Add(known);
