@@ -29,7 +29,13 @@ The AX.25 SDL figures are the source of truth. When a figure surprises you, the 
 
 ### Encode-then-verify
 
-Every transition in `/spec-sdl/` must come from an **explicit human-authored transcription** of the figure. You may *encode* paths that Tom has described in plain text; you may not *infer* paths by reading the PNG yourself.
+Every transition in `/spec-sdl/` must come from a deliberate, checked transcription of the figure, never from what the protocol "ought" to do. Agents may transcribe directly from the figure images, under these safeguards (the full procedure is in [`docs/sdl-transcription-runbook.md`](docs/sdl-transcription-runbook.md)):
+
+- **Read the page properly.** Render it at 300 dpi or more and crop into regions until every label, arrow and branch is legible. If something genuinely can't be read, record it with a `verification_pending:` note rather than guessing.
+- **Transcribe twice.** Two transcribers work independently. Their generated yaml must match; every difference is settled against the figure, never by picking one side.
+- **Say how it was made.** The PR states which page was transcribed, by whom (human or agent), and what the two transcriptions disagreed on. Human review of the ax25spec PR is the sign-off.
+
+Encoding paths Tom has described in plain text remains fine. (Until October 2026 this rule forbade agents from reading the figures at all; it was relaxed once models could transcribe them reliably.)
 
 ### Pin implementation evidence
 
@@ -105,7 +111,7 @@ cd spec/python && python3 -m pytest --import-mode=importlib && ruff check .
 - Don't hand-edit the generated files: `spec/csharp/*.g.cs`, `spec/go/ax25sdl/*.g.go`, `spec/ts/src/ax25sdl/*.g.ts`, `spec/rust/src/*.g.rs` (including `lib.rs` and the typed closed-set files `ax25_action_verb.g.rs` / `ax25_guard.g.rs` / `ax25_event.g.rs`), `spec/c/src/*.g.{c,h}`, `spec/python/ax25sdl/*.g.py` (+ `*_g_test.py`). Fix the figure/yaml in `packethacking/ax25spec`, bump the submodule pin, and rerun the codegen (or fix the emitter here). Never edit anything under `ax25spec/` (the submodule) from this repo — the SDL sources, their yaml and the SVG renders all change via ax25spec PRs. The per-backend **runtime type homes are hand-written** and must stay in sync with the C# types in `spec/csharp/`: `spec/go/ax25sdl/types.go`, `spec/ts/src/ax25sdl/types.ts` (+ `*.test.ts`), `spec/rust/src/types.rs`, `spec/c/src/ax25sdl.h`, `spec/python/ax25sdl/types.py`. The per-backend build files are also hand-written: `spec/rust/Cargo.toml`, `spec/c/CMakeLists.txt`. All six backends are built + tested in CI (not just drift-checked) — see the verify commands above.
 - **The Rust crate is `no_std`-capable** (`#![no_std]` unless the default-on `std` feature is set) and **publishable** (real crates.io metadata). Keep the core data/type path `no_std`-clean — `&'static` data + `Copy` types + the closed-set enums only; no `String` / `Vec` / `std::` / allocator on it. The typed closed sets (`Ax25ActionVerb` / `Ax25Guard` / `Ax25Event` + `GuardTerm`) match the C#/TS backends — see [`docs/adr/0003-rust-typed-closed-sets-and-no-std.md`](docs/adr/0003-rust-typed-closed-sets-and-no-std.md). CI runs `cargo build --no-default-features` to guard the `no_std` path.
 - Don't add `[Version=...]` on `<PackageReference>` items — CPM enforces a central version table.
-- Don't infer protocol semantics from the spec PNGs. See "Encode-then-verify" above.
+- Don't infer protocol semantics from the spec PNGs: transcribe what is drawn, and nothing more. See "Trust the figure" and "Encode-then-verify" above.
 - **Don't add new GitHub Actions jobs with `runs-on: ubuntu-latest`** (or any other GitHub-hosted runner label). This project has no Actions minutes budget for hosted runners; every workflow job MUST target `[self-hosted, Linux, X64]`. Same rule as `packet-net/packet.net`. **One standing exception, and only one:** `publish.yml`'s `publish-npm` job runs on `ubuntu-latest` because npm refuses a provenance attestation built anywhere else (`Only "github-hosted" runners are supported when publishing with provenance`), and trusted publishing generates provenance by default. It is a small job that runs on release tags only. Do not read it as licence to move drift or build jobs, which are what would actually cost minutes.
 
 ## When in doubt
