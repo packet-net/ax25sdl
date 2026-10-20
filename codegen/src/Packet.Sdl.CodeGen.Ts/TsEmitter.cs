@@ -18,8 +18,7 @@ public static class TsEmitter
     public static Emission EmitStatePage(ResolvedPage page)
     {
         var varName = Pascal(page.Machine) + page.State;
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.ts";
 
         var sb = new StringBuilder();
@@ -70,8 +69,7 @@ public static class TsEmitter
     public static Emission EmitStatePageTests(ResolvedPage page)
     {
         var varName = Pascal(page.Machine) + page.State;
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.test.ts";
 
         var sb = new StringBuilder();
@@ -130,7 +128,7 @@ public static class TsEmitter
         var fileStem = Path.GetFileNameWithoutExtension(page.SourcePath)
             .Replace(".sdl", string.Empty, StringComparison.Ordinal);
         var varName = Pascal(page.Machine) + Pascal(fileStem);
-        var fileName = fileStem + ".g.ts";
+        var fileName = AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.ts";
 
         var sb = new StringBuilder();
         EmitHeader(sb, page.SourcePath);
@@ -186,14 +184,12 @@ public static class TsEmitter
         sb.Append("export * from \"./types.js\";\n");
         foreach (var page in pages.OrderBy(p => p.SourcePath, StringComparer.Ordinal))
         {
-            var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-                .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+            var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
             sb.Append("export * from \"./").Append(stem).Append(".g.js\";\n");
         }
         foreach (var page in subPages.OrderBy(p => p.SourcePath, StringComparer.Ordinal))
         {
-            var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-                .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+            var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
             sb.Append("export * from \"./").Append(stem).Append(".g.js\";\n");
         }
         return sb.ToString();

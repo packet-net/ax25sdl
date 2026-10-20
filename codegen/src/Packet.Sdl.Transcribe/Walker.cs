@@ -400,10 +400,10 @@ public static class Walker
             // cycle — fail loudly rather than silently drop it.
             var decisionId = ContextualDecisionId(triggerPrefix, current.Label);
             RecordDecision(current, decisionId, decisionsSeen);
-            var resolvedBranchLabels = ResolveBranchLabels(current, outEdges);
-            for (int i = 0; i < outEdges.Count; i++)
+            var (orderedEdges, resolvedBranchLabels) = OrderBranches(outEdges, ResolveBranchLabels(current, outEdges));
+            for (int i = 0; i < orderedEdges.Count; i++)
             {
-                var edge = outEdges[i];
+                var edge = orderedEdges[i];
                 if (visitedInThisWalk.Contains(edge.Target))
                     throw new InvalidDataException(
                         $"{Path.GetFileName(graph.SourcePath)}: decision {current.Id} ('{current.Label}') edge {edge.Id} " +
@@ -658,6 +658,32 @@ public static class Walker
     /// caller throws on any blank label, so unlabelled edges surface at
     /// transcribe time rather than at runtime.
     /// </summary>
+    /// <summary>
+    /// Puts a decision's out-edges in a fixed order, so the paths (and the
+    /// transition order and subroutine path ids numbered from them) don't
+    /// depend on the order the edges happen to be stored in the graphml, or
+    /// on how the page is laid out: Yes first, then No, then any other label
+    /// (such as Undefined). Edges with the same rank keep their file order.
+    /// Shared with SubroutinesWalker.
+    /// </summary>
+    internal static (List<GraphmlEdge> Edges, List<string> Labels) OrderBranches(
+        List<GraphmlEdge> outEdges, List<string> labels)
+    {
+        var ordered = outEdges.Zip(labels)
+            .Select((pair, index) => (Edge: pair.First, Label: pair.Second, Index: index))
+            .OrderBy(p => BranchRank(p.Label))
+            .ThenBy(p => p.Index)
+            .ToList();
+        return (ordered.Select(p => p.Edge).ToList(), ordered.Select(p => p.Label).ToList());
+    }
+
+    private static int BranchRank(string? label) => NormaliseBranchLabel(label ?? "") switch
+    {
+        "Yes" => 0,
+        "No" => 1,
+        _ => 2,
+    };
+
     private static List<string> ResolveBranchLabels(GraphmlNode decision, List<GraphmlEdge> outEdges)
         => outEdges.Select(e => e.Label).ToList();
 

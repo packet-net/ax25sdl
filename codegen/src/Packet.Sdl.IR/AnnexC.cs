@@ -56,9 +56,10 @@ public static class AnnexC
         new("data_link",            "DataLink",           "data-link",             "Data Link"),
         new("management_data_link", "ManagementDataLink", "management-data-link",  "Management Data Link"),
         // Annex C6 draws the segmenter and the reassembler as two machines on
-        // one appendix; they share a directory.
-        new("segmenter",            "Segmenter",          "segmenter-reassembler", "Segmenter"),
-        new("reassembler",          "Reassembler",        "segmenter-reassembler", "Reassembler"),
+        // one appendix. Each gets its own directory: both have a Ready state,
+        // and the yaml is named by state.
+        new("segmenter",            "Segmenter",          "segmenter",             "Segmenter"),
+        new("reassembler",          "Reassembler",        "reassembler",           "Reassembler"),
     ];
 
     public static IReadOnlyList<AnnexCPage> Pages { get; } =
@@ -111,6 +112,36 @@ public static class AnnexC
         new("reassembler", "ReassemblingData",     "figc6.3", "121"),
         new("reassembler", "ReassemblingUnitData", "figc6.4", "122"),
     ];
+
+    /// <summary>
+    /// Machines already published in the generated packages. Codegen never
+    /// withholds them: a transition leading to a state with no page is an
+    /// error for these machines, not a sign of work in progress, so a
+    /// deleted yaml can't quietly remove generated code. Their generated
+    /// files also keep the
+    /// bare yaml stem (<c>connected.g.go</c>, <c>ready.g.json</c>), because
+    /// consumers import them by those names.
+    /// </summary>
+    public static IReadOnlySet<string> PublishedMachines { get; } =
+        new HashSet<string>(StringComparer.Ordinal) { "data_link", "management_data_link" };
+
+    /// <summary>The stem of a <c>*.sdl.yaml</c> path: <c>.../yaml/sieze_pending.sdl.yaml</c> gives <c>sieze_pending</c>.</summary>
+    public static string YamlStem(string sourcePath) =>
+        Path.GetFileNameWithoutExtension(sourcePath).Replace(".sdl", string.Empty, StringComparison.Ordinal);
+
+    /// <summary>
+    /// The stem every backend names a page's generated files with. State
+    /// names recur across machines (Ready is a state of four of them, and
+    /// several machines have a Subroutines page), so every machine but those
+    /// in <see cref="PublishedMachines"/> is qualified:
+    /// <c>link_mux_idle.g.go</c>, <c>simplex_phy_ready.g.json</c>.
+    /// Codegen also fails outright if two pages still end up with one stem.
+    /// </summary>
+    public static string OutputStem(string machine, string sourcePath)
+    {
+        var stem = YamlStem(sourcePath);
+        return PublishedMachines.Contains(machine) ? stem : machine + "_" + stem;
+    }
 
     /// <summary>The machine whose graphml filename prefix is <paramref name="prefix"/>, or null.</summary>
     public static AnnexCMachine? MachineByPrefix(string prefix) =>

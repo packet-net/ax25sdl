@@ -31,7 +31,7 @@ The AX.25 SDL figures are the source of truth. When a figure surprises you, the 
 
 Every transition in `/spec-sdl/` must come from a deliberate, checked transcription of the figure, never from what the protocol "ought" to do. Agents may transcribe directly from the figure images, under these safeguards (the full procedure is in [`docs/sdl-transcription-runbook.md`](docs/sdl-transcription-runbook.md)):
 
-- **Read the page properly.** Render it at 300 dpi or more and crop into regions until every label, arrow and branch is legible. If something genuinely can't be read, record it with a `verification_pending:` note rather than guessing.
+- **Read the page properly.** Render it at 300 dpi or more and crop into regions until every label, arrow and branch is legible. If something genuinely can't be read, record it with a `verification_pending:` note in the PR body and the transcriber's report rather than guessing (the generated yaml has no field for it).
 - **Transcribe twice.** Two transcribers work independently. Their generated yaml must match; every difference is settled against the figure, never by picking one side.
 - **Say how it was made.** The PR states which page was transcribed, by whom (human or agent), and what the two transcriptions disagreed on. Human review of the ax25spec PR is the sign-off.
 

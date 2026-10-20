@@ -43,7 +43,12 @@ public static class SubroutinesWalker
             var decisionsSeen = new Dictionary<string, Decision>();
             int pathIndex = 0;
             var startEdges = graph.OutgoingByNodeId[start.Id];
-            if (startEdges.Count == 0) continue;  // empty subroutine (probably authoring stub)
+            // A start node with no edge, or a path that can't be walked
+            // (typically a missing edge), is a hard error: skipping the
+            // subroutine would silently drop it from the page.
+            if (startEdges.Count == 0)
+                throw new InvalidDataException(
+                    $"subroutine '{name}' (start node {start.Id}) has no outgoing edge.");
 
             try
             {
@@ -58,11 +63,7 @@ public static class SubroutinesWalker
             }
             catch (InvalidDataException ex)
             {
-                // One subroutine's walk failed (typically a missing edge in the
-                // graphml). Emit a warning, skip this subroutine, continue with
-                // the others. Better than failing the entire page.
-                Console.Error.WriteLine($"::warning::subroutine '{name}' (starting at {start.Id}): {ex.Message}");
-                continue;
+                throw new InvalidDataException($"subroutine '{name}' (start node {start.Id}): {ex.Message}", ex);
             }
 
             sub.Decisions.AddRange(decisionsSeen.Values);
@@ -167,10 +168,10 @@ public static class SubroutinesWalker
         {
             var decisionId = Walker.ContextualDecisionIdPublic(triggerPrefix, current.Label);
             Walker.RecordDecisionPublic(current, decisionId, decisionsSeen);
-            var resolvedLabels = ResolveBranchLabels(outEdges);
-            for (int i = 0; i < outEdges.Count; i++)
+            var (orderedEdges, resolvedLabels) = Walker.OrderBranches(outEdges, ResolveBranchLabels(outEdges));
+            for (int i = 0; i < orderedEdges.Count; i++)
             {
-                var edge = outEdges[i];
+                var edge = orderedEdges[i];
                 if (visited.Contains(edge.Target))
                     throw new InvalidDataException(
                         $"{Path.GetFileName(graph.SourcePath)}: decision {current.Id} ('{current.Label}') edge {edge.Id} " +

@@ -244,11 +244,12 @@ public class TranscribeTests
     [InlineData("U or S Frame Length Error", "Signal reception from lower layer", "u_or_s_frame_length_error")]
     // Annex C machines other than Data Link (packethacking/ax25spec#116).
     [InlineData("LM-SEIZE Confirm",        "Signal reception from lower layer", "LM_SEIZE_confirm")]
-    [InlineData("LM-SIEZE Request",        "Signal reception from upper layer", "LM_SIEZE_request")]
+    [InlineData("LM-SIEZE Request",        "Signal reception from upper layer", "LM_SEIZE_request")]   // alias, ax25spec#61
     [InlineData("LM-EXPEDITED-DATA Request", "Signal reception from upper layer", "LM_EXPEDITED_DATA_request")]
-    [InlineData("PH-SIEZE Confirm",        "Signal reception from lower layer", "PH_SIEZE_confirm")]
+    [InlineData("PH-SIEZE Confirm",        "Signal reception from lower layer", "PH_SEIZE_confirm")]   // alias, ax25spec#61
+    [InlineData("PH-SEIZE Confirm",        "Signal reception from lower layer", "PH_SEIZE_confirm")]
     [InlineData("PH-Quiet Indication",     "Signal reception from lower layer", "PH_QUIET_indication")]
-    [InlineData("PH_SIEZE Confirm",        "Signal reception from lower layer", "PH_SIEZE_confirm")]
+    [InlineData("PH_SIEZE Confirm",        "Signal reception from lower layer", "PH_SEIZE_confirm")]
     [InlineData("PH-EXPEDITED_DATA Request", "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
     [InlineData("HW-AOS Indication",       "Signal reception from lower layer", "HW_AOS_indication")]
     [InlineData("MDL-NEGOTIATE Request",   "Signal reception from upper layer", "MDL_NEGOTIATE_request")]
@@ -271,12 +272,15 @@ public class TranscribeTests
     [Theory]
     [InlineData("T106 Expiry Or T108?", "Internal Signal Reception")]
     [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer")]
+    [InlineData("LM-\nDATA Request",             "Signal reception from upper layer")]
+    [InlineData("PH-EXPEDITED DATA Request",      "Signal reception from upper layer")]
+    [InlineData("PH-DATA Request Now",            "Signal reception from upper layer")]
     public void EventResolver_rejects_a_label_with_no_rule_rather_than_emit_a_bad_id(string label, string shapeClass)
     {
         // Before #116 an unruled label fell through to a lower-cased id that
         // could carry dashes or '?', breaking the transition-id pattern.
         var act = () => EventResolver.ResolveTriggerEvent(label, shapeClass);
-        act.Should().Throw<InvalidDataException>().WithMessage("*not a valid event id*EventResolver.cs*");
+        act.Should().Throw<InvalidDataException>().WithMessage("*EventResolver.cs*");
     }
 
     // ─── Annex C machine and figure table ─────────────────────────────
@@ -337,8 +341,10 @@ public class TranscribeTests
                                "LinkMux_Idle.graphml");
 
         var t = page.Transitions.Should().ContainSingle().Subject;
-        t.Id.Should().Be("t01_ph_sieze_confirm").And.MatchRegex("^t[0-9]{2}_[a-z0-9_]+$");
-        t.On.Should().Be("PH_SIEZE_confirm");
+        t.Id.Should().Be("t01_ph_seize_confirm").And.MatchRegex("^t[0-9]{2}_[a-z0-9_]+$");
+        // One id per primitive across machines (SIEZE is an alias, ax25spec#61),
+        // with the label still recorded as drawn.
+        t.On.Should().Be("PH_SEIZE_confirm");
         t.OnLabel.Should().Be("PH-SIEZE Confirm");
     }
 
@@ -532,6 +538,190 @@ public class TranscribeTests
         var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().Throw<System.IO.InvalidDataException>().WithMessage("*guarded*");
+    }
+
+    // ─── Branch order and subroutine failures ─────────────────────────
+
+    [Fact]
+    public void Decision_branches_are_walked_Yes_then_No_whatever_the_file_order()
+    {
+        // The No edge is stored first. Two transcriptions of C3.4 differed
+        // only in edge order and got different path ids.
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Queue Event", 0, 0),
+            new("n1", "Test or decision",       "Ready?",      0, 1),
+            new("n2", "Processing description", "Do No",       0, 2),
+            new("n3", "Processing description", "Do Yes",      1, 2),
+            new("n4", "Return from Subroutine", "",            0, 3),
+            new("n5", "Return from Subroutine", "",            1, 3),
+        };
+        var edges = new List<GraphmlEdge>
+        {
+            new("e0", "n0", "n1", ""),
+            new("e1", "n1", "n2", "No"),
+            new("e2", "n1", "n3", "Yes"),
+            new("e3", "n2", "n4", ""),
+            new("e4", "n3", "n5", ""),
+        };
+
+        var page = SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
+
+        page.Subroutines.Should().ContainSingle().Which.Paths.Select(p => p.Id)
+            .Should().Equal("t01_queue_event_yes", "t02_queue_event_no");
+    }
+
+    [Fact]
+    public void State_page_branches_are_walked_Yes_then_No_whatever_the_file_order()
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State",            "0 Idle",          0, 0),
+            new("n1", "Signal reception from upper layer", "LM-DATA Request", 0, 1),
+            new("n2", "Test or decision", "Ready?",          0, 2),
+            new("n3", "State",            "0 Idle",          0, 3),
+            new("n4", "State",            "1 Sieze Pending", 1, 3),
+        };
+        var edges = new List<GraphmlEdge>
+        {
+            new("e0", "n0", "n1", ""),
+            new("e1", "n1", "n2", ""),
+            new("e2", "n2", "n4", "No"),
+            new("e3", "n2", "n3", "Yes"),
+        };
+
+        var page = Walker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Idle.graphml");
+
+        page.Transitions.Select(t => (t.Id, t.Next))
+            .Should().Equal(("t01_lm_data_request_yes", "Idle"), ("t01_lm_data_request_no", "SiezePending"));
+    }
+
+    [Fact]
+    public void A_subroutine_that_fails_to_walk_is_an_error_not_a_skipped_subroutine()
+    {
+        // The edge out of "Push On Current Queue" is missing, a dead end.
+        // Before, the subroutine was skipped with a warning and the page
+        // written without it, with exit 0.
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",           "Queue Event",          0, 0),
+            new("n1", "Internal Signal Generation", "Push On Current Queue", 0, 1),
+            new("n2", "Subroutine start",           "Frame Received",       1, 0),
+            new("n3", "Return from Subroutine",     "",                     1, 1),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n2", "n3", "") };
+
+        var act = () => SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*subroutine 'Queue_Event'*dead end*");
+    }
+
+    [Fact]
+    public void A_subroutine_start_with_no_edge_is_an_error()
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Queue Event", 0, 0),
+            new("n1", "Subroutine start",       "Frame Received", 1, 0),
+            new("n2", "Return from Subroutine", "",            1, 1),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n1", "n2", "") };
+
+        var act = () => SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*subroutine 'Queue_Event'*no outgoing edge*");
+    }
+
+    // ─── Transcriber CLI hard errors ──────────────────────────────────
+
+    [Fact]
+    public void Two_graphmls_that_would_write_one_yaml_is_an_error_and_nothing_is_written()
+    {
+        // Segmenter and Reassembler both have a Ready state; filed together,
+        // both would write ready.sdl.yaml.
+        using var dir = new TempDir();
+        var input = dir.Sub("in");
+        File.WriteAllText(Path.Combine(input, "Segmenter_Ready.graphml"), "");
+        File.WriteAllText(Path.Combine(input, "Reassembler_Ready.graphml"), "");
+        var output = dir.Sub("out");
+
+        var (code, err) = RunTranscribe(input, output);
+
+        code.Should().NotBe(0);
+        err.Should().Contain("would both write").And.Contain("ready.sdl.yaml");
+        Directory.EnumerateFiles(output).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_graphml_in_another_machines_directory_is_an_error()
+    {
+        using var dir = new TempDir();
+        var input = dir.Sub(Path.Combine("simplex-physical", "sdl"));
+        File.WriteAllText(Path.Combine(input, "LinkMux_Idle.graphml"), "");
+
+        var (code, err) = RunTranscribe(input, dir.Sub(Path.Combine("simplex-physical", "yaml")));
+
+        code.Should().NotBe(0);
+        err.Should().Contain("link-multiplexer/sdl/").And.Contain("not simplex-physical/sdl/");
+    }
+
+    [Theory]
+    [InlineData("data-link/sdl/DataLink_Connected.graphml",            null)]
+    [InlineData("link-multiplexer/sdl/LinkMux_Idle.graphml",           null)]
+    [InlineData("segmenter/sdl/Segmenter_Ready.graphml",               null)]
+    [InlineData("reassembler/sdl/Reassembler_Ready.graphml",           null)]
+    [InlineData("segmenter/sdl/Reassembler_Ready.graphml",             "*reassembler/sdl/*")]
+    [InlineData("data-link/sdl/LinkMux_Idle.graphml",                  "*link-multiplexer/sdl/*")]
+    [InlineData("scratch/LinkMux_Idle.graphml",                        null)]
+    public void Graphml_must_be_under_its_own_machine_directory(string relative, string? expected)
+    {
+        var problem = Packet.Sdl.Transcribe.Program.MisfiledMachineDirectory(Path.Combine("/repo/spec-sdl/v2.2-errata", relative));
+        if (expected is null) problem.Should().BeNull();
+        else problem.Should().Match(expected);
+    }
+
+    [Fact]
+    public void An_orphan_yaml_with_no_graphml_is_an_error()
+    {
+        using var dir = new TempDir();
+        var input = dir.Sub(Path.Combine("data-link", "sdl"));
+        File.Copy(LocateRepoGraphml("DataLink_Disconnected.graphml"), Path.Combine(input, "DataLink_Disconnected.graphml"));
+        var output = dir.Sub(Path.Combine("data-link", "yaml"));
+        File.WriteAllText(Path.Combine(output, "deleted_state.sdl.yaml"), "machine: data_link\n");
+        File.WriteAllText(Path.Combine(output, "disconnected.citations.yaml"), "transitions: {}\n");
+
+        var (code, err) = RunTranscribe(input, output);
+
+        code.Should().NotBe(0);
+        err.Should().Contain("deleted_state.sdl.yaml has no graphml");
+        err.Should().NotContain("citations");
+        File.Exists(Path.Combine(output, "disconnected.sdl.yaml")).Should().BeTrue();
+    }
+
+    private static (int Code, string Stderr) RunTranscribe(string input, string output)
+    {
+        var originalErr = Console.Error;
+        var originalOut = Console.Out;
+        var err = new StringWriter();
+        Console.SetError(err);
+        Console.SetOut(TextWriter.Null);
+        try
+        {
+            var code = Packet.Sdl.Transcribe.Program.Main(["-i", input, "-o", output]);
+            return (code, err.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalErr);
+            Console.SetOut(originalOut);
+        }
+    }
+
+    private sealed class TempDir : IDisposable
+    {
+        public string Root { get; } = Directory.CreateTempSubdirectory("transcribe-cli-").FullName;
+        public string Sub(string relative) => Directory.CreateDirectory(Path.Combine(Root, relative)).FullName;
+        public void Dispose() => Directory.Delete(Root, recursive: true);
     }
 
     // ─── Locator helpers ──────────────────────────────────────────────

@@ -182,6 +182,15 @@ internal static class Program
         // is withheld from generation (below) instead of failing the build.
         var withheld = LintStateTargets(pages, errors);
 
+        // Published machines are never withheld: a missing page there is a
+        // broken checkout or a deleted yaml, and withholding would quietly
+        // delete the machine's generated code.
+        LintPublishedMachinesNeverWithheld(withheld, errors);
+
+        // Every page's generated files are named by AnnexC.OutputStem; two
+        // pages with one stem would overwrite each other in every backend.
+        LintOutputStemsUnique(pages, subroutinePages, errors);
+
         // Per-state catchall-coverage lint: every state should have at
         // least one transition triggered by a `catchalls:` event (e.g.
         // all_other_primitives__from_lower_layer). Without a catchall,
@@ -300,7 +309,7 @@ internal static class Program
                         // back to alongside the source for in-memory test
                         // fixtures, which don't use the three-way split.
                         SiblingMermaidDir(page.SourcePath),
-                        Path.GetFileNameWithoutExtension(page.SourcePath).Replace(".sdl", string.Empty, StringComparison.Ordinal) + ".g.mmd")
+                        AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.mmd")
                     : Path.Combine(plan.MermaidOut, model.ClassName + ".g.mmd");
 
                 var emission = CsharpEmitter.EmitStatePage(resolved, codePath, testsPath);
@@ -1059,6 +1068,31 @@ internal static class Program
         return partly;
     }
 
+
+    private static void LintPublishedMachinesNeverWithheld(Dictionary<string, HashSet<string>> withheld, List<string> errors)
+    {
+        foreach (var machine in AnnexC.PublishedMachines.Order(StringComparer.Ordinal))
+        {
+            if (!withheld.Remove(machine, out var missing)) continue;
+            errors.Add(
+                $"machine `{machine}` is published, so it is never withheld, but its pages lead to states with no page: " +
+                $"{string.Join(", ", missing.Order(StringComparer.Ordinal))}. Check the ax25spec submodule checkout and " +
+                "that no *.sdl.yaml was deleted.");
+        }
+    }
+
+    private static void LintOutputStemsUnique(List<SdlPage> pages, List<SubroutinePage> subPages, List<string> errors)
+    {
+        var all = pages.Select(p => (p.Machine, p.SourcePath))
+                       .Concat(subPages.Select(p => (p.Machine, p.SourcePath)));
+        foreach (var group in all.GroupBy(p => AnnexC.OutputStem(p.Machine, p.SourcePath), StringComparer.Ordinal))
+        {
+            if (group.Count() < 2) continue;
+            errors.Add(
+                $"pages {string.Join(", ", group.Select(g => g.SourcePath).Order(StringComparer.Ordinal))} would all generate " +
+                $"files named `{group.Key}.g.*`, so each would overwrite the others. Rename one *.sdl.yaml.");
+        }
+    }
 
     // ─── Per-state catchall coverage lint ───────────────────────────────
 

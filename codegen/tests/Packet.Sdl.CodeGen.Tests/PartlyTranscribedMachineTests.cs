@@ -117,6 +117,78 @@ public class PartlyTranscribedMachineTests
     }
 
     [Fact]
+    public void A_published_machine_is_never_withheld()
+    {
+        // A Data Link page leads to a state whose yaml is missing (a deleted
+        // file, or a bad submodule checkout). Withholding would quietly
+        // delete Data Link's generated code; it must fail instead.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        var page = DataLinkPage.Replace(
+            "kind: signal_lower }\n    next: Connected",
+            "kind: signal_lower }\n    next: AwaitingRelease");
+        page.Should().Contain("next: AwaitingRelease");
+        r.WritePage("data-link/connected.sdl.yaml", page);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("`data_link` is published").And.Contain("AwaitingRelease");
+        r.GeneratedExists("DataLink_Connected.g.cs").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Machines_sharing_a_state_name_get_separate_generated_files()
+    {
+        // Ready is a state of four machines. Published machines keep their
+        // bare file names; every other machine's are machine-qualified.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("management-data-link/ready.sdl.yaml", """
+            machine: management_data_link
+            state: Ready
+            coverage: partial
+            source: { spec: test, figure: figc5.1 }
+            transitions:
+              - id: t01_dl_disconnect_request
+                on: DL_DISCONNECT_request
+                path: []
+                next: Ready
+            """);
+        r.WritePage("segmenter/ready.sdl.yaml", """
+            machine: segmenter
+            state: Ready
+            source: { spec: test, figure: figc6.1 }
+            transitions:
+              - id: t01_all_other_primitives__from_upper_layer
+                on: all_other_primitives__from_upper_layer
+                path: []
+                next: Ready
+            """);
+
+        var result = r.RunJson();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}\nstdout: {result.Stdout}");
+        File.Exists(Path.Combine(r.JsonOutDir, "ready.g.json")).Should().BeTrue();
+        File.Exists(Path.Combine(r.JsonOutDir, "segmenter_ready.g.json")).Should().BeTrue();
+        File.ReadAllText(Path.Combine(r.JsonOutDir, "ready.g.json")).Should().Contain("management_data_link");
+    }
+
+    [Fact]
+    public void Two_pages_with_one_output_name_is_an_error()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("data-link/connected.sdl.yaml", DataLinkPage);
+        r.WritePage("other/data-link/connected.sdl.yaml", DataLinkPage);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("would all generate files named `connected.g.*`");
+    }
+
+    [Fact]
     public void A_machine_that_is_not_in_Annex_C_is_an_error()
     {
         using var r = new CodegenRunner();

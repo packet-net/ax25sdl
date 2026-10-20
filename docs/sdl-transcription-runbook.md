@@ -39,8 +39,10 @@ The graphml filename picks the machine, the state and the figure, through the An
 | Link Multiplexer | `LinkMux_` | `link_mux` | `link-multiplexer` | C3.1 to C3.4 |
 | Data Link | `DataLink_` | `data_link` | `data-link` | C4.1 to C4.7 |
 | Management Data Link | `ManagementDataLink_` | `management_data_link` | `management-data-link` | C5.1 to C5.8 |
-| Segmenter | `Segmenter_` | `segmenter` | `segmenter-reassembler` | C6.1 |
-| Reassembler | `Reassembler_` | `reassembler` | `segmenter-reassembler` | C6.2 to C6.4 |
+| Segmenter | `Segmenter_` | `segmenter` | `segmenter` | C6.1 |
+| Reassembler | `Reassembler_` | `reassembler` | `reassembler` | C6.2 to C6.4 |
+
+Each machine has its own directory, and a graphml filed under another machine's directory is rejected. Segmenter and Reassembler are separate even though Annex C6 draws them together: both have a Ready state.
 
 The part after the underscore is the page key from the table: the state name in PascalCase as the figures draw it (`LinkMux_SiezePending.graphml`, figure C3.2), or for a subroutines page its caption ending in `Subroutines` (`LinkMux_Subroutines.graphml`, `ManagementDataLink_T1NegotiationSubroutines.graphml`). The yaml filename is derived from it (`sieze_pending.sdl.yaml`).
 
@@ -64,10 +66,10 @@ Use absolute paths throughout. The physical PDF page of each figure is in the `P
 ### 2. Read the figure
 
 ```sh
-mkdir -p /tmp/fig && pdftoppm -f 81 -l 81 -r 200 -png "<ax25spec>/spec-sdl/v2.2-errata/ax.25 v2.2 rev 4 Oct 2025.pdf" /tmp/fig/p
+mkdir -p /tmp/fig && pdftoppm -f 81 -l 81 -r 300 -png "<ax25spec>/spec-sdl/v2.2-errata/ax.25 v2.2 rev 4 Oct 2025.pdf" /tmp/fig/p
 ```
 
-Zoom into strips (crop with Python PIL) until every label is legible. Before drawing anything, write an inventory of the page:
+Render at 300 dpi or more, and zoom into strips (crop with Python PIL) until every label, arrow and branch is legible. Before drawing anything, write an inventory of the page:
 
 - the entry state symbol (top left) and its exact text;
 - every input column, left to right, with its exact label and its shape class (primer, "Telling the shapes apart");
@@ -76,7 +78,7 @@ Zoom into strips (crop with Python PIL) until every label is legible. Before dra
 - where columns merge (an arrow joining another column), loop back, or end in a Save;
 - every terminal state symbol's exact text.
 
-Mark anything you cannot read as unreadable rather than guessing.
+Never guess. If something genuinely cannot be read, draw your best reading, and record it as `verification_pending:` in the PR body and in your report: the figure, the column, what you read and what else it could be. The yaml has no field for it, because it is regenerated from the graphml.
 
 ### 3. Draw the graphml
 
@@ -84,7 +86,7 @@ Start from the palette, `spec-sdl/ax25-sdl-all-shapes.graphml`. It holds one nod
 
 You can draw in yEd, or generate the file with a short script that copies the palette's node blocks and sets each node's id, geometry and label (one transcriber of figure C3.1 did this). Either way:
 
-- **Columns run left to right in the figure's order.** The walker numbers transitions by the x position of each input symbol (`t01_...`, `t02_...`), so the order is part of the output.
+- **Columns run left to right in the figure's order.** The walker numbers transitions by the x position of each input symbol (`t01_...`, `t02_...`), so the order is part of the output. See "Order in the yaml".
 - **One entry state** with an arrow to each input symbol. Every column ends in a State symbol whose label is the figure's text (`0 Idle`, `1 Sieze Pending`). The leading number is dropped and the rest becomes the `next:` state.
 - **Labels are typed verbatim.** See "Labels" below for line breaks.
 - **Decisions:** each out-edge of a Test or decision carries a label, `Yes` or `No` (or `undefined` where the figure says so). An unlabelled decision edge is an error.
@@ -103,9 +105,13 @@ dotnet run --project <ax25sdl>/.claude/worktrees/tooling/codegen/src/Packet.Sdl.
 A non-zero exit means the page was not written. The common causes:
 
 - *not an Annex C machine* or *not a page of*: fix the filename (see "Naming").
-- *not a valid event id ... Add a rule*: an input label that no rule in `EventResolver.cs` covers. That is a tooling change: add the rule and a test in ax25sdl first, get it merged, and bump `.github/ax25sdl-tooling-ref`. Don't reword the label to fit.
+- *must be under ...*: the graphml is in another machine's directory.
+- *would both write*: two graphmls map to one yaml file. Nothing is written.
+- *has no graphml*: a yaml in the output directory that no graphml produces (its graphml was deleted or renamed). Delete it, or restore the graphml.
+- *not a valid event id ... Add a rule*, or *primitive label ... is not*: an input label that no rule in `EventResolver.cs` covers, or a primitive typed with a space or a line break inside its name. Retype it on one line as the figure spells it. If the figure itself draws a new form, that is a tooling change: add the rule and a test in ax25sdl first, get it merged, and bump `.github/ax25sdl-tooling-ref`. Don't reword the label to fit.
 - *no branch label*: a decision edge is unlabelled.
 - *Unhandled cycle* or *guarded*: a back-edge that is not a loop through a decision; check the drawing against the figure.
+- *subroutine '...'*: one subroutine could not be walked (often a dead end where an edge is missing, or a start with no edge). The whole page fails; a subroutine is never silently dropped.
 
 Read the generated yaml against your inventory, column by column.
 
@@ -138,11 +144,26 @@ Both transcribers finish steps 1 to 7 on their own. Then compare the yaml (rule 
 
 ### 9. Open the PR in ax25spec
 
-Commit the graphml, yaml, svg and catalogue changes. The PR body says which figure and PDF page, that two independent transcriptions were compared and what differed, and lists any issues raised under rule 2. Link the epic the page belongs to.
+Commit the graphml, yaml, svg and catalogue changes. The PR body says:
+
+- which figure and PDF page;
+- who transcribed it, human or agent, for both transcriptions;
+- that the two were compared, what differed and how each difference was settled against the figure;
+- any `verification_pending:` readings (step 2) and any issues raised under rule 2.
+
+Link the epic the page belongs to. Human review of the ax25spec PR is the sign-off.
+
+## Order in the yaml
+
+The yaml must not depend on how a page happens to be drawn or stored, so two correct transcriptions give the same file:
+
+- **Transitions** follow the input symbols left to right by x position, so draw the columns in the figure's order.
+- **Decision branches** are walked Yes first, then No, then any other label (such as Undefined), whatever order the edges are stored in the graphml. Transitions of one input, and subroutine path ids (`t01_queue_event_yes`, `t02_queue_event_no`), are numbered in that order.
+- **Subroutines** follow their start symbols top to bottom by y position, then left to right by x. Lay the starts out in the figure's reading order.
 
 ## Labels
 
-- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces in an input label are read as single spaces, but a break straight after a dash (`LM-` then `EXPEDITED-DATA`) splits the name and is rejected.
+- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces are read as single spaces, so a primitive with a break or a space inside its name (`LM-` then `DATA Request`, or `PH-EXPEDITED DATA Request`) is rejected rather than given a different id.
 - **Each line of an action box is one action.** A box that lists statements one per line (`V(s) <- 0` then `V(a) <- 0`) becomes that many path steps, in order. So put a hard line break only where the figure starts a new statement; type a long single statement (`Move all events submitted by current DL to Current Queue`) on one line and let yEd wrap it.
 - Assignment arrows can be typed `<-` or as the arrow character; both become `:=` in the yaml.
 - A decision's question is copied into `question:` verbatim; its `predicate:` is derived from it.
@@ -153,7 +174,8 @@ The walker derives `on:` from the input label and shape class. Spelling is kept;
 
 | Figure label | Event id | Rule |
 | --- | --- | --- |
-| `DL-DATA Request`, `LM-SIEZE Request`, `PH-SIEZE Confirm`, `HW-AOS Indication`, `MDL-NEGOTIATE Request` | `DL_DATA_request`, `LM_SIEZE_request`, `PH_SIEZE_confirm`, `HW_AOS_indication`, `MDL_NEGOTIATE_request` | primitive name in upper case with underscores, then the kind in lower case. An underscore drawn for the dash (`PH_SIEZE Confirm`) is accepted; `PH-Quiet` becomes `PH_QUIET` |
+| `DL-DATA Request`, `LM-SEIZE Confirm`, `HW-AOS Indication`, `MDL-NEGOTIATE Request` | `DL_DATA_request`, `LM_SEIZE_confirm`, `HW_AOS_indication`, `MDL_NEGOTIATE_request` | `<PREFIX>-<NAME> <Kind>`: name in upper case with underscores, then the kind (Request, Indication, Indicate, Confirm) in lower case. An underscore drawn for the dash (`PH_SIEZE Confirm`) is accepted; `PH-Quiet` becomes `PH_QUIET` |
+| `LM-SIEZE Request`, `PH-SIEZE Confirm` | `LM_SEIZE_request`, `PH_SEIZE_confirm` | a known misspelling maps to the canonical name (below) |
 | `SABM`, `I` | `SABM_received`, `I_received` | bare frame name |
 | `XID Response`, `FRMR Response` | `XID_response_received`, `FRMR_response_received` | frame with its role |
 | `Timer T1 Expiry`, `T102 Expiry`, `TM 201 Expiry`, `TR210 Expiry` | `T1_expiry`, `T102_expiry`, `TM201_expiry`, `TR210_expiry` | timer name, spaces removed |
@@ -161,6 +183,8 @@ The walker derives `on:` from the input label and shape class. Spelling is kept;
 | `Control Field Error`, `Queue Empty` | `control_field_error`, `queue_empty` | anything else: lower case, underscores |
 
 A label that would give anything other than a plain identifier is rejected with a pointer to `EventResolver.cs`, so a new label family needs a rule (and a test) before its page can be generated.
+
+**One primitive, one id.** Where figures spell the same primitive differently, a small alias table in `EventResolver.cs` maps the figure spelling to the canonical name, so the primitive has one event id on every machine. `on_label` still records the label as drawn. Today it holds only SIEZE to SEIZE for LM- and PH- (C3.1 and C3.2, ax25spec#61). Add an alias only when a page being transcribed needs it, with its issue and a test.
 
 ## Partly transcribed machines
 
@@ -170,6 +194,8 @@ Machines are transcribed a page at a time, so a page often leads to a state that
 - When the last missing page lands, the machine starts generating and the closed sets (`Ax25Event` and the rest) grow. That shows up as a visible change in the ax25sdl pin-bump PR, as it should.
 - A target that is not an Annex C state of the machine at all is an error.
 - `coverage: partial` (used by the prose-derived Management Data Link bootstrap) still skips the state-target check for that page.
+- Data Link and Management Data Link are already published, so they are never withheld: a transition of theirs that leads to a missing page is an error. A deleted yaml can't quietly remove their generated code.
+- Generated files are named per machine (`link_mux_idle.g.go`, `segmenter_ready.g.json`), because states such as Ready recur across machines. The published machines keep their existing names (`connected.g.go`, `ready.g.json`). Two pages that would still share a name fail codegen.
 
 ## After the transcription
 

@@ -145,6 +145,35 @@ public static class EventResolver
         string.Join('_', s.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                           .Select(p => p.ToLowerInvariant()));
 
+    /// <summary>
+    /// The only shape a primitive label may have: a prefix and a name joined
+    /// by dashes (or underscores) with no spaces, then one kind word, then
+    /// optionally a parenthesised note such as an error code.
+    /// "LM-" then a line break then "DATA Request", or
+    /// "PH-EXPEDITED DATA Request", would otherwise give ids that differ from
+    /// the dashed spelling (<c>LM__data_request</c>,
+    /// <c>PH_EXPEDITED_data_request</c>), so they are rejected.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex PrimitiveShape = new(
+        @"^((?:DL|MDL|LM|PH|HW)(?:[-_][A-Za-z0-9]+)+) (Request|Indication|Indicate|Confirm)$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Figure spellings of one primitive that differ between pages, mapped
+    /// to the canonical name so the primitive has one event id on every
+    /// machine. The label stays recorded as drawn in <c>on_label</c>. Each
+    /// entry cites the ax25spec issue that records the misspelling; add one
+    /// only when a figure being transcribed needs it.
+    /// </summary>
+    private static readonly Dictionary<string, (string Canonical, string Issue)> PrimitiveNameAliases =
+        new(StringComparer.Ordinal)
+        {
+            // C3.1 and C3.2 draw SIEZE; the prose and the Data Link pages'
+            // LM-SEIZE Confirm spell SEIZE.
+            ["LM_SIEZE"] = ("LM_SEIZE", "packethacking/ax25spec#61"),
+            ["PH_SIEZE"] = ("PH_SEIZE", "packethacking/ax25spec#61"),
+        };
+
     private static string NormaliseDashPrefixedPrimitive(string label)
     {
         // "DL-DISCONNECT Request" → "DL_DISCONNECT_request"
@@ -152,18 +181,23 @@ public static class EventResolver
         // "DL-ERROR Indication (L)" → "DL_ERROR_indication"  (drop parenthetical)
         // "LM-SEIZE Confirm" → "LM_SEIZE_confirm"
         // "MDL-NEGOTIATE Request" → "MDL_NEGOTIATE_request"
-        // "PH-SIEZE Confirm" → "PH_SIEZE_confirm"  (figure spelling kept)
+        // "PH-SIEZE Confirm" → "PH_SEIZE_confirm"  (alias, #61)
         // "PH-EXPEDITED_DATA Request" → "PH_EXPEDITED_DATA_request"
         var stripped = StripTrailingParenthetical(label);
-        var parts = stripped.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        // First part is the primitive name: upper-cased, dashes to
-        // underscores. The figures' spelling is kept (SIEZE stays SIEZE);
-        // only the case is normalised, so "PH-Quiet Indication" (C3.2) and
-        // "PH-QUIET Indication" (C3.1) are one event.
-        var head = parts[0].Replace('-', '_').ToUpperInvariant();
-        // Trailing words lowercase (the action: Request/Confirm/Indication/Indicate).
-        var tail = string.Join('_', parts.Skip(1).Select(p => p.ToLowerInvariant()));
-        return string.IsNullOrEmpty(tail) ? head : $"{head}_{tail}";
+        var m = PrimitiveShape.Match(stripped);
+        if (!m.Success)
+            throw new InvalidDataException(
+                $"primitive label '{label}' is not '<PREFIX>-<NAME> <Request|Indication|Indicate|Confirm>' with no spaces " +
+                "inside the name. Type the label on one line as the figure spells it; if the figure itself draws it " +
+                "another way, add a rule in codegen/src/Packet.Sdl.Transcribe/EventResolver.cs.");
+        // The primitive name: upper-cased, dashes to underscores, so
+        // "PH-Quiet Indication" (C3.2) and "PH-QUIET Indication" (C3.1) are
+        // one event. A known misspelling maps to its canonical name.
+        var name = m.Groups[1].Value.Replace('-', '_').ToUpperInvariant();
+        if (PrimitiveNameAliases.TryGetValue(name, out var alias))
+            name = alias.Canonical;
+        // The kind word lower case: request / confirm / indication / indicate.
+        return $"{name}_{m.Groups[2].Value.ToLowerInvariant()}";
     }
 
     private static string ToSnakeCasePreservingSpecVars(string label)
