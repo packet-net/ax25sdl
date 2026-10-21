@@ -17,6 +17,8 @@ deadlock), and the same number of distinct states (clean runs).
   --work DIR        model directories (default: <temp>/ax25sdl-tlacheck)
   --only LIST       comma list of scenario names
   --list            print the scenario names and exit
+  --grid            the explorer's 576-cell data-phase grid instead of the calibration suite
+  --grid-flow       the same grid with B's layer 3 flow-controlling
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
@@ -29,6 +31,8 @@ string? jar = Environment.GetEnvironmentVariable("TLA2TOOLS_JAR");
 var work = Path.Combine(Path.GetTempPath(), "ax25sdl-tlacheck");
 HashSet<string>? only = null;
 var list = false;
+var grid = false;
+var gridFlow = false;
 int parallel = 1, workers = 1, timeout = 600;
 var heap = "2g";
 
@@ -42,6 +46,8 @@ for (var i = 0; i < args.Length; i++)
         case "--work": work = Next(); break;
         case "--only": only = new HashSet<string>(Next().Split(','), StringComparer.Ordinal); break;
         case "--list": list = true; break;
+        case "--grid": grid = true; break;
+        case "--grid-flow": grid = true; gridFlow = true; break;
         case "--parallel": parallel = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--workers": workers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--heap": heap = Next(); break;
@@ -58,7 +64,7 @@ string Dir(TableSetKind t) => t switch
     _ => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38"),
 };
 
-var scenarios = Scenarios.Calibration(Dir).Where(s => only is null || only.Contains(s.Name)).ToList();
+var scenarios = (grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow) : Scenarios.Calibration(Dir)).Where(s => only is null || only.Contains(s.Name)).ToList();
 if (list)
 {
     foreach (var s in scenarios) Console.WriteLine($"{s.Name,-22} {s.Defect,-18} {s.Tables,-8} {s.Expect}");

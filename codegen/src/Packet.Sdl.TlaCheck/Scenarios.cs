@@ -121,4 +121,31 @@ public static class Scenarios
 
         return list;
     }
+
+    /// <summary>
+    /// The explorer's data-phase grid (docs/explorer.md, "Grid"): frames
+    /// 0..3 each way, budget 0..2, k in {2, 4}, SREJ off and on, faults
+    /// drop, dup and drop+dup, all invariants on, visited-state cap 1.2
+    /// million. Optionally with B's layer 3 flow-controlling, as the
+    /// explorer's flow-control grid does.
+    /// </summary>
+    public static IReadOnlyList<Scenario> Grid(string currentDir, bool flowB)
+    {
+        var list = new List<Scenario>();
+        foreach (var ab in new[] { 0, 1, 2, 3 })
+        foreach (var ba in new[] { 0, 1, 2, 3 })
+        foreach (var b in new[] { 0, 1, 2 })
+        foreach (var k in new[] { 2, 4 })
+        foreach (var srej in new[] { false, true })
+        foreach (var (faults, fname) in new[] { (FaultKinds.Drop, "drop"), (FaultKinds.Duplicate, "dup"), (FaultKinds.Drop | FaultKinds.Duplicate, "drop+dup") })
+        {
+            var name = $"g-ab{ab}-ba{ba}-b{b}-k{k}-{(srej ? "srej" : "nosrej")}-{fname}{(flowB ? "-flowB" : "")}";
+            list.Add(new Scenario(name, "grid", TableSetKind.Current, new ExplorerOptions
+            {
+                TablesDir = currentDir, FramesAb = ab, FramesBa = ba, Budget = b, K = k, Srej = srej, Faults = faults,
+                FlowControl = flowB ? FlowControlAt.B : FlowControlAt.None, MaxStates = 1_200_000,
+            }, ""));
+        }
+        return list;
+    }
 }
