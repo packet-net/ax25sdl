@@ -702,7 +702,7 @@ internal static class Program
         {
             var tlaPath = Path.Combine(plan.TlaOut, TlaEmitter.FileName);
             WriteIfChanged(tlaPath, TlaEmitter.EmitFromJsonDir(plan.TlaTables));
-            Console.WriteLine($"  ok  {plan.TlaTables}  →  {tlaPath}");
+            Console.WriteLine($"  ok  {plan.TlaTables}  ->  {tlaPath}");
         }
 
         var which = string.Join(" + ", new[] {
