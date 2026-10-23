@@ -4,147 +4,147 @@
 /// The closed set of canonical AX.25 SDL guard atoms (figc4.x decision
 /// predicates), one variant per distinct predicate across every page +
 /// subroutine. A transition's [`TransitionSpec::guard`](crate::TransitionSpec) is a
-/// conjunction of these atoms (each optionally negated — see
+/// conjunction of these atoms (each optionally negated; see
 /// [`GuardTerm`](crate::GuardTerm)); enumerating them lets a guard evaluator bind
 /// every atom exhaustively.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ax25Guard {
     /// `AC_gt_NM201`
-    ACGtNM201,
+    ACGtNM201 = 37,
     /// `COP_negotiation_requested`
-    COPNegotiationRequested,
+    COPNegotiationRequested = 38,
     /// `COP_parameter_field_present`
-    COPParameterFieldPresent,
+    COPParameterFieldPresent = 39,
     /// `F_eq_1`
-    FEq1,
+    FEq1 = 0,
     /// `F_eq_1_and_frame_eq_RR_or_frame_eq_RNR_or_frame_eq_I`
-    FEq1AndFrameEqRROrFrameEqRNROrFrameEqI,
+    FEq1AndFrameEqRROrFrameEqRNROrFrameEqI = 1,
     /// `N1_notification_requested`
-    N1NotificationRequested,
+    N1NotificationRequested = 47,
     /// `N1_parameter_field_present`
-    N1ParameterFieldPresent,
+    N1ParameterFieldPresent = 48,
     /// `N2_notification_requested`
-    N2NotificationRequested,
+    N2NotificationRequested = 49,
     /// `N2_parameter_field_present`
-    N2ParameterFieldPresent,
+    N2ParameterFieldPresent = 50,
     /// `N_eq_0`
-    NEq0,
+    NEq0 = 51,
     /// `OF_negotiation_requested`
-    OFNegotiationRequested,
+    OFNegotiationRequested = 53,
     /// `OF_parameter_field_present`
-    OFParameterFieldPresent,
+    OFParameterFieldPresent = 54,
     /// `P_eq_1`
-    PEq1,
+    PEq1 = 2,
     /// `P_or_F_eq_1`
-    POrFEq1,
+    POrFEq1 = 3,
     /// `RC_eq_0`
-    RCEq0,
+    RCEq0 = 4,
     /// `RC_eq_N2`
-    RCEqN2,
+    RCEqN2 = 5,
     /// `R_lt_p`
-    RLtP,
+    RLtP = 56,
     /// `SREJ_acceptable`
-    SREJAcceptable,
+    SREJAcceptable = 59,
     /// `SREJ_enabled`
-    SREJEnabled,
+    SREJEnabled = 7,
     /// `SREJ_or_REJ_acceptable`
-    SREJOrREJAcceptable,
+    SREJOrREJAcceptable = 60,
     /// `T1_expired`
-    T1Expired,
+    T1Expired = 8,
     /// `T1_negotiation_requested`
-    T1NegotiationRequested,
+    T1NegotiationRequested = 63,
     /// `T1_parameter_field_present`
-    T1ParameterFieldPresent,
+    T1ParameterFieldPresent = 64,
     /// `T1_running`
-    T1Running,
+    T1Running = 9,
     /// `XID_rejected`
-    XIDRejected,
+    XIDRejected = 69,
     /// `able_to_establish`
-    AbleToEstablish,
+    AbleToEstablish = 10,
     /// `ack_pending`
-    AckPending,
+    AckPending = 11,
     /// `command`
-    Command,
+    Command = 12,
     /// `command_and_P_eq_1`
-    CommandAndPEq1,
+    CommandAndPEq1 = 13,
     /// `digipeating`
-    Digipeating,
+    Digipeating = 40,
     /// `first_segment`
-    FirstSegment,
+    FirstSegment = 41,
     /// `full_duplex_acceptable`
-    FullDuplexAcceptable,
+    FullDuplexAcceptable = 42,
     /// `info_field_length_le_N1_and_content_is_octet_aligned`
-    InfoFieldLengthLeN1AndContentIsOctetAligned,
+    InfoFieldLengthLeN1AndContentIsOctetAligned = 14,
     /// `interrupted`
-    Interrupted,
+    Interrupted = 43,
     /// `k_notification_requested`
-    KNotificationRequested,
+    KNotificationRequested = 44,
     /// `k_parameter_field_present`
-    KParameterFieldPresent,
+    KParameterFieldPresent = 45,
     /// `layer_3_initiated`
-    Layer3Initiated,
+    Layer3Initiated = 15,
     /// `mod_128`
-    Mod128,
+    Mod128 = 16,
     /// `mod_8`
-    Mod8,
+    Mod8 = 17,
     /// `modulo_128_acceptable`
-    Modulo128Acceptable,
+    Modulo128Acceptable = 46,
     /// `next_segment`
-    NextSegment,
+    NextSegment = 52,
     /// `nr_eq_va`
-    NrEqVa,
+    NrEqVa = 18,
     /// `nr_eq_vs`
-    NrEqVs,
+    NrEqVs = 19,
     /// `ns_eq_vr`
-    NsEqVr,
+    NsEqVr = 20,
     /// `ns_gt_vr_plus_1`
-    NsGtVrPlus1,
+    NsGtVrPlus1 = 21,
     /// `out_of_sequence_frames_in_receive_buffer`
-    OutOfSequenceFramesInReceiveBuffer,
+    OutOfSequenceFramesInReceiveBuffer = 22,
     /// `own_receiver_busy`
-    OwnReceiverBusy,
+    OwnReceiverBusy = 23,
     /// `peer_receiver_busy`
-    PeerReceiverBusy,
+    PeerReceiverBusy = 24,
     /// `priority_queue_empty`
-    PriorityQueueEmpty,
+    PriorityQueueEmpty = 55,
     /// `reject_exception`
-    RejectException,
+    RejectException = 25,
     /// `remaining_segments_eq_N`
-    RemainingSegmentsEqN,
+    RemainingSegmentsEqN = 57,
     /// `repeater_up`
-    RepeaterUp,
+    RepeaterUp = 58,
     /// `response`
-    Response,
+    Response = 26,
     /// `response_and_F_eq_1`
-    ResponseAndFEq1,
+    ResponseAndFEq1 = 27,
     /// `segment_PID_present`
-    SegmentPIDPresent,
+    SegmentPIDPresent = 62,
     /// `segment_header_present`
-    SegmentHeaderPresent,
+    SegmentHeaderPresent = 61,
     /// `sreject_exception_gt_0`
-    SrejectExceptionGt0,
+    SrejectExceptionGt0 = 28,
     /// `transmit_N1_acceptable`
-    TransmitN1Acceptable,
+    TransmitN1Acceptable = 66,
     /// `transmit_N2_acceptable`
-    TransmitN2Acceptable,
+    TransmitN2Acceptable = 67,
     /// `transmit_T1_acceptable`
-    TransmitT1Acceptable,
+    TransmitT1Acceptable = 68,
     /// `transmit_k_acceptable`
-    TransmitKAcceptable,
+    TransmitKAcceptable = 65,
     /// `va_le_nr_le_vs`
-    VaLeNrLeVs,
+    VaLeNrLeVs = 29,
     /// `version_2_2`
-    Version22,
+    Version22 = 30,
     /// `vr_I_frame_stored`
-    VrIFrameStored,
+    VrIFrameStored = 31,
     /// `vr_lt_ns_lt_vr_plus_k`
-    VrLtNsLtVrPlusK,
+    VrLtNsLtVrPlusK = 32,
     /// `vs_eq_X`
-    VsEqX,
+    VsEqX = 33,
     /// `vs_eq_nr`
-    VsEqNr,
+    VsEqNr = 34,
     /// `vs_eq_va`
-    VsEqVa,
+    VsEqVa = 35,
     /// `vs_eq_va_plus_k`
-    VsEqVaPlusK,
+    VsEqVaPlusK = 36,
 }

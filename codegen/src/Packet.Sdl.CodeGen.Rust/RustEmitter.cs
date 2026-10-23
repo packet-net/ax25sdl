@@ -472,39 +472,42 @@ public static class RustEmitter
     /// emission asserts variant-name distinctness so a future collision fails
     /// codegen (mirrors the C# emitter).
     /// </summary>
-    public static string EmitActionVerbEnum(IEnumerable<string> canonicalVerbs)
+    public static string EmitActionVerbEnum(IEnumerable<string> canonicalVerbs, IReadOnlyDictionary<string, int>? values = null)
         => EmitEnum(
             "Ax25ActionVerb",
             "spec-sdl/actions.yaml",
             "The closed set of canonical AX.25 SDL action verbs (figc4.x), one variant per\n/// distinct semantic action across every page + subroutine. Carried by\n/// [`ActionStep::verb`](crate::ActionStep); lets a consumer `match` exhaustively.",
             canonicalVerbs,
-            VerbEnumMember);
+            VerbEnumMember,
+            values);
 
     /// <summary>
     /// Render the generated <c>ax25_guard.g.rs</c> — the closed set of every
     /// canonical guard atom (gathered from the resolved IR, so it includes
     /// Resolver-synthesised atoms like <c>vs_eq_nr</c>) as a Rust enum.
     /// </summary>
-    public static string EmitGuardEnum(IEnumerable<string> canonicalAtoms)
+    public static string EmitGuardEnum(IEnumerable<string> canonicalAtoms, IReadOnlyDictionary<string, int>? values = null)
         => EmitEnum(
             "Ax25Guard",
             "spec-sdl/predicates.yaml",
-            "The closed set of canonical AX.25 SDL guard atoms (figc4.x decision\n/// predicates), one variant per distinct predicate across every page +\n/// subroutine. A transition's [`TransitionSpec::guard`](crate::TransitionSpec) is a\n/// conjunction of these atoms (each optionally negated — see\n/// [`GuardTerm`](crate::GuardTerm)); enumerating them lets a guard evaluator bind\n/// every atom exhaustively.",
+            "The closed set of canonical AX.25 SDL guard atoms (figc4.x decision\n/// predicates), one variant per distinct predicate across every page +\n/// subroutine. A transition's [`TransitionSpec::guard`](crate::TransitionSpec) is a\n/// conjunction of these atoms (each optionally negated; see\n/// [`GuardTerm`](crate::GuardTerm)); enumerating them lets a guard evaluator bind\n/// every atom exhaustively.",
             canonicalAtoms,
-            GuardEnumMember);
+            GuardEnumMember,
+            values);
 
     /// <summary>
     /// Render the generated <c>ax25_event.g.rs</c> — the closed set of every
     /// AX.25 SDL event (the <c>spec-sdl/events.yaml</c> catalogue) as a Rust
     /// enum.
     /// </summary>
-    public static string EmitEventEnum(IEnumerable<string> events)
+    public static string EmitEventEnum(IEnumerable<string> events, IReadOnlyDictionary<string, int>? values = null)
         => EmitEnum(
             "Ax25Event",
             "spec-sdl/events.yaml",
-            "The closed set of AX.25 SDL events — every primitive, received frame,\n/// timer expiry, internal queue/error signal, and catch-all in\n/// `spec-sdl/events.yaml`. Carried by [`TransitionSpec::on`](crate::TransitionSpec);\n/// lets a consumer dispatch on the incoming event exhaustively.",
+            "The closed set of AX.25 SDL events: every primitive, received frame,\n/// timer expiry, internal queue/error signal, and catch-all in\n/// `spec-sdl/events.yaml`. Carried by [`TransitionSpec::on`](crate::TransitionSpec);\n/// lets a consumer dispatch on the incoming event exhaustively.",
             events,
-            EventEnumMember);
+            EventEnumMember,
+            values);
 
     /// <summary>
     /// Shared renderer for the three closed-set enums. De-duplicates +
@@ -517,7 +520,8 @@ public static class RustEmitter
         string sourceFile,
         string summary,
         IEnumerable<string> canonicals,
-        Func<string, string> member)
+        Func<string, string> member,
+        IReadOnlyDictionary<string, int>? values = null)
     {
         var distinct = canonicals.Distinct(StringComparer.Ordinal)
                                  .OrderBy(v => v, StringComparer.Ordinal)
@@ -543,7 +547,9 @@ public static class RustEmitter
         foreach (var v in distinct)
         {
             sb.Append("    ").Append(EnumDocComment(v));
-            sb.Append("    ").Append(member(v)).Append(",\n");
+            sb.Append("    ").Append(member(v));
+            if (values is not null) sb.Append(" = ").Append(values[v].ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\n");
         }
         sb.Append("}\n");
         return sb.ToString();

@@ -438,18 +438,67 @@ public class PartlyTranscribedMachineTests
 
         var unlisted = r.Run();
         unlisted.ExitCode.Should().NotBe(0);
-        unlisted.Stderr.Should().Contain("subroutine call \"Queue Evnet\" names no subroutine of `link_mux`");
+        unlisted.Stderr.Should().Contain("subroutine call \"Queue Evnet\" on page Idle names no subroutine of `link_mux`");
 
         File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
             defects:
               - kind: unknown_subroutine
                 machine: link_mux
+                page: Idle
                 call: Queue Evnet
                 issue: https://github.com/packethacking/ax25spec/issues/144
             """);
         var listed = r.Run();
         listed.Stderr.Should().NotContain("names no subroutine");
-        listed.Stderr.Should().Contain("::warning::").And.Contain("calls subroutine \"Queue Evnet\", which it does not define");
+        listed.Stderr.Should().Contain("::warning::").And.Contain("link_mux Idle calls subroutine \"Queue Evnet\", which it does not define");
+    }
+
+    [Fact]
+    public void An_actions_alias_does_not_hide_a_call_drawn_under_another_name()
+    {
+        // C4.4c and C4.5 call "Check I Frames Acknowledged"; C4.7a defines
+        // "Check I Frame Acknowledged". actions.yaml aliases both spellings to
+        // one verb, which must not make the call resolve.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WriteActionsCatalog("""
+            subroutine:
+              - name: Queue_Event
+                aliases:
+                  - "Queue Events"
+            """);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleCalling("Queue Events"));
+        r.WritePage("link-multiplexer/subroutines.sdl.yaml", LinkMuxSubroutines);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("subroutine call \"Queue Events\" on page Idle names no subroutine of `link_mux`");
+    }
+
+    [Fact]
+    public void An_unknown_subroutine_entry_covers_only_its_own_page()
+    {
+        // Listed for Idle, the same misspelling drawn on Seized still fails.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleCalling("Queue Evnet"));
+        r.WritePage("link-multiplexer/seized.sdl.yaml", IdleCalling("Queue Evnet").Replace("state: Idle", "state: Seized"));
+        r.WritePage("link-multiplexer/subroutines.sdl.yaml", LinkMuxSubroutines);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - kind: unknown_subroutine
+                machine: link_mux
+                page: Idle
+                call: Queue Evnet
+                issue: https://github.com/packethacking/ax25spec/issues/144
+            """);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("subroutine call \"Queue Evnet\" on page Seized names no subroutine");
+        result.Stderr.Should().NotContain("on page Idle names no subroutine");
     }
 
     [Fact]
@@ -463,6 +512,7 @@ public class PartlyTranscribedMachineTests
             defects:
               - kind: unknown_subroutine
                 machine: link_mux
+                page: Idle
                 call: Queue Event
                 issue: https://github.com/packethacking/ax25spec/issues/144
             """);
@@ -491,7 +541,7 @@ public class PartlyTranscribedMachineTests
         var result = r.Run();
 
         result.ExitCode.Should().NotBe(0);
-        result.Stderr.Should().Contain("needs machine and call");
+        result.Stderr.Should().Contain("needs machine, page (the Annex C page key) and call");
     }
 
     // ─── Catch-all family and cross-machine targets (figc6.x) ──────────

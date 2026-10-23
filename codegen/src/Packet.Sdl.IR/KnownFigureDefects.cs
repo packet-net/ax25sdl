@@ -35,6 +35,14 @@ public sealed class KnownFigureDefect
     /// <summary>unknown_subroutine only: the call's label exactly as drawn (e.g. "Select T1 Value").</summary>
     public string Call { get; set; } = "";
 
+    /// <summary>
+    /// unknown_subroutine only: the page that draws the call, as its Annex C
+    /// page key (the state, such as <c>TimerRecovery</c>, or a subroutines
+    /// page, such as <c>Subroutines</c>). One entry per page, so the entry
+    /// can't hide the same misspelling drawn somewhere else.
+    /// </summary>
+    public string Page { get; set; } = "";
+
     /// <summary>The page's <c>machine:</c>.</summary>
     public string Machine { get; set; } = "";
     /// <summary>The page's <c>state:</c>.</summary>
@@ -50,7 +58,7 @@ public sealed class KnownFigureDefect
     public string Describe() => Kind switch
     {
         MissingCatchall => $"{Machine} {State} has no catch-all input ({Issue})",
-        UnknownSubroutine => $"{Machine} calls subroutine \"{Call}\", which it does not define ({Issue})",
+        UnknownSubroutine => $"{Machine} {Page} calls subroutine \"{Call}\", which it does not define ({Issue})",
         _ => $"{Machine} {State} transition `{Transition}` leads to `{Next}` ({Issue})",
     };
 }
@@ -113,10 +121,10 @@ public static class KnownFigureDefects
             }
             if (d.Kind == KnownFigureDefect.UnknownSubroutine)
             {
-                if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.Call)
+                if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.Page) || string.IsNullOrWhiteSpace(d.Call)
                     || !string.IsNullOrWhiteSpace(d.State) || !string.IsNullOrWhiteSpace(d.Transition) || !string.IsNullOrWhiteSpace(d.Next))
                 {
-                    errors.Add($"{path}: an {KnownFigureDefect.UnknownSubroutine} entry needs machine and call (the label as drawn), and nothing else.");
+                    errors.Add($"{path}: an {KnownFigureDefect.UnknownSubroutine} entry needs machine, page (the Annex C page key) and call (the label as drawn), and nothing else.");
                     continue;
                 }
             }
@@ -125,9 +133,9 @@ public static class KnownFigureDefects
                 errors.Add($"{path}: every entry needs machine and state.");
                 continue;
             }
-            else if (!string.IsNullOrWhiteSpace(d.Call))
+            else if (!string.IsNullOrWhiteSpace(d.Call) || !string.IsNullOrWhiteSpace(d.Page))
             {
-                errors.Add($"{path}: `call` belongs only to {KnownFigureDefect.UnknownSubroutine} entries.");
+                errors.Add($"{path}: `call` and `page` belong only to {KnownFigureDefect.UnknownSubroutine} entries.");
                 continue;
             }
             if (d.Kind == KnownFigureDefect.UnknownNextState
@@ -148,7 +156,7 @@ public static class KnownFigureDefects
                            "(https://github.com/packethacking/ax25spec/issues/<number>).");
                 continue;
             }
-            if (!seen.Add((d.Kind + ":" + d.Machine, d.State + d.Call, d.Transition)))
+            if (!seen.Add((d.Kind + ":" + d.Machine, d.State + "|" + d.Page + "|" + d.Call, d.Transition)))
             {
                 errors.Add($"{path}: {d.Describe()} is listed twice.");
                 continue;

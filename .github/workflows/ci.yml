@@ -54,7 +54,7 @@ jobs:
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --csharp
       - name: assert no diff
         run: |
-          if ! git diff --exit-code -- spec/csharp/; then
+          if ! git diff --exit-code -- spec/csharp/ codegen/closed-set-values.yaml; then
             echo "::error::Generated C# files in spec/csharp/ are out of sync with the SDL YAML. Run \`dotnet run --project codegen/src/Packet.Sdl.CodeGen -- --csharp\` locally and commit the diff."
             exit 1
           fi

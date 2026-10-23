@@ -7,521 +7,521 @@
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ax25ActionVerb {
     /// `(Start T108)`
-    StartT108,
+    StartT108 = 244,
     /// `AV := 0`
-    AVAssign0,
+    AVAssign0 = 143,
     /// `Accept Receive N1 from XID Response`
-    AcceptReceiveN1FromXIDResponse,
+    AcceptReceiveN1FromXIDResponse = 145,
     /// `Accept Receive N2 from XID Response`
-    AcceptReceiveN2FromXIDResponse,
+    AcceptReceiveN2FromXIDResponse = 146,
     /// `Accept Receive T1 from XID Response`
-    AcceptReceiveT1FromXIDResponse,
+    AcceptReceiveT1FromXIDResponse = 147,
     /// `Accept Receive k from XID Response`
-    AcceptReceiveKFromXIDResponse,
+    AcceptReceiveKFromXIDResponse = 144,
     /// `Accept Transmit N1 From XID Command`
-    AcceptTransmitN1FromXIDCommand,
+    AcceptTransmitN1FromXIDCommand = 149,
     /// `Accept Transmit N2 From XID Command`
-    AcceptTransmitN2FromXIDCommand,
+    AcceptTransmitN2FromXIDCommand = 150,
     /// `Accept Transmit T1 From XID Command`
-    AcceptTransmitT1FromXIDCommand,
+    AcceptTransmitT1FromXIDCommand = 151,
     /// `Accept Transmit k From XID Command`
-    AcceptTransmitKFromXIDCommand,
+    AcceptTransmitKFromXIDCommand = 148,
     /// `Accumulate First Segment`
-    AccumulateFirstSegment,
+    AccumulateFirstSegment = 152,
     /// `Acquisition`
-    Acquisition,
+    Acquisition = 153,
     /// `Acuisition`
-    Acuisition,
+    Acuisition = 154,
     /// `Add Frame to Priority Queue`
-    AddFrameToPriorityQueue,
+    AddFrameToPriorityQueue = 155,
     /// `Add Receive COP Parameter field to XID Command`
-    AddReceiveCOPParameterFieldToXIDCommand,
+    AddReceiveCOPParameterFieldToXIDCommand = 156,
     /// `Add Receive COP Parameter field to XID Response`
-    AddReceiveCOPParameterFieldToXIDResponse,
+    AddReceiveCOPParameterFieldToXIDResponse = 157,
     /// `Add Receive N1 Parameter field to XID Command`
-    AddReceiveN1ParameterFieldToXIDCommand,
+    AddReceiveN1ParameterFieldToXIDCommand = 160,
     /// `Add Receive N1 Parameter field to XID Response`
-    AddReceiveN1ParameterFieldToXIDResponse,
+    AddReceiveN1ParameterFieldToXIDResponse = 161,
     /// `Add Receive N2 Parameter field to XID Command`
-    AddReceiveN2ParameterFieldToXIDCommand,
+    AddReceiveN2ParameterFieldToXIDCommand = 162,
     /// `Add Receive N2 Parameter field to XID Response`
-    AddReceiveN2ParameterFieldToXIDResponse,
+    AddReceiveN2ParameterFieldToXIDResponse = 163,
     /// `Add Receive OF Parameter field to XID Command`
-    AddReceiveOFParameterFieldToXIDCommand,
+    AddReceiveOFParameterFieldToXIDCommand = 164,
     /// `Add Receive OF Parameter field to XID Response`
-    AddReceiveOFParameterFieldToXIDResponse,
+    AddReceiveOFParameterFieldToXIDResponse = 165,
     /// `Add Receive T1 Parameter field to XID Command`
-    AddReceiveT1ParameterFieldToXIDCommand,
+    AddReceiveT1ParameterFieldToXIDCommand = 166,
     /// `Add Receive T1 Parameter field to XID Response`
-    AddReceiveT1ParameterFieldToXIDResponse,
+    AddReceiveT1ParameterFieldToXIDResponse = 167,
     /// `Add Receive k Parameter field to XID Command`
-    AddReceiveKParameterFieldToXIDCommand,
+    AddReceiveKParameterFieldToXIDCommand = 158,
     /// `Add Receive k Parameter field to XID Response`
-    AddReceiveKParameterFieldToXIDResponse,
+    AddReceiveKParameterFieldToXIDResponse = 159,
     /// `Add to Normal Queue`
-    AddToNormalQueue,
+    AddToNormalQueue = 168,
     /// `Add to Priority Queue`
-    AddToPriorityQueue,
+    AddToPriorityQueue = 169,
     /// `Allocate Buffers for All Segments`
-    AllocateBuffersForAllSegments,
+    AllocateBuffersForAllSegments = 170,
     /// `Assemble Last Segment to Previous`
-    AssembleLastSegmentToPrevious,
+    AssembleLastSegmentToPrevious = 171,
     /// `Assemble This Segment to Previous`
-    AssembleThisSegmentToPrevious,
+    AssembleThisSegmentToPrevious = 172,
     /// `Backtrack`
-    Backtrack,
+    Backtrack = 1,
     /// `Check Need For Response`
-    CheckNeedForResponse,
+    CheckNeedForResponse = 2,
     /// `Check_I_Frame_Acknowledged`
-    CheckIFrameAcknowledged,
+    CheckIFrameAcknowledged = 3,
     /// `Classes of Procedures Negotiation Response`
-    ClassesOfProceduresNegotiationResponse,
+    ClassesOfProceduresNegotiationResponse = 173,
     /// `Clear Acknowledge Pending`
-    ClearAcknowledgePending,
+    ClearAcknowledgePending = 4,
     /// `Clear Digipeating`
-    ClearDigipeating,
+    ClearDigipeating = 174,
     /// `Clear Exception Conditions`
-    ClearExceptionConditions,
+    ClearExceptionConditions = 5,
     /// `Clear Interrupted`
-    ClearInterrupted,
+    ClearInterrupted = 175,
     /// `Clear Layer 3 Initiated`
-    ClearLayer3Initiated,
+    ClearLayer3Initiated = 6,
     /// `Clear Own Receiver Busy`
-    ClearOwnReceiverBusy,
+    ClearOwnReceiverBusy = 7,
     /// `Clear Reject Condition`
-    ClearRejectCondition,
+    ClearRejectCondition = 8,
     /// `Clear Reject Exception`
-    ClearRejectException,
+    ClearRejectException = 9,
     /// `Clear Repeater Up`
-    ClearRepeaterUp,
+    ClearRepeaterUp = 176,
     /// `Clear Sreject Condition`
-    ClearSrejectCondition,
+    ClearSrejectCondition = 10,
     /// `Complete Classes of Procedures Negotiation`
-    CompleteClassesOfProceduresNegotiation,
+    CompleteClassesOfProceduresNegotiation = 177,
     /// `Complete N1 Negotiation`
-    CompleteN1Negotiation,
+    CompleteN1Negotiation = 178,
     /// `Complete Optional Functions Negotiation`
-    CompleteOptionalFunctionsNegotiation,
+    CompleteOptionalFunctionsNegotiation = 179,
     /// `Complete Retry Negotiation`
-    CompleteRetryNegotiation,
+    CompleteRetryNegotiation = 180,
     /// `Complete T1 Negotiation`
-    CompleteT1Negotiation,
+    CompleteT1Negotiation = 181,
     /// `Complete Window Negotiation`
-    CompleteWindowNegotiation,
+    CompleteWindowNegotiation = 182,
     /// `DISC (P = 1)`
-    DISCPEq1,
+    DISCPEq1 = 11,
     /// `DL-ERROR Indication (A)`
-    DLERRORIndicationA,
+    DLERRORIndicationA = 12,
     /// `DL-ERROR Indication (E)`
-    DLERRORIndicationE,
+    DLERRORIndicationE = 13,
     /// `DL-ERROR Indication (F)`
-    DLERRORIndicationF,
+    DLERRORIndicationF = 14,
     /// `DL-ERROR Indication (G)`
-    DLERRORIndicationG,
+    DLERRORIndicationG = 15,
     /// `DL-ERROR Indication (I)`
-    DLERRORIndicationI,
+    DLERRORIndicationI = 16,
     /// `DL-ERROR Indication (J)`
-    DLERRORIndicationJ,
+    DLERRORIndicationJ = 17,
     /// `DL-ERROR Indication (K)`
-    DLERRORIndicationK,
+    DLERRORIndicationK = 18,
     /// `DL-ERROR Indication (L)`
-    DLERRORIndicationL,
+    DLERRORIndicationL = 19,
     /// `DL-ERROR Indication (M)`
-    DLERRORIndicationM,
+    DLERRORIndicationM = 20,
     /// `DL-ERROR Indication (N)`
-    DLERRORIndicationN,
+    DLERRORIndicationN = 21,
     /// `DL-ERROR Indication (O)`
-    DLERRORIndicationO,
+    DLERRORIndicationO = 22,
     /// `DL-ERROR Indication (Q)`
-    DLERRORIndicationQ,
+    DLERRORIndicationQ = 23,
     /// `DL-ERROR Indication (T)`
-    DLERRORIndicationT,
+    DLERRORIndicationT = 24,
     /// `DL-ERROR Indication (U)`
-    DLERRORIndicationU,
+    DLERRORIndicationU = 25,
     /// `DL-ERROR Indication (Z)`
-    DLERRORIndicationZ,
+    DLERRORIndicationZ = 183,
     /// `DL-ERROR Indication (add)`
-    DLERRORIndicationAdd,
+    DLERRORIndicationAdd = 26,
     /// `DL_CONNECT_confirm`
-    DLCONNECTConfirm,
+    DLCONNECTConfirm = 27,
     /// `DL_CONNECT_indication`
-    DLCONNECTIndication,
+    DLCONNECTIndication = 28,
     /// `DL_DATA_indication`
-    DLDATAIndication,
+    DLDATAIndication = 29,
     /// `DL_DISCONNECT_confirm`
-    DLDISCONNECTConfirm,
+    DLDISCONNECTConfirm = 30,
     /// `DL_DISCONNECT_indication`
-    DLDISCONNECTIndication,
+    DLDISCONNECTIndication = 31,
     /// `DL_ERROR_indication_C_D`
-    DLERRORIndicationCD,
+    DLERRORIndicationCD = 32,
     /// `DL_ERROR_indication_D`
-    DLERRORIndicationD,
+    DLERRORIndicationD = 33,
     /// `DL_UNIT_DATA_indication`
-    DLUNITDATAIndication,
+    DLUNITDATAIndication = 34,
     /// `DM`
-    DM,
+    DM = 35,
     /// `DM (F = 1)`
-    DMFEq1,
+    DMFEq1 = 36,
     /// `DM Response (F = 0)`
-    DMResponseFEq0,
+    DMResponseFEq0 = 37,
     /// `Decrement Sreject Exception if > 0`
-    DecrementSrejectExceptionIf0,
+    DecrementSrejectExceptionIf0 = 38,
     /// `Discard All Accumulated Segments`
-    DiscardAllAccumulatedSegments,
+    DiscardAllAccumulatedSegments = 184,
     /// `Discard Contents of I Frame`
-    DiscardContentsOfIFrame,
+    DiscardContentsOfIFrame = 39,
     /// `Discard I Frame`
-    DiscardIFrame,
+    DiscardIFrame = 40,
     /// `Discard I Queue Entries`
-    DiscardIQueueEntries,
+    DiscardIQueueEntries = 41,
     /// `Discard Primitive`
-    DiscardPrimitive,
+    DiscardPrimitive = 42,
     /// `Discard Queue`
-    DiscardQueue,
+    DiscardQueue = 43,
     /// `Discard: Erroneous Primitive`
-    DiscardErroneousPrimitive,
+    DiscardErroneousPrimitive = 185,
     /// `Discard: Segment`
-    DiscardSegment,
+    DiscardSegment = 186,
     /// `Enquiry Response (F = 0)`
-    EnquiryResponseFEq0,
+    EnquiryResponseFEq0 = 44,
     /// `Enquiry_Response_F_1`
-    EnquiryResponseF1,
+    EnquiryResponseF1 = 45,
     /// `Establish_Data_Link`
-    EstablishDataLink,
+    EstablishDataLink = 46,
     /// `Expedited DM`
-    ExpeditedDM,
+    ExpeditedDM = 47,
     /// `Expedited UA`
-    ExpeditedUA,
+    ExpeditedUA = 48,
     /// `F := 0`
-    FAssign0,
+    FAssign0 = 49,
     /// `F := 1`
-    FAssign1,
+    FAssign1 = 50,
     /// `F := P`
-    FAssignP,
+    FAssignP = 51,
     /// `Free all Allocated Buffers`
-    FreeAllAllocatedBuffers,
+    FreeAllAllocatedBuffers = 187,
     /// `HW-DATA Request`
-    HWDATARequest,
+    HWDATARequest = 188,
     /// `HW-TOFF Request`
-    HWTOFFRequest,
+    HWTOFFRequest = 189,
     /// `HW-TON Request`
-    HWTONRequest,
+    HWTONRequest = 190,
     /// `I Command`
-    ICommand,
+    ICommand = 52,
     /// `Increment Sreject Exception`
-    IncrementSrejectException,
+    IncrementSrejectException = 53,
     /// `Initiate Classes of Procedures Negotiation`
-    InitiateClassesOfProceduresNegotiation,
+    InitiateClassesOfProceduresNegotiation = 191,
     /// `Initiate N1 Negotiation`
-    InitiateN1Negotiation,
+    InitiateN1Negotiation = 192,
     /// `Initiate Optional Functions Negotiation`
-    InitiateOptionalFunctionsNegotiation,
+    InitiateOptionalFunctionsNegotiation = 193,
     /// `Initiate Retry Negotiation`
-    InitiateRetryNegotiation,
+    InitiateRetryNegotiation = 194,
     /// `Initiate T1 Negotiation`
-    InitiateT1Negotiation,
+    InitiateT1Negotiation = 195,
     /// `Initiate Window Negotiation`
-    InitiateWindowNegotiation,
+    InitiateWindowNegotiation = 196,
     /// `Invoke Retransmission`
-    InvokeRetransmission,
+    InvokeRetransmission = 54,
     /// `LM_data_request`
-    LMDataRequest,
+    LMDataRequest = 55,
     /// `LM_release_request`
-    LMReleaseRequest,
+    LMReleaseRequest = 56,
     /// `LM_seize_request`
-    LMSeizeRequest,
+    LMSeizeRequest = 57,
     /// `MDL-NEGOTIATE Request`
-    MDLNEGOTIATERequest,
+    MDLNEGOTIATERequest = 58,
     /// `MDL_ERROR_indicate_A`
-    MDLERRORIndicateA,
+    MDLERRORIndicateA = 197,
     /// `MDL_ERROR_indicate_B`
-    MDLERRORIndicateB,
+    MDLERRORIndicateB = 59,
     /// `MDL_ERROR_indicate_C`
-    MDLERRORIndicateC,
+    MDLERRORIndicateC = 60,
     /// `MDL_ERROR_indicate_D`
-    MDLERRORIndicateD,
+    MDLERRORIndicateD = 61,
     /// `MDL_ERROR_indicate_E`
-    MDLERRORIndicateE,
+    MDLERRORIndicateE = 198,
     /// `MDL_NEGOTIATE_confirm`
-    MDLNEGOTIATEConfirm,
+    MDLNEGOTIATEConfirm = 62,
     /// `Modulo := 128`
-    ModuloAssign128,
+    ModuloAssign128 = 63,
     /// `Modulo := 8`
-    ModuloAssign8,
+    ModuloAssign8 = 64,
     /// `N := Remaining Segment Number`
-    NAssignRemainingSegmentNumber,
+    NAssignRemainingSegmentNumber = 200,
     /// `N(r) := N(s)`
-    NRAssignNS,
+    NRAssignNS = 65,
     /// `N(r) := V(r)`
-    NRAssignVR,
+    NRAssignVR = 66,
     /// `N(r) Error Recovery`
-    NRErrorRecovery,
+    NRErrorRecovery = 67,
     /// `N(r) Recovery`
-    NRRecovery,
+    NRRecovery = 68,
     /// `N(s) := V(s)`
-    NSAssignVS,
+    NSAssignVS = 69,
     /// `N1 := 2048`
-    N1Assign2048,
+    N1Assign2048 = 70,
     /// `N1 Negotiation Response`
-    N1NegotiationResponse,
+    N1NegotiationResponse = 199,
     /// `N2 := 10`
-    N2Assign10,
+    N2Assign10 = 71,
     /// `Next T1 := (RC*0.25)+SRT*2`
-    NextT1AssignRCTimes025PlusSRTTimes2,
+    NextT1AssignRCTimes025PlusSRTTimes2 = 72,
     /// `Next T1 := 2 * SRT`
-    NextT1Assign2TimesSRT,
+    NextT1Assign2TimesSRT = 73,
     /// `Optional Functions Negotiation Response`
-    OptionalFunctionsNegotiationResponse,
+    OptionalFunctionsNegotiationResponse = 201,
     /// `P := 0`
-    PAssign0,
+    PAssign0 = 74,
     /// `P := 1`
-    PAssign1,
+    PAssign1 = 75,
     /// `PH-BUSY Indication`
-    PHBUSYIndication,
+    PHBUSYIndication = 202,
     /// `PH-DATA Indication`
-    PHDATAIndication,
+    PHDATAIndication = 203,
     /// `PH-QUIET Indication`
-    PHQUIETIndication,
+    PHQUIETIndication = 204,
     /// `PH_SEIZE_confirm`
-    PHSEIZEConfirm,
+    PHSEIZEConfirm = 205,
     /// `Push I Frame on I Queue`
-    PushIFrameOnIQueue,
+    PushIFrameOnIQueue = 76,
     /// `Push Old I Frame N(r) on Queue`
-    PushOldIFrameNROnQueue,
+    PushOldIFrameNROnQueue = 77,
     /// `Push Old I Frame onto Queue`
-    PushOldIFrameOntoQueue,
+    PushOldIFrameOntoQueue = 78,
     /// `Push on I Frame Queue`
-    PushOnIFrameQueue,
+    PushOnIFrameQueue = 79,
     /// `Push on I Frame Queue (note: word order?)`
-    PushOnIFrameQueueNoteWordOrder,
+    PushOnIFrameQueueNoteWordOrder = 80,
     /// `R := Random Number in Range 0 to 255`
-    RAssignRandomNumberInRange0To255,
+    RAssignRandomNumberInRange0To255 = 206,
     /// `RC := 0`
-    RCAssign0,
+    RCAssign0 = 81,
     /// `RC := 1`
-    RCAssign1,
+    RCAssign1 = 82,
     /// `RC := RC + 1`
-    RCAssignRCPlus1,
+    RCAssignRCPlus1 = 83,
     /// `REJ`
-    REJ,
+    REJ = 84,
     /// `RNR`
-    RNR,
+    RNR = 85,
     /// `RNR Command`
-    RNRCommand,
+    RNRCommand = 86,
     /// `RNR Response`
-    RNRResponse,
+    RNRResponse = 87,
     /// `RNR Response (F = 0)`
-    RNRResponseFEq0,
+    RNRResponseFEq0 = 88,
     /// `RR`
-    RR,
+    RR = 89,
     /// `RR Command`
-    RRCommand,
+    RRCommand = 90,
     /// `RR Command (P = 0)`
-    RRCommandPEq0,
+    RRCommandPEq0 = 91,
     /// `RR Response`
-    RRResponse,
+    RRResponse = 92,
     /// `Restart TR210`
-    RestartTR210,
+    RestartTR210 = 207,
     /// `Resume Processing Normal Queue`
-    ResumeProcessingNormalQueue,
+    ResumeProcessingNormalQueue = 208,
     /// `Resume Processing Priority Queue`
-    ResumeProcessingPriorityQueue,
+    ResumeProcessingPriorityQueue = 209,
     /// `Retransmit XID Command`
-    RetransmitXIDCommand,
+    RetransmitXIDCommand = 210,
     /// `Retrieve Stored V(r) I Frame`
-    RetrieveStoredVRIFrame,
+    RetrieveStoredVRIFrame = 93,
     /// `Retry Negotiation Response`
-    RetryNegotiationResponse,
+    RetryNegotiationResponse = 211,
     /// `SABM`
-    SABM,
+    SABM = 94,
     /// `SABM (P == 1)`
-    SABMPEqEq1,
+    SABMPEqEq1 = 95,
     /// `SABME`
-    SABME,
+    SABME = 96,
     /// `SABME (P = 1)`
-    SABMEPEq1,
+    SABMEPEq1 = 97,
     /// `SREJ`
-    SREJ,
+    SREJ = 98,
     /// `SRT := 7(SRT)/8 + (T1)/8 - (Remaining Time on T1 When Last Stopped)/8`
-    SRTAssign7SRT8PlusT18RemainingTimeOnT1WhenLastStopped8,
+    SRTAssign7SRT8PlusT18RemainingTimeOnT1WhenLastStopped8 = 99,
     /// `SRT := Initial Default`
-    SRTAssignInitialDefault,
+    SRTAssignInitialDefault = 100,
     /// `Save Contents of I Frame`
-    SaveContentsOfIFrame,
+    SaveContentsOfIFrame = 101,
     /// `Select Required Functions`
-    SelectRequiredFunctions,
+    SelectRequiredFunctions = 212,
     /// `Select_T1_Value`
-    SelectT1Value,
+    SelectT1Value = 102,
     /// `Send Unmodified Primitive`
-    SendUnmodifiedPrimitive,
+    SendUnmodifiedPrimitive = 213,
     /// `Set Digipeater`
-    SetDigipeater,
+    SetDigipeater = 214,
     /// `Set Digipeating`
-    SetDigipeating,
+    SetDigipeating = 215,
     /// `Set Extended`
-    SetExtended,
+    SetExtended = 217,
     /// `Set Full Duplex`
-    SetFullDuplex,
+    SetFullDuplex = 218,
     /// `Set Full or Half Duplex`
-    SetFullOrHalfDuplex,
+    SetFullOrHalfDuplex = 219,
     /// `Set Half Duplex`
-    SetHalfDuplex,
+    SetHalfDuplex = 103,
     /// `Set Implicit Reject`
-    SetImplicitReject,
+    SetImplicitReject = 104,
     /// `Set Interrupted`
-    SetInterrupted,
+    SetInterrupted = 220,
     /// `Set Layer 3 Initiated`
-    SetLayer3Initiated,
+    SetLayer3Initiated = 105,
     /// `Set Normal`
-    SetNormal,
+    SetNormal = 221,
     /// `Set Own Receiver Busy`
-    SetOwnReceiverBusy,
+    SetOwnReceiverBusy = 106,
     /// `Set Receive N1 to Default`
-    SetReceiveN1ToDefault,
+    SetReceiveN1ToDefault = 223,
     /// `Set Receive N2 to Default`
-    SetReceiveN2ToDefault,
+    SetReceiveN2ToDefault = 224,
     /// `Set Receive T1 to Default`
-    SetReceiveT1ToDefault,
+    SetReceiveT1ToDefault = 225,
     /// `Set Receive k to Default`
-    SetReceiveKToDefault,
+    SetReceiveKToDefault = 222,
     /// `Set Reject Exception`
-    SetRejectException,
+    SetRejectException = 107,
     /// `Set Repeater Up`
-    SetRepeaterUp,
+    SetRepeaterUp = 226,
     /// `Set Segmentor Off`
-    SetSegmentorOff,
+    SetSegmentorOff = 227,
     /// `Set Selective Reject`
-    SetSelectiveReject,
+    SetSelectiveReject = 108,
     /// `Set Selective Reject/Reject`
-    SetSelectiveRejectReject,
+    SetSelectiveRejectReject = 228,
     /// `Set Transmit N1 to Default`
-    SetTransmitN1ToDefault,
+    SetTransmitN1ToDefault = 230,
     /// `Set Transmit N2 to Default`
-    SetTransmitN2ToDefault,
+    SetTransmitN2ToDefault = 231,
     /// `Set Transmit T1 to Default`
-    SetTransmitT1ToDefault,
+    SetTransmitT1ToDefault = 232,
     /// `Set Transmit k to Default`
-    SetTransmitKToDefault,
+    SetTransmitKToDefault = 229,
     /// `Set Version 2.0 Defaults`
-    SetVersion20Defaults,
+    SetVersion20Defaults = 233,
     /// `Set Version 2.2`
-    SetVersion22,
+    SetVersion22 = 109,
     /// `Set_Digipeating_bracketed`
-    SetDigipeatingBracketed,
+    SetDigipeatingBracketed = 216,
     /// `Sreject := Sreject + 1`
-    SrejectAssignSrejectPlus1,
+    SrejectAssignSrejectPlus1 = 110,
     /// `Start T1`
-    StartT1,
+    StartT1 = 111,
     /// `Start T100`
-    StartT100,
+    StartT100 = 234,
     /// `Start T101`
-    StartT101,
+    StartT101 = 236,
     /// `Start T102`
-    StartT102,
+    StartT102 = 237,
     /// `Start T103.`
-    StartT103,
+    StartT103 = 238,
     /// `Start T104`
-    StartT104,
+    StartT104 = 239,
     /// `Start T105`
-    StartT105,
+    StartT105 = 240,
     /// `Start T106`
-    StartT106,
+    StartT106 = 241,
     /// `Start T106 (T108?)`
-    StartT106T108,
+    StartT106T108 = 242,
     /// `Start T107`
-    StartT107,
+    StartT107 = 243,
     /// `Start T3`
-    StartT3,
+    StartT3 = 112,
     /// `Start TM201`
-    StartTM201,
+    StartTM201 = 113,
     /// `Start TR210`
-    StartTR210,
+    StartTR210 = 245,
     /// `Start Transmitter`
-    StartTransmitter,
+    StartTransmitter = 246,
     /// `Start_T100_bracketed`
-    StartT100Bracketed,
+    StartT100Bracketed = 235,
     /// `Stop All Timer Except T100.`
-    StopAllTimerExceptT100,
+    StopAllTimerExceptT100 = 247,
     /// `Stop All Timers`
-    StopAllTimers,
+    StopAllTimers = 248,
     /// `Stop T1`
-    StopT1,
+    StopT1 = 114,
     /// `Stop T106`
-    StopT106,
+    StopT106 = 249,
     /// `Stop T107`
-    StopT107,
+    StopT107 = 250,
     /// `Stop T3`
-    StopT3,
+    StopT3 = 115,
     /// `Stop TM201`
-    StopTM201,
+    StopTM201 = 116,
     /// `Stop TR210`
-    StopTR210,
+    StopTR210 = 251,
     /// `Stsrt T103`
-    StsrtT103,
+    StsrtT103 = 252,
     /// `Suspend All Queue Processing`
-    SuspendAllQueueProcessing,
+    SuspendAllQueueProcessing = 253,
     /// `Suspend Priority and Normal Queue Processing`
-    SuspendPriorityAndNormalQueueProcessing,
+    SuspendPriorityAndNormalQueueProcessing = 254,
     /// `Suspend Processing Priority Queue`
-    SuspendProcessingPriorityQueue,
+    SuspendProcessingPriorityQueue = 255,
     /// `T1 Negotiation Response`
-    T1NegotiationResponse,
+    T1NegotiationResponse = 256,
     /// `T1V := 2 * SRT`
-    T1VAssign2TimesSRT,
+    T1VAssign2TimesSRT = 117,
     /// `T2 := 3000`
-    T2Assign3000,
+    T2Assign3000 = 118,
     /// `Transmit Enquery`
-    TransmitEnquery,
+    TransmitEnquery = 119,
     /// `Transmit Enquiry`
-    TransmitEnquiry,
+    TransmitEnquiry = 120,
     /// `Turn Off Transmitter`
-    TurnOffTransmitter,
+    TurnOffTransmitter = 257,
     /// `UA`
-    UA,
+    UA = 121,
     /// `UI Check`
-    UICheck,
+    UICheck = 122,
     /// `UI Command`
-    UICommand,
+    UICommand = 123,
     /// `V(a) := 0`
-    VAAssign0,
+    VAAssign0 = 124,
     /// `V(a) := N(r)`
-    VAAssignNR,
+    VAAssignNR = 125,
     /// `V(r) := 0`
-    VRAssign0,
+    VRAssign0 = 126,
     /// `V(r) := V(r) + 1`
-    VRAssignVRPlus1,
+    VRAssignVRPlus1 = 127,
     /// `V(r) := V(r) - 1`
-    VRAssignVR1,
+    VRAssignVR1 = 128,
     /// `V(s) := 0`
-    VSAssign0,
+    VSAssign0 = 129,
     /// `V(s) := N(r)`
-    VSAssignNR,
+    VSAssignNR = 130,
     /// `V(s) := V(s) + 1`
-    VSAssignVSPlus1,
+    VSAssignVSPlus1 = 131,
     /// `Window Negotiation Response`
-    WindowNegotiationResponse,
+    WindowNegotiationResponse = 258,
     /// `X := V(s)`
-    XAssignVS,
+    XAssignVS = 132,
     /// `XID Command`
-    XIDCommand,
+    XIDCommand = 133,
     /// `XID Response`
-    XIDResponse,
+    XIDResponse = 259,
     /// `clear_peer_receiver_busy`
-    ClearPeerReceiverBusy,
+    ClearPeerReceiverBusy = 134,
     /// `discard_I_frame_queue`
-    DiscardIFrameQueue,
+    DiscardIFrameQueue = 135,
     /// `discard_frame_queue`
-    DiscardFrameQueue,
+    DiscardFrameQueue = 136,
     /// `k := 32`
-    KAssign32,
+    KAssign32 = 137,
     /// `k := 8`
-    KAssign8,
+    KAssign8 = 138,
     /// `push_frame_on_queue`
-    PushFrameOnQueue,
+    PushFrameOnQueue = 139,
     /// `set_acknowledge_pending`
-    SetAcknowledgePending,
+    SetAcknowledgePending = 140,
     /// `set_peer_receiver_busy`
-    SetPeerReceiverBusy,
+    SetPeerReceiverBusy = 141,
     /// `set_version_2_0`
-    SetVersion20,
+    SetVersion20 = 142,
 }
