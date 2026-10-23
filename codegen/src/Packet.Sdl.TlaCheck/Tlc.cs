@@ -224,18 +224,34 @@ public sealed class Tlc
         return Parse(text, sw.Elapsed);
     }
 
-    private static readonly Regex ArmsField = new(@"arms \|->\s*\{([^}]*)\}", RegexOptions.Singleline);
     private static readonly Regex Quoted = new(@"""((?:[^""\\]|\\.)*)""");
 
-    /// <summary>The table arms (State/transition, Subroutine:path) on any state of a Coverage run's dump.</summary>
+    /// <summary>
+    /// The table arms (State/transition, Subroutine:path) on any state of a
+    /// Coverage run's dump. The dump of a large cell runs to gigabytes, so it
+    /// is streamed a line at a time and deleted once read.
+    /// </summary>
     public static HashSet<string> ReadArms(string workDir)
     {
         var arms = new HashSet<string>(StringComparer.Ordinal);
         var dump = Path.Combine(workDir, "states.dump");
         if (!File.Exists(dump)) return arms;
-        foreach (Match m in ArmsField.Matches(File.ReadAllText(dump)))
-            foreach (Match q in Quoted.Matches(m.Groups[1].Value))
-                arms.Add(q.Groups[1].Value);
+        StringBuilder? field = null;
+        foreach (var line in File.ReadLines(dump))
+        {
+            var at = line.IndexOf("arms |->", StringComparison.Ordinal);
+            if (field is null && at < 0) continue;
+            field ??= new StringBuilder();
+            field.Append(at >= 0 ? line[at..] : line).Append(' ');
+            var text = field.ToString();
+            var open = text.IndexOf('{', StringComparison.Ordinal);
+            if (open < 0) continue;
+            var close = text.IndexOf('}', open);
+            if (close < 0) continue;
+            foreach (Match q in Quoted.Matches(text[open..close])) arms.Add(q.Groups[1].Value);
+            field = null;
+        }
+        File.Delete(dump);
         return arms;
     }
 
