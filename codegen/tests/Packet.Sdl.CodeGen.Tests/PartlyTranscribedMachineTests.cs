@@ -356,7 +356,7 @@ public class PartlyTranscribedMachineTests
         var result = r.Run();
 
         result.ExitCode.Should().NotBe(0);
-        result.Stderr.Should().Contain("has no transition triggered by any of").And.Contain("missing_catchall");
+        result.Stderr.Should().Contain("has no transition triggered by a catch-all event").And.Contain("missing_catchall");
     }
 
     [Fact]
@@ -492,6 +492,68 @@ public class PartlyTranscribedMachineTests
 
         result.ExitCode.Should().NotBe(0);
         result.Stderr.Should().Contain("needs machine and call");
+    }
+
+    // ─── Catch-all family and cross-machine targets (figc6.x) ──────────
+
+    [Fact]
+    public void All_other_DL_primitives_counts_as_a_catchall()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events + "\n  - all_other_dl_primitives__from_lower_layer\n");
+        r.WritePage("reassembler/ready.sdl.yaml", """
+            machine: reassembler
+            state: Ready
+            source: { spec: test, figure: figc6.2 }
+            transitions:
+              - id: t01_all_other_dl_primitives__from_lower_layer
+                on: all_other_dl_primitives__from_lower_layer
+                path: []
+                next: Ready
+            """);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}\nstdout: {result.Stdout}");
+    }
+
+    [Fact]
+    public void A_target_that_is_another_machines_state_says_so()
+    {
+        // figc6.1 (Segmenter Ready) leads to Reassembling Data, a Reassembler state.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("segmenter/ready.sdl.yaml", """
+            machine: segmenter
+            state: Ready
+            source: { spec: test, figure: figc6.1 }
+            transitions:
+              - id: t01_dl_disconnect_request
+                on: DL_DISCONNECT_request
+                path: []
+                next: ReassemblingData
+              - id: t02_all_other_primitives__from_upper_layer
+                on: all_other_primitives__from_upper_layer
+                path: []
+                next: Ready
+            """);
+
+        var result = r.Run();
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("`ReassemblingData` is a state of `reassembler`, a different machine");
+
+        // Listed as a known figure defect, the Segmenter is withheld instead.
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - machine: segmenter
+                state: Ready
+                transition: t01_dl_disconnect_request
+                next: ReassemblingData
+                issue: https://github.com/packethacking/ax25spec/issues/140
+            """);
+        var listed = r.Run();
+        listed.ExitCode.Should().Be(0, $"stderr: {listed.Stderr}");
+        listed.Stdout.Should().Contain("withheld  segmenter: ReassemblingData (known figure defect");
     }
 
     [Fact]

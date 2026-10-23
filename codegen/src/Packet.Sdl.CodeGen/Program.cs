@@ -1109,10 +1109,15 @@ internal static class Program
                     missingKnown.Add($"{t.Next} (known figure defect, {known.Issue})");
                     continue;
                 }
+                var owners = AnnexC.Pages
+                    .Where(p => !p.IsSubroutines && p.Key == t.Next && p.Machine != page.Machine)
+                    .Select(p => p.Machine).Distinct().ToList();
+                var elsewhere = owners.Count == 0 ? ""
+                    : $"`{t.Next}` is a state of {string.Join(" and ", owners.Select(o => $"`{o}`"))}, a different machine: a page can only lead to its own machine's states. ";
                 errors.Add(
                     $"{page.SourcePath}: transition `{t.Id}` targets state `{t.Next}` which is not " +
                     $"a known state in machine `{page.Machine}` (transcribed: {string.Join(", ", validStates.OrderBy(x => x, StringComparer.Ordinal))}; " +
-                    $"Annex C: {string.Join(", ", annexStates)}). " +
+                    $"Annex C: {string.Join(", ", annexStates)}). " + elsewhere +
                     "Typo, OR the figure names a state Annex C does not have: raise it as an issue against the figure, " +
                     $"and list it in spec-sdl/{KnownFigureDefects.FileName} with the issue URL.");
             }
@@ -1260,12 +1265,9 @@ internal static class Program
     /// full event coverage (deciding which events a state should handle
     /// is the spec author's call).
     /// </summary>
-    private static readonly string[] CatchallEvents =
-    {
-        "all_other_primitives__from_lower_layer",
-        "all_other_primitives__from_upper_layer",
-        "all_other_commands",
-    };
+    // The catch-all family is IR's CatchallEvents: any id starting
+    // `all_other_` (all_other_primitives__*, all_other_commands,
+    // all_other_dl_primitives__* from figc6.x, ...).
 
     private static void LintCatchallCoverage(List<SdlPage> pages, List<KnownFigureDefect> knownDefects, List<string> errors)
     {
@@ -1278,7 +1280,7 @@ internal static class Program
             // catchall requirement applies once the page is complete.
             if (string.Equals(page.Coverage, "partial", StringComparison.OrdinalIgnoreCase)) continue;
 
-            bool hasCatchall = page.Transitions.Any(t => CatchallEvents.Contains(t.On, StringComparer.Ordinal));
+            bool hasCatchall = page.Transitions.Any(t => CatchallEvents.IsCatchall(t.On));
             var known = exempt.FirstOrDefault(d => d.Machine == page.Machine && d.State == page.State);
             if (known is not null)
             {
@@ -1302,8 +1304,8 @@ internal static class Program
             if (!hasCatchall)
             {
                 errors.Add(
-                    $"{page.SourcePath}: state `{page.State}` has no transition triggered by any of " +
-                    $"`{string.Join("` / `", CatchallEvents)}`. Add a catchall transition (or mark the page " +
+                    $"{page.SourcePath}: state `{page.State}` has no transition triggered by a catch-all event " +
+                    $"(`{CatchallEvents.Prefix}...`, such as all_other_primitives__from_upper_layer). Add a catchall transition (or mark the page " +
                     "`coverage: partial` if this is a work-in-progress transcription) so events not " +
                     "explicitly handled don't silently no-op at runtime. If the figure itself draws none, raise it " +
                     $"as an ax25spec issue and list it in spec-sdl/{KnownFigureDefects.FileName} as {KnownFigureDefect.MissingCatchall}.");

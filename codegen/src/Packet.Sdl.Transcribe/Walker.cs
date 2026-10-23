@@ -76,7 +76,7 @@ public static class Walker
             // colliding group's paths forward and find the first path element
             // that differs; append a sanitised form to the id so consumers
             // can map the id back to a figure-recognisable element.
-            foreach (var t in DisambiguateColliding(perTriggerTransitions, triggerEvent, triggerNode.Label))
+            foreach (var t in DisambiguateColliding(perTriggerTransitions, triggerEvent, EventResolver.NormaliseTriggerLabel(triggerNode.Label)))
                 page.Transitions.Add(t);
         }
 

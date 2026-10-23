@@ -266,15 +266,20 @@ public class TranscribeTests
     [InlineData("All Other DL Primitives", "Signal reception from lower layer", "all_other_dl_primitives__from_lower_layer")]
     [InlineData("Queue Empty",             "Internal Signal Reception",         "queue_empty")]
     [InlineData("PH-DATA\nIndication",     "Signal reception from lower layer", "PH_DATA_indication")]
+    // A name wrapped at a "-" or "_" joins with no space (C2b.5 draws
+    // "PH-" / "EXPEDITED_" / "DATA" / "Request"), however it was typed.
+    [InlineData("PH-\nEXPEDITED_\nDATA\nRequest", "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
+    [InlineData("PH-EXPEDITED_ DATA Request",  "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
+    // C2a.7's input names two timers with a "?"; the id names both.
+    [InlineData("T106 Expiry Or T108?",        "Internal Signal Reception",         "T106_or_T108_expiry")]
+    [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer", "LM_EXPEDITED_DATA_request")]
     public void EventResolver_canonicalises_trigger_labels(string label, string shapeClass, string expected)
     {
         EventResolver.ResolveTriggerEvent(label, shapeClass).Should().Be(expected);
     }
 
     [Theory]
-    [InlineData("T106 Expiry Or T108?", "Internal Signal Reception")]
-    [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer")]
-    [InlineData("LM-\nDATA Request",             "Signal reception from upper layer")]
+    [InlineData("T106 Expiry Or T108?", "Signal reception from lower layer")]   // only the C2a.7 shape is mapped
     [InlineData("PH-EXPEDITED DATA Request",      "Signal reception from upper layer")]
     [InlineData("PH-DATA Request Now",            "Signal reception from upper layer")]
     public void EventResolver_rejects_a_label_with_no_rule_rather_than_emit_a_bad_id(string label, string shapeClass)
@@ -540,6 +545,26 @@ public class TranscribeTests
         var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().Throw<System.IO.InvalidDataException>().WithMessage("*guarded*");
+    }
+
+    [Theory]
+    [InlineData("PH-\nEXPEDITED_\nDATA\nRequest")]
+    [InlineData("PH-EXPEDITED_ DATA Request")]
+    [InlineData("PH-EXPEDITED_DATA  Request")]
+    public void On_label_records_a_wrapped_name_joined(string drawn)
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "2 Transmitting", 0, 0),
+            new("n1", "Signal reception from upper layer", drawn, 0, 1),
+            new("n2", "State", "2 Transmitting", 0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+
+        var t = Walker.Walk(new GraphmlGraph("synthetic", nodes, edges), "DuplexPhy_Transmitting.graphml").Transitions.Single();
+
+        t.On.Should().Be("PH_EXPEDITED_DATA_request");
+        t.OnLabel.Should().Be("PH-EXPEDITED_DATA Request");
     }
 
     // ─── Save columns ─────────────────────────────────────────────────

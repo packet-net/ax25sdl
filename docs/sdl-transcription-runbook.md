@@ -165,8 +165,15 @@ The yaml must not depend on how a page happens to be drawn or stored, so two cor
 
 ## Labels
 
-- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces are read as single spaces, so a primitive with a break or a space inside its name (`LM-` then `DATA Request`, or `PH-EXPEDITED DATA Request`) is rejected rather than given a different id.
-- **Each line of an action box is one action.** A box that lists statements one per line (`V(s) <- 0` then `V(a) <- 0`) becomes that many path steps, in order. So put a hard line break only where the figure starts a new statement; type a long single statement (`Move all events submitted by current DL to Current Queue`) on one line and let yEd wrap it.
+- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces are read as single spaces.
+- **A name wrapped at a "-" or "_" joins with no space.** The figures wrap long primitive names at their dashes and underscores. C2b.5 prints "PH-" / "EXPEDITED_" / "DATA" / "Request" on four lines: type `PH-EXPEDITED_DATA Request`. The walker joins a break or space straight after a "-" or "_" in a primitive label anyway, so `PH-EXPEDITED_ DATA Request` gives the same id and `on_label`. A space inside the name anywhere else (`PH-EXPEDITED DATA Request`) is rejected rather than given a different id.
+- **One statement, one line.** Each line of an action box becomes one action, in order. So type one line per statement, and decide what a statement is by these rules, applied in order:
+  1. **A line in brackets is its own statement.** C2a.5 prints "Resume / Processing Priority / Queue" and then "(Set Digipeating)" on a line of its own: that is two actions, `Resume Processing Priority Queue` and `(Set Digipeating)`. C2a.6's box "Clear Digipeating / (Start T100) / (Start T108) / Suspend Processing Priority Queue" is four.
+  2. **An assignment is its own statement.** `V(s) <- 0` and `V(a) <- 0` on two lines are two actions.
+  3. **A line that starts with a verb starts a new statement** (Start, Stop, Set, Clear, Discard, Push, Move, Resume, Suspend and so on).
+  4. **Any other line continues the line above.** It is the figure wrapping a long statement because the box is narrow. C2b.1's box prints "Discard:" / "Erroneous" / "Primitive": only the first line starts with a verb, so it is one action, `Discard: Erroneous Primitive`. C3.1's `Move all events submitted by current DL to Current Queue` is one action however it wraps.
+
+  Join a continued statement onto one line with single spaces, and let yEd wrap it visually. Never put a hard line break inside a statement.
 - Assignment arrows: `<-` and the arrow character `←` are equivalent. Type either; both become `:=` in the yaml, so two transcribers who chose differently still get the same file.
 - A decision's question is copied into `question:` as drawn, and its `predicate:` is derived from it. Type it on one line. Where the figure sets the "?" apart (on its own line, or after a gap, as in C5.3's "Full Duplex Acceptable ?"), type it after one space: `Full Duplex Acceptable ?`. A line break in a question is read as a single space, so a "?" typed on its own line gives the same yaml. Keep any other spacing as drawn; the predicate ignores it.
 
