@@ -1,0 +1,237 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "simplex_phy",
+  "state": "Transmitting",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2a.5",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_ph_expedited_data_request",
+      "from": "Transmitting",
+      "on": "PH_EXPEDITED_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add Frame to Priority Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_ph_seize_request",
+      "from": "Transmitting",
+      "on": "PH_SEIZE_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "PH_SEIZE_confirm",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_ph_data_request",
+      "from": "Transmitting",
+      "on": "PH_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-DATA Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_all_other_primitives__from_upper_layer",
+      "from": "Transmitting",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_t106_expiry",
+      "from": "Transmitting",
+      "on": "T106_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Stop T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend All Queue Processing",
+          "kind": "processing"
+        },
+        {
+          "verb": "Turn Off Transmitter",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Start T106 (T108?)",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_t107_expiry_yes",
+      "from": "Transmitting",
+      "on": "T107_expiry",
+      "guard": "priority_queue_empty",
+      "actions": [
+        {
+          "verb": "Set Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend All Queue Processing",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T106",
+          "kind": "processing"
+        },
+        {
+          "verb": "Turn Off Transmitter",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Start T106 (T108?)",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_t107_expiry_no",
+      "from": "Transmitting",
+      "on": "T107_expiry",
+      "guard": "not priority_queue_empty",
+      "actions": [
+        {
+          "verb": "Set Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend All Queue Processing",
+          "kind": "processing"
+        },
+        {
+          "verb": "Resume Processing Priority Queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set_Digipeating_bracketed",
+          "kind": "processing"
+        }
+      ],
+      "next": "Digipeating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_ph_release_request_yes",
+      "from": "Transmitting",
+      "on": "PH_RELEASE_request",
+      "guard": "priority_queue_empty",
+      "actions": [
+        {
+          "verb": "Stop T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend All Queue Processing",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T106",
+          "kind": "processing"
+        },
+        {
+          "verb": "Turn Off Transmitter",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Start T106 (T108?)",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t07_ph_release_request_no",
+      "from": "Transmitting",
+      "on": "PH_RELEASE_request",
+      "guard": "not priority_queue_empty",
+      "actions": [
+        {
+          "verb": "Stop T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "Clear Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend All Queue Processing",
+          "kind": "processing"
+        },
+        {
+          "verb": "Resume Processing Priority Queue",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set_Digipeating_bracketed",
+          "kind": "processing"
+        }
+      ],
+      "next": "Digipeating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

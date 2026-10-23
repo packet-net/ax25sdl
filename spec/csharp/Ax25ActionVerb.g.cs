@@ -11,6 +11,8 @@ namespace Packet.Ax25.Sdl;
 /// </summary>
 public enum Ax25ActionVerb
 {
+    /// <summary><c>(Start T108)</c></summary>
+    StartT108,
     /// <summary><c>AV := 0</c></summary>
     AVAssign0,
     /// <summary><c>Accept Receive N1 from XID Response</c></summary>
@@ -29,6 +31,14 @@ public enum Ax25ActionVerb
     AcceptTransmitT1FromXIDCommand,
     /// <summary><c>Accept Transmit k From XID Command</c></summary>
     AcceptTransmitKFromXIDCommand,
+    /// <summary><c>Accumulate First Segment</c></summary>
+    AccumulateFirstSegment,
+    /// <summary><c>Acquisition</c></summary>
+    Acquisition,
+    /// <summary><c>Acuisition</c></summary>
+    Acuisition,
+    /// <summary><c>Add Frame to Priority Queue</c></summary>
+    AddFrameToPriorityQueue,
     /// <summary><c>Add Receive COP Parameter field to XID Command</c></summary>
     AddReceiveCOPParameterFieldToXIDCommand,
     /// <summary><c>Add Receive COP Parameter field to XID Response</c></summary>
@@ -53,6 +63,16 @@ public enum Ax25ActionVerb
     AddReceiveKParameterFieldToXIDCommand,
     /// <summary><c>Add Receive k Parameter field to XID Response</c></summary>
     AddReceiveKParameterFieldToXIDResponse,
+    /// <summary><c>Add to Normal Queue</c></summary>
+    AddToNormalQueue,
+    /// <summary><c>Add to Priority Queue</c></summary>
+    AddToPriorityQueue,
+    /// <summary><c>Allocate Buffers for All Segments</c></summary>
+    AllocateBuffersForAllSegments,
+    /// <summary><c>Assemble Last Segment to Previous</c></summary>
+    AssembleLastSegmentToPrevious,
+    /// <summary><c>Assemble This Segment to Previous</c></summary>
+    AssembleThisSegmentToPrevious,
     /// <summary><c>Backtrack</c></summary>
     Backtrack,
     /// <summary><c>Check Need For Response</c></summary>
@@ -63,8 +83,12 @@ public enum Ax25ActionVerb
     ClassesOfProceduresNegotiationResponse,
     /// <summary><c>Clear Acknowledge Pending</c></summary>
     ClearAcknowledgePending,
+    /// <summary><c>Clear Digipeating</c></summary>
+    ClearDigipeating,
     /// <summary><c>Clear Exception Conditions</c></summary>
     ClearExceptionConditions,
+    /// <summary><c>Clear Interrupted</c></summary>
+    ClearInterrupted,
     /// <summary><c>Clear Layer 3 Initiated</c></summary>
     ClearLayer3Initiated,
     /// <summary><c>Clear Own Receiver Busy</c></summary>
@@ -73,6 +97,8 @@ public enum Ax25ActionVerb
     ClearRejectCondition,
     /// <summary><c>Clear Reject Exception</c></summary>
     ClearRejectException,
+    /// <summary><c>Clear Repeater Up</c></summary>
+    ClearRepeaterUp,
     /// <summary><c>Clear Sreject Condition</c></summary>
     ClearSrejectCondition,
     /// <summary><c>Complete Classes of Procedures Negotiation</c></summary>
@@ -117,6 +143,8 @@ public enum Ax25ActionVerb
     DLERRORIndicationT,
     /// <summary><c>DL-ERROR Indication (U)</c></summary>
     DLERRORIndicationU,
+    /// <summary><c>DL-ERROR Indication (Z)</c></summary>
+    DLERRORIndicationZ,
     /// <summary><c>DL-ERROR Indication (add)</c></summary>
     DLERRORIndicationAdd,
     /// <summary><c>DL_CONNECT_confirm</c></summary>
@@ -143,6 +171,8 @@ public enum Ax25ActionVerb
     DMResponseFEq0,
     /// <summary><c>Decrement Sreject Exception if &gt; 0</c></summary>
     DecrementSrejectExceptionIf0,
+    /// <summary><c>Discard All Accumulated Segments</c></summary>
+    DiscardAllAccumulatedSegments,
     /// <summary><c>Discard Contents of I Frame</c></summary>
     DiscardContentsOfIFrame,
     /// <summary><c>Discard I Frame</c></summary>
@@ -153,6 +183,10 @@ public enum Ax25ActionVerb
     DiscardPrimitive,
     /// <summary><c>Discard Queue</c></summary>
     DiscardQueue,
+    /// <summary><c>Discard: Erroneous Primitive</c></summary>
+    DiscardErroneousPrimitive,
+    /// <summary><c>Discard: Segment</c></summary>
+    DiscardSegment,
     /// <summary><c>Enquiry Response (F = 0)</c></summary>
     EnquiryResponseFEq0,
     /// <summary><c>Enquiry_Response_F_1</c></summary>
@@ -169,6 +203,14 @@ public enum Ax25ActionVerb
     FAssign1,
     /// <summary><c>F := P</c></summary>
     FAssignP,
+    /// <summary><c>Free all Allocated Buffers</c></summary>
+    FreeAllAllocatedBuffers,
+    /// <summary><c>HW-DATA Request</c></summary>
+    HWDATARequest,
+    /// <summary><c>HW-TOFF Request</c></summary>
+    HWTOFFRequest,
+    /// <summary><c>HW-TON Request</c></summary>
+    HWTONRequest,
     /// <summary><c>I Command</c></summary>
     ICommand,
     /// <summary><c>Increment Sreject Exception</c></summary>
@@ -211,6 +253,8 @@ public enum Ax25ActionVerb
     ModuloAssign128,
     /// <summary><c>Modulo := 8</c></summary>
     ModuloAssign8,
+    /// <summary><c>N := Remaining Segment Number</c></summary>
+    NAssignRemainingSegmentNumber,
     /// <summary><c>N(r) := N(s)</c></summary>
     NRAssignNS,
     /// <summary><c>N(r) := V(r)</c></summary>
@@ -237,6 +281,14 @@ public enum Ax25ActionVerb
     PAssign0,
     /// <summary><c>P := 1</c></summary>
     PAssign1,
+    /// <summary><c>PH-BUSY Indication</c></summary>
+    PHBUSYIndication,
+    /// <summary><c>PH-DATA Indication</c></summary>
+    PHDATAIndication,
+    /// <summary><c>PH-QUIET Indication</c></summary>
+    PHQUIETIndication,
+    /// <summary><c>PH_SEIZE_confirm</c></summary>
+    PHSEIZEConfirm,
     /// <summary><c>Push I Frame on I Queue</c></summary>
     PushIFrameOnIQueue,
     /// <summary><c>Push Old I Frame N(r) on Queue</c></summary>
@@ -247,6 +299,8 @@ public enum Ax25ActionVerb
     PushOnIFrameQueue,
     /// <summary><c>Push on I Frame Queue (note: word order?)</c></summary>
     PushOnIFrameQueueNoteWordOrder,
+    /// <summary><c>R := Random Number in Range 0 to 255</c></summary>
+    RAssignRandomNumberInRange0To255,
     /// <summary><c>RC := 0</c></summary>
     RCAssign0,
     /// <summary><c>RC := 1</c></summary>
@@ -271,6 +325,12 @@ public enum Ax25ActionVerb
     RRCommandPEq0,
     /// <summary><c>RR Response</c></summary>
     RRResponse,
+    /// <summary><c>Restart TR210</c></summary>
+    RestartTR210,
+    /// <summary><c>Resume Processing Normal Queue</c></summary>
+    ResumeProcessingNormalQueue,
+    /// <summary><c>Resume Processing Priority Queue</c></summary>
+    ResumeProcessingPriorityQueue,
     /// <summary><c>Retransmit XID Command</c></summary>
     RetransmitXIDCommand,
     /// <summary><c>Retrieve Stored V(r) I Frame</c></summary>
@@ -297,6 +357,12 @@ public enum Ax25ActionVerb
     SelectRequiredFunctions,
     /// <summary><c>Select_T1_Value</c></summary>
     SelectT1Value,
+    /// <summary><c>Send Unmodified Primitive</c></summary>
+    SendUnmodifiedPrimitive,
+    /// <summary><c>Set Digipeater</c></summary>
+    SetDigipeater,
+    /// <summary><c>Set Digipeating</c></summary>
+    SetDigipeating,
     /// <summary><c>Set Extended</c></summary>
     SetExtended,
     /// <summary><c>Set Full Duplex</c></summary>
@@ -307,6 +373,8 @@ public enum Ax25ActionVerb
     SetHalfDuplex,
     /// <summary><c>Set Implicit Reject</c></summary>
     SetImplicitReject,
+    /// <summary><c>Set Interrupted</c></summary>
+    SetInterrupted,
     /// <summary><c>Set Layer 3 Initiated</c></summary>
     SetLayer3Initiated,
     /// <summary><c>Set Normal</c></summary>
@@ -323,6 +391,8 @@ public enum Ax25ActionVerb
     SetReceiveKToDefault,
     /// <summary><c>Set Reject Exception</c></summary>
     SetRejectException,
+    /// <summary><c>Set Repeater Up</c></summary>
+    SetRepeaterUp,
     /// <summary><c>Set Segmentor Off</c></summary>
     SetSegmentorOff,
     /// <summary><c>Set Selective Reject</c></summary>
@@ -341,20 +411,64 @@ public enum Ax25ActionVerb
     SetVersion20Defaults,
     /// <summary><c>Set Version 2.2</c></summary>
     SetVersion22,
+    /// <summary><c>Set_Digipeating_bracketed</c></summary>
+    SetDigipeatingBracketed,
     /// <summary><c>Sreject := Sreject + 1</c></summary>
     SrejectAssignSrejectPlus1,
     /// <summary><c>Start T1</c></summary>
     StartT1,
+    /// <summary><c>Start T100</c></summary>
+    StartT100,
+    /// <summary><c>Start T101</c></summary>
+    StartT101,
+    /// <summary><c>Start T102</c></summary>
+    StartT102,
+    /// <summary><c>Start T103.</c></summary>
+    StartT103,
+    /// <summary><c>Start T104</c></summary>
+    StartT104,
+    /// <summary><c>Start T105</c></summary>
+    StartT105,
+    /// <summary><c>Start T106</c></summary>
+    StartT106,
+    /// <summary><c>Start T106 (T108?)</c></summary>
+    StartT106T108,
+    /// <summary><c>Start T107</c></summary>
+    StartT107,
     /// <summary><c>Start T3</c></summary>
     StartT3,
     /// <summary><c>Start TM201</c></summary>
     StartTM201,
+    /// <summary><c>Start TR210</c></summary>
+    StartTR210,
+    /// <summary><c>Start Transmitter</c></summary>
+    StartTransmitter,
+    /// <summary><c>Start_T100_bracketed</c></summary>
+    StartT100Bracketed,
+    /// <summary><c>Stop All Timer Except T100.</c></summary>
+    StopAllTimerExceptT100,
+    /// <summary><c>Stop All Timers</c></summary>
+    StopAllTimers,
     /// <summary><c>Stop T1</c></summary>
     StopT1,
+    /// <summary><c>Stop T106</c></summary>
+    StopT106,
+    /// <summary><c>Stop T107</c></summary>
+    StopT107,
     /// <summary><c>Stop T3</c></summary>
     StopT3,
     /// <summary><c>Stop TM201</c></summary>
     StopTM201,
+    /// <summary><c>Stop TR210</c></summary>
+    StopTR210,
+    /// <summary><c>Stsrt T103</c></summary>
+    StsrtT103,
+    /// <summary><c>Suspend All Queue Processing</c></summary>
+    SuspendAllQueueProcessing,
+    /// <summary><c>Suspend Priority and Normal Queue Processing</c></summary>
+    SuspendPriorityAndNormalQueueProcessing,
+    /// <summary><c>Suspend Processing Priority Queue</c></summary>
+    SuspendProcessingPriorityQueue,
     /// <summary><c>T1 Negotiation Response</c></summary>
     T1NegotiationResponse,
     /// <summary><c>T1V := 2 * SRT</c></summary>
@@ -365,6 +479,8 @@ public enum Ax25ActionVerb
     TransmitEnquery,
     /// <summary><c>Transmit Enquiry</c></summary>
     TransmitEnquiry,
+    /// <summary><c>Turn Off Transmitter</c></summary>
+    TurnOffTransmitter,
     /// <summary><c>UA</c></summary>
     UA,
     /// <summary><c>UI Check</c></summary>

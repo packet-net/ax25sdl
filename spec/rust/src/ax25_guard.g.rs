@@ -27,6 +27,8 @@ pub enum Ax25Guard {
     N2NotificationRequested,
     /// `N2_parameter_field_present`
     N2ParameterFieldPresent,
+    /// `N_eq_0`
+    NEq0,
     /// `OF_negotiation_requested`
     OFNegotiationRequested,
     /// `OF_parameter_field_present`
@@ -39,6 +41,8 @@ pub enum Ax25Guard {
     RCEq0,
     /// `RC_eq_N2`
     RCEqN2,
+    /// `R_lt_p`
+    RLtP,
     /// `SREJ_acceptable`
     SREJAcceptable,
     /// `SREJ_enabled`
@@ -63,10 +67,16 @@ pub enum Ax25Guard {
     Command,
     /// `command_and_P_eq_1`
     CommandAndPEq1,
+    /// `digipeating`
+    Digipeating,
+    /// `first_segment`
+    FirstSegment,
     /// `full_duplex_acceptable`
     FullDuplexAcceptable,
     /// `info_field_length_le_N1_and_content_is_octet_aligned`
     InfoFieldLengthLeN1AndContentIsOctetAligned,
+    /// `interrupted`
+    Interrupted,
     /// `k_notification_requested`
     KNotificationRequested,
     /// `k_parameter_field_present`
@@ -79,6 +89,8 @@ pub enum Ax25Guard {
     Mod8,
     /// `modulo_128_acceptable`
     Modulo128Acceptable,
+    /// `next_segment`
+    NextSegment,
     /// `nr_eq_va`
     NrEqVa,
     /// `nr_eq_vs`
@@ -93,12 +105,22 @@ pub enum Ax25Guard {
     OwnReceiverBusy,
     /// `peer_receiver_busy`
     PeerReceiverBusy,
+    /// `priority_queue_empty`
+    PriorityQueueEmpty,
     /// `reject_exception`
     RejectException,
+    /// `remaining_segments_eq_N`
+    RemainingSegmentsEqN,
+    /// `repeater_up`
+    RepeaterUp,
     /// `response`
     Response,
     /// `response_and_F_eq_1`
     ResponseAndFEq1,
+    /// `segment_PID_present`
+    SegmentPIDPresent,
+    /// `segment_header_present`
+    SegmentHeaderPresent,
     /// `sreject_exception_gt_0`
     SrejectExceptionGt0,
     /// `transmit_N1_acceptable`

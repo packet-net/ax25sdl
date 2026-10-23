@@ -13,8 +13,23 @@ extern const StatePage data_link_awaiting_v22_connection;
 extern const StatePage data_link_connected;
 extern const StatePage data_link_disconnected;
 extern const StatePage data_link_timer_recovery;
+extern const StatePage duplex_phy_receiver_ready;
+extern const StatePage duplex_phy_receiving;
+extern const StatePage duplex_phy_transmitter_ready;
+extern const StatePage duplex_phy_transmitter_start;
+extern const StatePage duplex_phy_transmitting;
 extern const StatePage management_data_link_negotiating;
 extern const StatePage management_data_link_ready;
+extern const StatePage reassembler_ready;
+extern const StatePage reassembler_reassembling_data;
+extern const StatePage reassembler_reassembling_unit_data;
+extern const StatePage simplex_phy_digipeating;
+extern const StatePage simplex_phy_ready;
+extern const StatePage simplex_phy_receiver_start;
+extern const StatePage simplex_phy_receiving;
+extern const StatePage simplex_phy_transmitter_start;
+extern const StatePage simplex_phy_transmitter_suppression;
+extern const StatePage simplex_phy_transmitting;
 extern const SubroutinesPage data_link_subroutines;
 extern const SubroutinesPage
     management_data_link_classes_of_procedures_negotiation_subroutines;
@@ -26,5 +41,6 @@ extern const SubroutinesPage
 extern const SubroutinesPage management_data_link_t1_negotiation_subroutines;
 extern const SubroutinesPage
     management_data_link_window_negotiation_subroutines;
+extern const SubroutinesPage simplex_phy_subroutines;
 
 #endif // AX25SDL_GENERATED_H

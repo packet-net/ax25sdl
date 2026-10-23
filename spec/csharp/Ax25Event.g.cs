@@ -16,6 +16,8 @@ public enum Ax25Event
     DISCReceived,
     /// <summary><c>DL_CONNECT_request</c></summary>
     DLCONNECTRequest,
+    /// <summary><c>DL_DATA_indication</c></summary>
+    DLDATAIndication,
     /// <summary><c>DL_DATA_request</c></summary>
     DLDATARequest,
     /// <summary><c>DL_DISCONNECT_request</c></summary>
@@ -24,6 +26,8 @@ public enum Ax25Event
     DLFLOWOFFRequest,
     /// <summary><c>DL_FLOW_ON_request</c></summary>
     DLFLOWONRequest,
+    /// <summary><c>DL_UNIT_DATA_indication</c></summary>
+    DLUNITDATAIndication,
     /// <summary><c>DL_UNIT_DATA_request</c></summary>
     DLUNITDATARequest,
     /// <summary><c>DM_received</c></summary>
@@ -32,6 +36,12 @@ public enum Ax25Event
     FRMRReceived,
     /// <summary><c>FRMR_response_received</c></summary>
     FRMRResponseReceived,
+    /// <summary><c>HW_AOS_indication</c></summary>
+    HWAOSIndication,
+    /// <summary><c>HW_DATA_indication</c></summary>
+    HWDATAIndication,
+    /// <summary><c>HW_LOS_indication</c></summary>
+    HWLOSIndication,
     /// <summary><c>I_frame_pops_off_queue</c></summary>
     IFramePopsOffQueue,
     /// <summary><c>I_received</c></summary>
@@ -44,6 +54,14 @@ public enum Ax25Event
     MDLNEGOTIATEConfirm,
     /// <summary><c>MDL_NEGOTIATE_request</c></summary>
     MDLNEGOTIATERequest,
+    /// <summary><c>PH_DATA_request</c></summary>
+    PHDATARequest,
+    /// <summary><c>PH_EXPEDITED_DATA_request</c></summary>
+    PHEXPEDITEDDATARequest,
+    /// <summary><c>PH_RELEASE_request</c></summary>
+    PHRELEASERequest,
+    /// <summary><c>PH_SEIZE_request</c></summary>
+    PHSEIZERequest,
     /// <summary><c>REJ_received</c></summary>
     REJReceived,
     /// <summary><c>RNR_received</c></summary>
@@ -56,6 +74,24 @@ public enum Ax25Event
     SABMReceived,
     /// <summary><c>SREJ_received</c></summary>
     SREJReceived,
+    /// <summary><c>T100_expiry</c></summary>
+    T100Expiry,
+    /// <summary><c>T101_expiry</c></summary>
+    T101Expiry,
+    /// <summary><c>T102_expiry</c></summary>
+    T102Expiry,
+    /// <summary><c>T103_expiry</c></summary>
+    T103Expiry,
+    /// <summary><c>T104_expiry</c></summary>
+    T104Expiry,
+    /// <summary><c>T105_expiry</c></summary>
+    T105Expiry,
+    /// <summary><c>T106_expiry</c></summary>
+    T106Expiry,
+    /// <summary><c>T106_or_T108_expiry</c></summary>
+    T106OrT108Expiry,
+    /// <summary><c>T107_expiry</c></summary>
+    T107Expiry,
     /// <summary><c>T1_expiry</c></summary>
     T1Expiry,
     /// <summary><c>T2_expiry</c></summary>
@@ -66,6 +102,8 @@ public enum Ax25Event
     TESTReceived,
     /// <summary><c>TM201_expiry</c></summary>
     TM201Expiry,
+    /// <summary><c>TR210_expiry</c></summary>
+    TR210Expiry,
     /// <summary><c>UA_received</c></summary>
     UAReceived,
     /// <summary><c>UI_received</c></summary>
@@ -78,6 +116,8 @@ public enum Ax25Event
     XIDResponseReceived,
     /// <summary><c>all_other_commands</c></summary>
     AllOtherCommands,
+    /// <summary><c>all_other_dl_primitives__from_lower_layer</c></summary>
+    AllOtherDlPrimitivesFromLowerLayer,
     /// <summary><c>all_other_primitives__from_lower_layer</c></summary>
     AllOtherPrimitivesFromLowerLayer,
     /// <summary><c>all_other_primitives__from_upper_layer</c></summary>
@@ -90,6 +130,8 @@ public enum Ax25Event
     InfoFieldPermittedInFrame,
     /// <summary><c>info_not_permitted_in_frame</c></summary>
     InfoNotPermittedInFrame,
+    /// <summary><c>priority_queue_empty</c></summary>
+    PriorityQueueEmpty,
     /// <summary><c>u_or_s_frame_length_error</c></summary>
     UOrSFrameLengthError,
 }

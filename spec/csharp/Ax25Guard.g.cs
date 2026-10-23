@@ -32,6 +32,8 @@ public enum Ax25Guard
     N2NotificationRequested,
     /// <summary><c>N2_parameter_field_present</c></summary>
     N2ParameterFieldPresent,
+    /// <summary><c>N_eq_0</c></summary>
+    NEq0,
     /// <summary><c>OF_negotiation_requested</c></summary>
     OFNegotiationRequested,
     /// <summary><c>OF_parameter_field_present</c></summary>
@@ -44,6 +46,8 @@ public enum Ax25Guard
     RCEq0,
     /// <summary><c>RC_eq_N2</c></summary>
     RCEqN2,
+    /// <summary><c>R_lt_p</c></summary>
+    RLtP,
     /// <summary><c>SREJ_acceptable</c></summary>
     SREJAcceptable,
     /// <summary><c>SREJ_enabled</c></summary>
@@ -68,10 +72,16 @@ public enum Ax25Guard
     Command,
     /// <summary><c>command_and_P_eq_1</c></summary>
     CommandAndPEq1,
+    /// <summary><c>digipeating</c></summary>
+    Digipeating,
+    /// <summary><c>first_segment</c></summary>
+    FirstSegment,
     /// <summary><c>full_duplex_acceptable</c></summary>
     FullDuplexAcceptable,
     /// <summary><c>info_field_length_le_N1_and_content_is_octet_aligned</c></summary>
     InfoFieldLengthLeN1AndContentIsOctetAligned,
+    /// <summary><c>interrupted</c></summary>
+    Interrupted,
     /// <summary><c>k_notification_requested</c></summary>
     KNotificationRequested,
     /// <summary><c>k_parameter_field_present</c></summary>
@@ -84,6 +94,8 @@ public enum Ax25Guard
     Mod8,
     /// <summary><c>modulo_128_acceptable</c></summary>
     Modulo128Acceptable,
+    /// <summary><c>next_segment</c></summary>
+    NextSegment,
     /// <summary><c>nr_eq_va</c></summary>
     NrEqVa,
     /// <summary><c>nr_eq_vs</c></summary>
@@ -98,12 +110,22 @@ public enum Ax25Guard
     OwnReceiverBusy,
     /// <summary><c>peer_receiver_busy</c></summary>
     PeerReceiverBusy,
+    /// <summary><c>priority_queue_empty</c></summary>
+    PriorityQueueEmpty,
     /// <summary><c>reject_exception</c></summary>
     RejectException,
+    /// <summary><c>remaining_segments_eq_N</c></summary>
+    RemainingSegmentsEqN,
+    /// <summary><c>repeater_up</c></summary>
+    RepeaterUp,
     /// <summary><c>response</c></summary>
     Response,
     /// <summary><c>response_and_F_eq_1</c></summary>
     ResponseAndFEq1,
+    /// <summary><c>segment_PID_present</c></summary>
+    SegmentPIDPresent,
+    /// <summary><c>segment_header_present</c></summary>
+    SegmentHeaderPresent,
     /// <summary><c>sreject_exception_gt_0</c></summary>
     SrejectExceptionGt0,
     /// <summary><c>transmit_N1_acceptable</c></summary>

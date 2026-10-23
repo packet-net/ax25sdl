@@ -11,6 +11,8 @@ pub enum Ax25Event {
     DISCReceived,
     /// `DL_CONNECT_request`
     DLCONNECTRequest,
+    /// `DL_DATA_indication`
+    DLDATAIndication,
     /// `DL_DATA_request`
     DLDATARequest,
     /// `DL_DISCONNECT_request`
@@ -19,6 +21,8 @@ pub enum Ax25Event {
     DLFLOWOFFRequest,
     /// `DL_FLOW_ON_request`
     DLFLOWONRequest,
+    /// `DL_UNIT_DATA_indication`
+    DLUNITDATAIndication,
     /// `DL_UNIT_DATA_request`
     DLUNITDATARequest,
     /// `DM_received`
@@ -27,6 +31,12 @@ pub enum Ax25Event {
     FRMRReceived,
     /// `FRMR_response_received`
     FRMRResponseReceived,
+    /// `HW_AOS_indication`
+    HWAOSIndication,
+    /// `HW_DATA_indication`
+    HWDATAIndication,
+    /// `HW_LOS_indication`
+    HWLOSIndication,
     /// `I_frame_pops_off_queue`
     IFramePopsOffQueue,
     /// `I_received`
@@ -39,6 +49,14 @@ pub enum Ax25Event {
     MDLNEGOTIATEConfirm,
     /// `MDL_NEGOTIATE_request`
     MDLNEGOTIATERequest,
+    /// `PH_DATA_request`
+    PHDATARequest,
+    /// `PH_EXPEDITED_DATA_request`
+    PHEXPEDITEDDATARequest,
+    /// `PH_RELEASE_request`
+    PHRELEASERequest,
+    /// `PH_SEIZE_request`
+    PHSEIZERequest,
     /// `REJ_received`
     REJReceived,
     /// `RNR_received`
@@ -51,6 +69,24 @@ pub enum Ax25Event {
     SABMReceived,
     /// `SREJ_received`
     SREJReceived,
+    /// `T100_expiry`
+    T100Expiry,
+    /// `T101_expiry`
+    T101Expiry,
+    /// `T102_expiry`
+    T102Expiry,
+    /// `T103_expiry`
+    T103Expiry,
+    /// `T104_expiry`
+    T104Expiry,
+    /// `T105_expiry`
+    T105Expiry,
+    /// `T106_expiry`
+    T106Expiry,
+    /// `T106_or_T108_expiry`
+    T106OrT108Expiry,
+    /// `T107_expiry`
+    T107Expiry,
     /// `T1_expiry`
     T1Expiry,
     /// `T2_expiry`
@@ -61,6 +97,8 @@ pub enum Ax25Event {
     TESTReceived,
     /// `TM201_expiry`
     TM201Expiry,
+    /// `TR210_expiry`
+    TR210Expiry,
     /// `UA_received`
     UAReceived,
     /// `UI_received`
@@ -73,6 +111,8 @@ pub enum Ax25Event {
     XIDResponseReceived,
     /// `all_other_commands`
     AllOtherCommands,
+    /// `all_other_dl_primitives__from_lower_layer`
+    AllOtherDlPrimitivesFromLowerLayer,
     /// `all_other_primitives__from_lower_layer`
     AllOtherPrimitivesFromLowerLayer,
     /// `all_other_primitives__from_upper_layer`
@@ -85,6 +125,8 @@ pub enum Ax25Event {
     InfoFieldPermittedInFrame,
     /// `info_not_permitted_in_frame`
     InfoNotPermittedInFrame,
+    /// `priority_queue_empty`
+    PriorityQueueEmpty,
     /// `u_or_s_frame_length_error`
     UOrSFrameLengthError,
 }

@@ -6,6 +6,8 @@
 /// [`ActionStep::verb`](crate::ActionStep); lets a consumer `match` exhaustively.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ax25ActionVerb {
+    /// `(Start T108)`
+    StartT108,
     /// `AV := 0`
     AVAssign0,
     /// `Accept Receive N1 from XID Response`
@@ -24,6 +26,14 @@ pub enum Ax25ActionVerb {
     AcceptTransmitT1FromXIDCommand,
     /// `Accept Transmit k From XID Command`
     AcceptTransmitKFromXIDCommand,
+    /// `Accumulate First Segment`
+    AccumulateFirstSegment,
+    /// `Acquisition`
+    Acquisition,
+    /// `Acuisition`
+    Acuisition,
+    /// `Add Frame to Priority Queue`
+    AddFrameToPriorityQueue,
     /// `Add Receive COP Parameter field to XID Command`
     AddReceiveCOPParameterFieldToXIDCommand,
     /// `Add Receive COP Parameter field to XID Response`
@@ -48,6 +58,16 @@ pub enum Ax25ActionVerb {
     AddReceiveKParameterFieldToXIDCommand,
     /// `Add Receive k Parameter field to XID Response`
     AddReceiveKParameterFieldToXIDResponse,
+    /// `Add to Normal Queue`
+    AddToNormalQueue,
+    /// `Add to Priority Queue`
+    AddToPriorityQueue,
+    /// `Allocate Buffers for All Segments`
+    AllocateBuffersForAllSegments,
+    /// `Assemble Last Segment to Previous`
+    AssembleLastSegmentToPrevious,
+    /// `Assemble This Segment to Previous`
+    AssembleThisSegmentToPrevious,
     /// `Backtrack`
     Backtrack,
     /// `Check Need For Response`
@@ -58,8 +78,12 @@ pub enum Ax25ActionVerb {
     ClassesOfProceduresNegotiationResponse,
     /// `Clear Acknowledge Pending`
     ClearAcknowledgePending,
+    /// `Clear Digipeating`
+    ClearDigipeating,
     /// `Clear Exception Conditions`
     ClearExceptionConditions,
+    /// `Clear Interrupted`
+    ClearInterrupted,
     /// `Clear Layer 3 Initiated`
     ClearLayer3Initiated,
     /// `Clear Own Receiver Busy`
@@ -68,6 +92,8 @@ pub enum Ax25ActionVerb {
     ClearRejectCondition,
     /// `Clear Reject Exception`
     ClearRejectException,
+    /// `Clear Repeater Up`
+    ClearRepeaterUp,
     /// `Clear Sreject Condition`
     ClearSrejectCondition,
     /// `Complete Classes of Procedures Negotiation`
@@ -112,6 +138,8 @@ pub enum Ax25ActionVerb {
     DLERRORIndicationT,
     /// `DL-ERROR Indication (U)`
     DLERRORIndicationU,
+    /// `DL-ERROR Indication (Z)`
+    DLERRORIndicationZ,
     /// `DL-ERROR Indication (add)`
     DLERRORIndicationAdd,
     /// `DL_CONNECT_confirm`
@@ -138,6 +166,8 @@ pub enum Ax25ActionVerb {
     DMResponseFEq0,
     /// `Decrement Sreject Exception if > 0`
     DecrementSrejectExceptionIf0,
+    /// `Discard All Accumulated Segments`
+    DiscardAllAccumulatedSegments,
     /// `Discard Contents of I Frame`
     DiscardContentsOfIFrame,
     /// `Discard I Frame`
@@ -148,6 +178,10 @@ pub enum Ax25ActionVerb {
     DiscardPrimitive,
     /// `Discard Queue`
     DiscardQueue,
+    /// `Discard: Erroneous Primitive`
+    DiscardErroneousPrimitive,
+    /// `Discard: Segment`
+    DiscardSegment,
     /// `Enquiry Response (F = 0)`
     EnquiryResponseFEq0,
     /// `Enquiry_Response_F_1`
@@ -164,6 +198,14 @@ pub enum Ax25ActionVerb {
     FAssign1,
     /// `F := P`
     FAssignP,
+    /// `Free all Allocated Buffers`
+    FreeAllAllocatedBuffers,
+    /// `HW-DATA Request`
+    HWDATARequest,
+    /// `HW-TOFF Request`
+    HWTOFFRequest,
+    /// `HW-TON Request`
+    HWTONRequest,
     /// `I Command`
     ICommand,
     /// `Increment Sreject Exception`
@@ -206,6 +248,8 @@ pub enum Ax25ActionVerb {
     ModuloAssign128,
     /// `Modulo := 8`
     ModuloAssign8,
+    /// `N := Remaining Segment Number`
+    NAssignRemainingSegmentNumber,
     /// `N(r) := N(s)`
     NRAssignNS,
     /// `N(r) := V(r)`
@@ -232,6 +276,14 @@ pub enum Ax25ActionVerb {
     PAssign0,
     /// `P := 1`
     PAssign1,
+    /// `PH-BUSY Indication`
+    PHBUSYIndication,
+    /// `PH-DATA Indication`
+    PHDATAIndication,
+    /// `PH-QUIET Indication`
+    PHQUIETIndication,
+    /// `PH_SEIZE_confirm`
+    PHSEIZEConfirm,
     /// `Push I Frame on I Queue`
     PushIFrameOnIQueue,
     /// `Push Old I Frame N(r) on Queue`
@@ -242,6 +294,8 @@ pub enum Ax25ActionVerb {
     PushOnIFrameQueue,
     /// `Push on I Frame Queue (note: word order?)`
     PushOnIFrameQueueNoteWordOrder,
+    /// `R := Random Number in Range 0 to 255`
+    RAssignRandomNumberInRange0To255,
     /// `RC := 0`
     RCAssign0,
     /// `RC := 1`
@@ -266,6 +320,12 @@ pub enum Ax25ActionVerb {
     RRCommandPEq0,
     /// `RR Response`
     RRResponse,
+    /// `Restart TR210`
+    RestartTR210,
+    /// `Resume Processing Normal Queue`
+    ResumeProcessingNormalQueue,
+    /// `Resume Processing Priority Queue`
+    ResumeProcessingPriorityQueue,
     /// `Retransmit XID Command`
     RetransmitXIDCommand,
     /// `Retrieve Stored V(r) I Frame`
@@ -292,6 +352,12 @@ pub enum Ax25ActionVerb {
     SelectRequiredFunctions,
     /// `Select_T1_Value`
     SelectT1Value,
+    /// `Send Unmodified Primitive`
+    SendUnmodifiedPrimitive,
+    /// `Set Digipeater`
+    SetDigipeater,
+    /// `Set Digipeating`
+    SetDigipeating,
     /// `Set Extended`
     SetExtended,
     /// `Set Full Duplex`
@@ -302,6 +368,8 @@ pub enum Ax25ActionVerb {
     SetHalfDuplex,
     /// `Set Implicit Reject`
     SetImplicitReject,
+    /// `Set Interrupted`
+    SetInterrupted,
     /// `Set Layer 3 Initiated`
     SetLayer3Initiated,
     /// `Set Normal`
@@ -318,6 +386,8 @@ pub enum Ax25ActionVerb {
     SetReceiveKToDefault,
     /// `Set Reject Exception`
     SetRejectException,
+    /// `Set Repeater Up`
+    SetRepeaterUp,
     /// `Set Segmentor Off`
     SetSegmentorOff,
     /// `Set Selective Reject`
@@ -336,20 +406,64 @@ pub enum Ax25ActionVerb {
     SetVersion20Defaults,
     /// `Set Version 2.2`
     SetVersion22,
+    /// `Set_Digipeating_bracketed`
+    SetDigipeatingBracketed,
     /// `Sreject := Sreject + 1`
     SrejectAssignSrejectPlus1,
     /// `Start T1`
     StartT1,
+    /// `Start T100`
+    StartT100,
+    /// `Start T101`
+    StartT101,
+    /// `Start T102`
+    StartT102,
+    /// `Start T103.`
+    StartT103,
+    /// `Start T104`
+    StartT104,
+    /// `Start T105`
+    StartT105,
+    /// `Start T106`
+    StartT106,
+    /// `Start T106 (T108?)`
+    StartT106T108,
+    /// `Start T107`
+    StartT107,
     /// `Start T3`
     StartT3,
     /// `Start TM201`
     StartTM201,
+    /// `Start TR210`
+    StartTR210,
+    /// `Start Transmitter`
+    StartTransmitter,
+    /// `Start_T100_bracketed`
+    StartT100Bracketed,
+    /// `Stop All Timer Except T100.`
+    StopAllTimerExceptT100,
+    /// `Stop All Timers`
+    StopAllTimers,
     /// `Stop T1`
     StopT1,
+    /// `Stop T106`
+    StopT106,
+    /// `Stop T107`
+    StopT107,
     /// `Stop T3`
     StopT3,
     /// `Stop TM201`
     StopTM201,
+    /// `Stop TR210`
+    StopTR210,
+    /// `Stsrt T103`
+    StsrtT103,
+    /// `Suspend All Queue Processing`
+    SuspendAllQueueProcessing,
+    /// `Suspend Priority and Normal Queue Processing`
+    SuspendPriorityAndNormalQueueProcessing,
+    /// `Suspend Processing Priority Queue`
+    SuspendProcessingPriorityQueue,
     /// `T1 Negotiation Response`
     T1NegotiationResponse,
     /// `T1V := 2 * SRT`
@@ -360,6 +474,8 @@ pub enum Ax25ActionVerb {
     TransmitEnquery,
     /// `Transmit Enquiry`
     TransmitEnquiry,
+    /// `Turn Off Transmitter`
+    TurnOffTransmitter,
     /// `UA`
     UA,
     /// `UI Check`
