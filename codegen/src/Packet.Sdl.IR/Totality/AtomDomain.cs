@@ -252,6 +252,24 @@ public sealed class AtomDomain
         Free("requestor_eq_current_DL", "figc3.4 Queue Event \"Requestor == Current DL?\": which Data Link machine raised the event"),
         Free("requestor_on_served_list", "figc3.4 Queue Event \"Requestor on Served List?\": Link Multiplexer queue state"),
 
+        // ── Segmenter / Reassembler (figc6.1 to figc6.4). Message and segment properties, and the Reassembler's count N, which the figures relate to nothing else here (N is never decremented, packethacking/ax25spec#136).
+        Free("longer_than_N1_octets", "figc6.1 \"Longer than N1 Octets?\": a property of the DL-DATA or DL-UNIT-DATA request"),
+        Free("longer_than_N1_128", "figc6.1 \"Longer than (N1* 128)?\": a property of the request (packethacking/ax25spec#138)"),
+        Free("all_segments_sent", "figc6.1 \"All Segments Sent?\": segmenter loop state"),
+        Free("segment_header_present", "figc6.2 \"Segment Header Present?\": a property of the received frame"),
+        Free("first_segment", "figc6.2 \"First Segment?\": a property of the received segment header"),
+        Free("segment_PID_present", "figc6.3, figc6.4 \"Segment PID Present?\": a property of the received frame"),
+        Free("next_segment", "figc6.3, figc6.4 \"Next Segment?\": a property of the received segment header"),
+        Free("remaining_segments_eq_N", "figc6.3, figc6.4 \"Remaining Segments == N?\": the header count against N"),
+        Free("N_eq_0", "figc6.3, figc6.4 \"N == 0?\": the Reassembler's remaining-segment count"),
+
+        // ── Physical layer (figc2a.x Simplex, figc2b.x Duplex). Queue state, channel access and flags the figures relate to nothing else here.
+        Free("interrupted", "figc2b.4, figc2a.3, figc2a.4 \"Interrup-ted?\": set on T107 expiry (packethacking/ax25spec#140)"),
+        Free("priority_queue_empty", "figc2a.2, figc2a.3, figc2a.5 \"Priority Queue Empty?\": queue state"),
+        Free("R_lt_p", "figc2a.3 \"R < p?\": the p-persistence draw against p (6.4.2)"),
+        Free("repeater_up", "figc2a.4 \"Repeater Up?\": flag set and cleared by the Simplex Physical machine (packethacking/ax25spec#146)"),
+        Free("digipeating", "figc2a.4 \"Digipeat-ing?\": flag set and cleared by the Simplex Physical machine"),
+
         // ── Management Data Link (figc5.2 to figc5.8). Configuration,
         //    capability and received-XID properties, unrelated by
         //    definition to anything else here.

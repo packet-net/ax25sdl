@@ -1,0 +1,169 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "reassembler",
+  "state": "ReassemblingUnitData",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc6.4",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_tr210_expiry",
+      "from": "ReassemblingUnitData",
+      "on": "TR210_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Discard All Accumulated Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Free all Allocated Buffers",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_yes_yes_yes",
+      "from": "ReassemblingUnitData",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_PID_present and next_segment and remaining_segments_eq_N and N_eq_0",
+      "actions": [
+        {
+          "verb": "Stop TR210",
+          "kind": "processing"
+        },
+        {
+          "verb": "Assemble Last Segment to Previous",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL_UNIT_DATA_indication",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_yes_yes_no",
+      "from": "ReassemblingUnitData",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_PID_present and next_segment and remaining_segments_eq_N and not N_eq_0",
+      "actions": [
+        {
+          "verb": "Restart TR210",
+          "kind": "processing"
+        },
+        {
+          "verb": "Assemble This Segment to Previous",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReassemblingUnitData",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_yes_no",
+      "from": "ReassemblingUnitData",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_PID_present and next_segment and not remaining_segments_eq_N",
+      "actions": [
+        {
+          "verb": "Discard All Accumulated Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Free all Allocated Buffers",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_no",
+      "from": "ReassemblingUnitData",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_PID_present and not next_segment",
+      "actions": [
+        {
+          "verb": "Discard All Accumulated Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Free all Allocated Buffers",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_no",
+      "from": "ReassemblingUnitData",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "not segment_PID_present",
+      "actions": [
+        {
+          "verb": "Discard All Accumulated Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Free all Allocated Buffers",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_all_other_dl_primitives__from_lower_layer",
+      "from": "ReassemblingUnitData",
+      "on": "all_other_dl_primitives__from_lower_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Send Unmodified Primitive",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "ReassemblingUnitData",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

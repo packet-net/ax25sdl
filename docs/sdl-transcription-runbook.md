@@ -165,8 +165,29 @@ The yaml must not depend on how a page happens to be drawn or stored, so two cor
 
 ## Labels
 
-- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces are read as single spaces, so a primitive with a break or a space inside its name (`LM-` then `DATA Request`, or `PH-EXPEDITED DATA Request`) is rejected rather than given a different id.
-- **Each line of an action box is one action.** A box that lists statements one per line (`V(s) <- 0` then `V(a) <- 0`) becomes that many path steps, in order. So put a hard line break only where the figure starts a new statement; type a long single statement (`Move all events submitted by current DL to Current Queue`) on one line and let yEd wrap it.
+- **Input labels are one line.** An input names one event, so type it on a single line and let yEd wrap it. Line breaks and runs of spaces are read as single spaces.
+- **A name wrapped at a "-" or "_" joins with no space.** The figures wrap long primitive names at their dashes and underscores. C2b.5 prints "PH-" / "EXPEDITED_" / "DATA" / "Request" on four lines: type `PH-EXPEDITED_DATA Request`. The walker joins a break or space straight after a "-" or "_" in a primitive label anyway, so `PH-EXPEDITED_ DATA Request` gives the same id and `on_label`. A space inside the name anywhere else (`PH-EXPEDITED DATA Request`) is rejected rather than given a different id.
+- **One statement, one line.** Each line of an action box becomes one action, in order. So type one line per statement, and decide where statements start with this rule. It is closed, and `StatementRule.cs` applies the same rule in a test against every committed page.
+
+  Go through the box's printed lines top to bottom. A printed line **starts a new statement only when both** of these hold. Otherwise it continues the statement above, because the figure is only wrapping it.
+  1. **The statement so far is complete:** it ends with ".", or it is an assignment with something after the arrow (`R <- Random`), or its first word is a listed verb (also when it is in brackets).
+  2. **The line opens a statement:** it is an assignment (`V(a) <- 0`), or its first word is a listed verb, or it is a bracketed line whose first word is a listed verb (`(Set Digipeating)`). A bracketed line that doesn't start with one (`(F = 1)`) is an argument, and continues.
+
+  The listed verbs are exactly: Accumulate, Add, Allocate, Assemble, Backtrack, Clear, Decrement, Discard, Divide, Free, Insert, Restart, Resume, Select, Set, Start, Stop, Suspend. If a new page needs another, add it to `StatementRule.Verbs` in ax25sdl; the test proves every committed page still reads the same.
+
+  Examples:
+  - C2a.5 "Resume / Processing Priority / Queue" then "(Set Digipeating)": two actions, `Resume Processing Priority Queue` and `(Set Digipeating)`.
+  - C2a.6 "Clear Digipeating / (Start T100) / (Start T108) / Suspend Processing Priority Queue": four actions.
+  - `V(s) <- 0` over `V(a) <- 0`: two.
+  - These are each **one** action:
+    - C2b.1 "Discard: / Erroneous / Primitive": `Discard: Erroneous Primitive`, because "Erroneous" is not a listed verb.
+    - C2a.5 "Suspend All / Queue Processing".
+    - C2a.3 "R <- Random / Number in Range / 0 to 255".
+    - C4.7b "Set Selective / Reject".
+    - C4.4a "Clear / Acknowledge / Pending".
+    - C4.4b "Enquiry / Response / (F = 1)", where "Enquiry Response" is not complete.
+
+  Join a continued statement onto one line with single spaces, and let yEd wrap it visually. Never put a hard line break inside a statement.
 - Assignment arrows: `<-` and the arrow character `←` are equivalent. Type either; both become `:=` in the yaml, so two transcribers who chose differently still get the same file.
 - A decision's question is copied into `question:` as drawn, and its `predicate:` is derived from it. Type it on one line. Where the figure sets the "?" apart (on its own line, or after a gap, as in C5.3's "Full Duplex Acceptable ?"), type it after one space: `Full Duplex Acceptable ?`. A line break in a question is read as a single space, so a "?" typed on its own line gives the same yaml. Keep any other spacing as drawn; the predicate ignores it.
 
@@ -225,16 +246,17 @@ A second kind covers a state whose figure draws no catch-all input (no "All Othe
 
 It names a state, not a transition. The page is exempt from the catch-all lint and the machine still generates, with partial coverage: events the state doesn't handle have no transition, as with a `coverage: partial` page. It is reported as a warning, and is stale (an error) once the page gains a catch-all. This and `unknown_subroutine` (below) are the only kinds a published machine (Data Link, Management Data Link) may carry, because they change no transition. Any other defect on a published machine still fails, because those machines are never withheld.
 
-A third kind covers a subroutine call that names no subroutine of its machine. Codegen checks every call against the machine's subroutines pages, ignoring case, spaces, punctuation and a trailing bracketed argument ("Enquiry Response (F = 1)" calls Enquiry_Response), either as drawn or through its actions.yaml canonical name. A call the figure really draws under another name is listed with its label exactly as drawn:
+A third kind covers a subroutine call that names no subroutine of its machine. Codegen checks every call's drawn label against the machine's subroutines pages, ignoring case, spaces, punctuation and a trailing bracketed argument ("Enquiry Response (F = 1)" calls Enquiry_Response). It deliberately does not use actions.yaml aliases: an alias joining two spellings must not hide a figure that calls a subroutine by the wrong name. A call the figure really draws under another name is listed once per page that draws it, with the page's Annex C key and the label exactly as drawn:
 
 ```yaml
   - kind: unknown_subroutine
     machine: data_link
+    page: TimerRecovery
     call: Select T1 Value
     issue: https://github.com/packethacking/ax25spec/issues/144
 ```
 
-It warns, changes nothing that is generated, and so is allowed on a published machine. It is stale once the call resolves or is no longer drawn. A machine whose Annex C subroutines page is not transcribed yet is skipped.
+It warns, changes nothing that is generated, and so is allowed on a published machine. It is stale once the call resolves or is no longer drawn on that page. A machine whose Annex C subroutines page is not transcribed yet is skipped.
 
 ## After the transcription
 

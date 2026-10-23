@@ -101,6 +101,7 @@ internal static class Program
         }
 
         var events     = EventCatalog.Load(Path.Combine(plan.InDir, "events.yaml"));
+        var closedSetValues = ClosedSetValues.Load(plan.ClosedSetValuesPath);
         var actions    = ActionCatalog.Load(Path.Combine(plan.InDir, "actions.yaml"));
         var predicates = PredicateCatalog.Load(Path.Combine(plan.InDir, "predicates.yaml"));
 
@@ -524,20 +525,36 @@ internal static class Program
                 .Where(a => !string.IsNullOrWhiteSpace(a))
                 .ToList();
 
+            // Stable, append-only numbers for the C# and Rust enums
+            // (codegen/closed-set-values.yaml; see ClosedSetValues).
+            // Keyed by the emitted member name (what a consumer sees), so a
+            // canonical spelling that changes but keeps its member keeps its
+            // number.
+            static IReadOnlyDictionary<string, int> ValuesFor(
+                ClosedSetValues registry, string set, IEnumerable<string> canonicals, Func<string, string> member)
+            {
+                var distinct = canonicals.Distinct(StringComparer.Ordinal).ToList();
+                var byMember = registry.Assign(set, distinct.Select(member));
+                return distinct.ToDictionary(c => c, c => byMember[member(c)], StringComparer.Ordinal);
+            }
+            var verbValues  = ValuesFor(closedSetValues, "Ax25ActionVerb", allVerbs, CsharpEmitter.VerbEnumMember);
+            var guardValues = ValuesFor(closedSetValues, "Ax25Guard", allGuardAtoms, CsharpEmitter.GuardEnumMember);
+            var eventValues = ValuesFor(closedSetValues, "Ax25Event", emittedEvents, CsharpEmitter.EventEnumMember);
+
             if (plan.EmitCsharp)
             {
                 var verbEnumPath = Path.Combine(plan.CsharpOut, "Ax25ActionVerb.g.cs");
-                WriteIfChanged(verbEnumPath, CsharpEmitter.EmitActionVerbEnum(allVerbs));
+                WriteIfChanged(verbEnumPath, CsharpEmitter.EmitActionVerbEnum(allVerbs, verbValues));
                 writtenCsharpCode.Add(Path.GetFullPath(verbEnumPath));
                 Console.WriteLine("  ok  (all pages + subroutines)  →  Ax25ActionVerb.g.cs");
 
                 var guardEnumPath = Path.Combine(plan.CsharpOut, "Ax25Guard.g.cs");
-                WriteIfChanged(guardEnumPath, CsharpEmitter.EmitGuardEnum(allGuardAtoms));
+                WriteIfChanged(guardEnumPath, CsharpEmitter.EmitGuardEnum(allGuardAtoms, guardValues));
                 writtenCsharpCode.Add(Path.GetFullPath(guardEnumPath));
                 Console.WriteLine("  ok  (all pages + subroutines)  →  Ax25Guard.g.cs");
 
                 var eventEnumPath = Path.Combine(plan.CsharpOut, "Ax25Event.g.cs");
-                WriteIfChanged(eventEnumPath, CsharpEmitter.EmitEventEnum(emittedEvents));
+                WriteIfChanged(eventEnumPath, CsharpEmitter.EmitEventEnum(emittedEvents, eventValues));
                 writtenCsharpCode.Add(Path.GetFullPath(eventEnumPath));
                 Console.WriteLine("  ok  (events.yaml)  →  Ax25Event.g.cs");
             }
@@ -561,21 +578,26 @@ internal static class Program
             if (plan.EmitRust)
             {
                 var verbEnumPath = Path.Combine(plan.RustOut, "ax25_action_verb.g.rs");
-                WriteIfChanged(verbEnumPath, RustEmitter.EmitActionVerbEnum(allVerbs));
+                WriteIfChanged(verbEnumPath, RustEmitter.EmitActionVerbEnum(allVerbs, verbValues));
                 writtenRust.Add(Path.GetFullPath(verbEnumPath));
                 Console.WriteLine("  ok  (all pages + subroutines)  →  ax25_action_verb.g.rs");
 
                 var guardEnumPath = Path.Combine(plan.RustOut, "ax25_guard.g.rs");
-                WriteIfChanged(guardEnumPath, RustEmitter.EmitGuardEnum(allGuardAtoms));
+                WriteIfChanged(guardEnumPath, RustEmitter.EmitGuardEnum(allGuardAtoms, guardValues));
                 writtenRust.Add(Path.GetFullPath(guardEnumPath));
                 Console.WriteLine("  ok  (all pages + subroutines)  →  ax25_guard.g.rs");
 
                 var eventEnumPath = Path.Combine(plan.RustOut, "ax25_event.g.rs");
-                WriteIfChanged(eventEnumPath, RustEmitter.EmitEventEnum(emittedEvents));
+                WriteIfChanged(eventEnumPath, RustEmitter.EmitEventEnum(emittedEvents, eventValues));
                 writtenRust.Add(Path.GetFullPath(eventEnumPath));
                 Console.WriteLine("  ok  (events.yaml)  →  ax25_event.g.rs");
             }
         }
+
+        // The registry gains any newly numbered names; write it back so the
+        // numbers stay fixed (only when it was loaded from a file).
+        if (closedSetValues.Path is not null)
+            WriteIfChanged(closedSetValues.Path, closedSetValues.ToYaml());
 
         // TS package needs an index.ts that re-exports every page so
         // consumers can `import { DataLinkConnected } from "ax25sdl"`.
@@ -1109,10 +1131,15 @@ internal static class Program
                     missingKnown.Add($"{t.Next} (known figure defect, {known.Issue})");
                     continue;
                 }
+                var owners = AnnexC.Pages
+                    .Where(p => !p.IsSubroutines && p.Key == t.Next && p.Machine != page.Machine)
+                    .Select(p => p.Machine).Distinct().ToList();
+                var elsewhere = owners.Count == 0 ? ""
+                    : $"`{t.Next}` is a state of {string.Join(" and ", owners.Select(o => $"`{o}`"))}, a different machine: a page can only lead to its own machine's states. ";
                 errors.Add(
                     $"{page.SourcePath}: transition `{t.Id}` targets state `{t.Next}` which is not " +
                     $"a known state in machine `{page.Machine}` (transcribed: {string.Join(", ", validStates.OrderBy(x => x, StringComparer.Ordinal))}; " +
-                    $"Annex C: {string.Join(", ", annexStates)}). " +
+                    $"Annex C: {string.Join(", ", annexStates)}). " + elsewhere +
                     "Typo, OR the figure names a state Annex C does not have: raise it as an issue against the figure, " +
                     $"and list it in spec-sdl/{KnownFigureDefects.FileName} with the issue URL.");
             }
@@ -1158,25 +1185,42 @@ internal static class Program
 
     // ─── Subroutine-call lint ─────────────────────────────────────────
 
-    private sealed record SubroutineCall(string Machine, string SourcePath, string Label);
+    private sealed record SubroutineCall(string Machine, string Page, string SourcePath, string Label);
+
+    /// <summary>
+    /// The Annex C page key of a subroutines page, from its yaml filename
+    /// (<c>t1_negotiation_subroutines.sdl.yaml</c> is
+    /// <c>T1NegotiationSubroutines</c>); the stem itself when no Annex C
+    /// page matches.
+    /// </summary>
+    private static string SubroutinesPageKey(string machine, string sourcePath)
+    {
+        var stem = AnnexC.YamlStem(sourcePath);
+        static string Snake(string pascal) =>
+            string.Concat(pascal.Select((c, i) => i > 0 && char.IsUpper(c) ? "_" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
+        return AnnexC.Pages.FirstOrDefault(p => p.IsSubroutines && p.Machine == machine && Snake(p.Key) == stem)?.Key ?? stem;
+    }
 
     private static List<SubroutineCall> CollectSubroutineCalls(List<SdlPage> pages, List<SubroutinePage> subPages)
     {
         var calls = new List<SubroutineCall>();
-        void Walk(string machine, string source, IEnumerable<SdlPathStep>? steps)
+        void Walk(string machine, string page, string source, IEnumerable<SdlPathStep>? steps)
         {
             foreach (var st in steps ?? Enumerable.Empty<SdlPathStep>())
             {
                 if (st.Kind == "subroutine" && !string.IsNullOrWhiteSpace(st.Action))
-                    calls.Add(new SubroutineCall(machine, source, st.Action!));
-                Walk(machine, source, st.Body);
+                    calls.Add(new SubroutineCall(machine, page, source, st.Action!));
+                Walk(machine, page, source, st.Body);
             }
         }
         foreach (var p in pages)
-            foreach (var t in p.Transitions) Walk(p.Machine, p.SourcePath, t.Path);
+            foreach (var t in p.Transitions) Walk(p.Machine, p.State, p.SourcePath, t.Path);
         foreach (var sp in subPages)
+        {
+            var key = SubroutinesPageKey(sp.Machine, sp.SourcePath);
             foreach (var sub in sp.Subroutines)
-                foreach (var path in sub.Paths) Walk(sp.Machine, sp.SourcePath, path.Path);
+                foreach (var path in sub.Paths) Walk(sp.Machine, key, sp.SourcePath, path.Path);
+        }
         return calls;
     }
 
@@ -1194,12 +1238,14 @@ internal static class Program
 
     /// <summary>
     /// Every subroutine call must name a subroutine defined on one of its
-    /// machine's subroutines pages, either as drawn or through its
-    /// actions.yaml canonical name. A call the figures really draw with a
-    /// name the subroutines page doesn't use is listed in
-    /// known-figure-defects.yaml as unknown_subroutine (warned, never
-    /// silently passed); such an entry for a call that now resolves, or no
-    /// longer occurs, is stale. A machine whose Annex C subroutines page is
+    /// machine's subroutines pages, by its drawn label (case, spacing,
+    /// punctuation and a trailing bracketed argument ignored; actions.yaml
+    /// aliases deliberately not consulted, so an alias can't hide a figure
+    /// defect). A call the figures really draw with a name the subroutines
+    /// page doesn't use is listed in known-figure-defects.yaml as
+    /// unknown_subroutine, one entry per page (warned, never silently
+    /// passed); such an entry for a call that now resolves, or is no longer
+    /// drawn on that page, is stale. A machine whose Annex C subroutines page is
     /// not transcribed yet is skipped.
     /// </summary>
     private static void LintSubroutineCalls(
@@ -1222,11 +1268,13 @@ internal static class Program
                 if (hasPageInAnnexC) continue;   // subroutines page not transcribed yet
                 names = new HashSet<string>(StringComparer.Ordinal);
             }
-            var canonical = actions.CanonicalLookup.TryGetValue(call.Label, out var c) ? c : call.Label;
-            if (names.Contains(SubroutineKey(call.Label)) || names.Contains(SubroutineKey(canonical))) continue;
+            // The drawn label only. An actions.yaml alias may map two
+            // spellings to one verb, but that must not hide a call whose
+            // drawn name differs from the subroutine's.
+            if (names.Contains(SubroutineKey(call.Label))) continue;
 
-            var known = listed.FirstOrDefault(d => d.Machine == call.Machine && d.Call == call.Label);
-            if (!reported.Add((call.Machine, call.Label))) continue;
+            var known = listed.FirstOrDefault(d => d.Machine == call.Machine && d.Page == call.Page && d.Call == call.Label);
+            if (!reported.Add((call.Machine + "|" + call.Page, call.Label))) continue;
             if (known is not null)
             {
                 matched.Add(known);
@@ -1234,7 +1282,7 @@ internal static class Program
                 continue;
             }
             errors.Add(
-                $"{call.SourcePath}: subroutine call \"{call.Label}\" names no subroutine of `{call.Machine}`" +
+                $"{call.SourcePath}: subroutine call \"{call.Label}\" on page {call.Page} names no subroutine of `{call.Machine}`" +
                 (hasPageInAnnexC ? "" : " (Annex C draws no subroutines page for it)") +
                 ". Typo, OR the figure calls it by another name: raise it as an ax25spec issue and list it in " +
                 $"spec-sdl/{KnownFigureDefects.FileName} as {KnownFigureDefect.UnknownSubroutine}.");
@@ -1260,12 +1308,9 @@ internal static class Program
     /// full event coverage (deciding which events a state should handle
     /// is the spec author's call).
     /// </summary>
-    private static readonly string[] CatchallEvents =
-    {
-        "all_other_primitives__from_lower_layer",
-        "all_other_primitives__from_upper_layer",
-        "all_other_commands",
-    };
+    // The catch-all family is IR's CatchallEvents: any id starting
+    // `all_other_` (all_other_primitives__*, all_other_commands,
+    // all_other_dl_primitives__* from figc6.x, ...).
 
     private static void LintCatchallCoverage(List<SdlPage> pages, List<KnownFigureDefect> knownDefects, List<string> errors)
     {
@@ -1278,7 +1323,7 @@ internal static class Program
             // catchall requirement applies once the page is complete.
             if (string.Equals(page.Coverage, "partial", StringComparison.OrdinalIgnoreCase)) continue;
 
-            bool hasCatchall = page.Transitions.Any(t => CatchallEvents.Contains(t.On, StringComparer.Ordinal));
+            bool hasCatchall = page.Transitions.Any(t => CatchallEvents.IsCatchall(t.On));
             var known = exempt.FirstOrDefault(d => d.Machine == page.Machine && d.State == page.State);
             if (known is not null)
             {
@@ -1302,8 +1347,8 @@ internal static class Program
             if (!hasCatchall)
             {
                 errors.Add(
-                    $"{page.SourcePath}: state `{page.State}` has no transition triggered by any of " +
-                    $"`{string.Join("` / `", CatchallEvents)}`. Add a catchall transition (or mark the page " +
+                    $"{page.SourcePath}: state `{page.State}` has no transition triggered by a catch-all event " +
+                    $"(`{CatchallEvents.Prefix}...`, such as all_other_primitives__from_upper_layer). Add a catchall transition (or mark the page " +
                     "`coverage: partial` if this is a work-in-progress transcription) so events not " +
                     "explicitly handled don't silently no-op at runtime. If the figure itself draws none, raise it " +
                     $"as an ax25spec issue and list it in spec-sdl/{KnownFigureDefects.FileName} as {KnownFigureDefect.MissingCatchall}.");
@@ -1369,6 +1414,9 @@ internal sealed class CodegenOptions
 
     [Option("known-findings", Default = "", HelpText = "Allow-list of known totality/determinism findings (docs/lint-totality.md). Defaults to codegen/lint-known-findings.yaml relative to the working directory, treated as empty when absent; an explicit path must exist.")]
     public string KnownFindings { get; set; } = "";
+
+    [Option("closed-set-values", Default = "", HelpText = "Registry of stable numeric values for the generated closed-set enums. Defaults to codegen/closed-set-values.yaml relative to the working directory; when absent, values are assigned in memory and nothing is written.")]
+    public string ClosedSetValues { get; set; } = "";
 
     // ─── C# ────────────────────────────────────────────────────────────
     [Option("csharp", Default = false, HelpText = "Emit C# backend (defaults to spec/csharp + spec/csharp/tests).")]
@@ -1444,6 +1492,8 @@ internal sealed class CodegenPlan
     public required string KnownFindingsPath { get; init; }
     /// <summary>True when the user passed --known-findings, so a missing file is an error rather than an empty list.</summary>
     public required bool KnownFindingsExplicit { get; init; }
+    /// <summary>Path of the closed-set value registry (see <see cref="Packet.Sdl.IR.ClosedSetValues"/>).</summary>
+    public required string ClosedSetValuesPath { get; init; }
     public required bool EmitCsharp { get; init; }
     public required bool EmitGo { get; init; }
     public required bool EmitTs { get; init; }
@@ -1501,6 +1551,7 @@ internal sealed class CodegenPlan
             InDir       = opt.InDir,
             KnownFindingsPath     = opt.KnownFindings.Length > 0 ? opt.KnownFindings : DefaultKnownFindings,
             KnownFindingsExplicit = opt.KnownFindings.Length > 0,
+            ClosedSetValuesPath   = opt.ClosedSetValues.Length > 0 ? opt.ClosedSetValues : "codegen/closed-set-values.yaml",
             EmitCsharp  = emitCsharp,
             EmitGo      = emitGo,
             EmitTs      = emitTs,

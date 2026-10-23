@@ -196,3 +196,19 @@ public static class EventCatalog
         return events;
     }
 }
+
+/// <summary>
+/// The catch-all event family. The transcriber gives every catch-all input
+/// ("All Other Primitives", "All Other Commands", "All Other DL Primitives")
+/// an id starting <c>all_other_</c>, with a <c>__from_upper_layer</c> or
+/// <c>__from_lower_layer</c> suffix where the figures draw both sides, so the
+/// family is defined by that prefix rather than a fixed list. Each id must
+/// still be in <c>events.yaml</c> (the catalogue lint checks that).
+/// </summary>
+public static class CatchallEvents
+{
+    public const string Prefix = "all_other_";
+
+    public static bool IsCatchall(string? eventId) =>
+        eventId is not null && eventId.StartsWith(Prefix, StringComparison.Ordinal);
+}

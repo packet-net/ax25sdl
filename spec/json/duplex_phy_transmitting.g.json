@@ -1,0 +1,121 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "duplex_phy",
+  "state": "Transmitting",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2b.5",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_ph_seize_request",
+      "from": "Transmitting",
+      "on": "PH_SEIZE_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "PH_SEIZE_confirm",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_ph_release_request",
+      "from": "Transmitting",
+      "on": "PH_RELEASE_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Clear Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "HW-TOFF Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "TransmitterReady",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_t107_expiry",
+      "from": "Transmitting",
+      "on": "T107_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Set Interrupted",
+          "kind": "processing"
+        },
+        {
+          "verb": "HW-TOFF Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "TransmitterReady",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ph_data_request",
+      "from": "Transmitting",
+      "on": "PH_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-DATA Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_ph_expedited_data_request",
+      "from": "Transmitting",
+      "on": "PH_EXPEDITED_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-DATA Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_all_other_primitives__from_upper_layer",
+      "from": "Transmitting",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

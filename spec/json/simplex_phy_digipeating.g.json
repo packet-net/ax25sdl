@@ -1,0 +1,109 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "simplex_phy",
+  "state": "Digipeating",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2a.6",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_ph_expedited_data_request",
+      "from": "Digipeating",
+      "on": "PH_EXPEDITED_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-DATA Request",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Digipeating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_all_other_primitives__from_upper_layer",
+      "from": "Digipeating",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Digipeating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_priority_queue_empty",
+      "from": "Digipeating",
+      "on": "priority_queue_empty",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-TOFF Request",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Digipeating",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start_T100_bracketed",
+          "kind": "processing"
+        },
+        {
+          "verb": "(Start T108)",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend Processing Priority Queue",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_t106_expiry",
+      "from": "Digipeating",
+      "on": "T106_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "HW-TOFF Request",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Clear Digipeating",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start_T100_bracketed",
+          "kind": "processing"
+        },
+        {
+          "verb": "(Start T108)",
+          "kind": "processing"
+        },
+        {
+          "verb": "Suspend Processing Priority Queue",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}
