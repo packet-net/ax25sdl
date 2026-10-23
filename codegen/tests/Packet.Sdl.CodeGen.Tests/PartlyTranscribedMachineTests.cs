@@ -396,6 +396,104 @@ public class PartlyTranscribedMachineTests
         result.Stderr.Should().Contain(expected);
     }
 
+    // ─── Subroutine calls must name a subroutine of the machine ────────
+
+    private const string LinkMuxSubroutines = """
+        machine: link_mux
+        source: { spec: test, figure: figc3.4 }
+        subroutines:
+          - name: Queue_Event
+            paths:
+              - id: t01_queue_event
+                path:
+                  - { action: Push On Current Queue, kind: internal_out }
+        """;
+
+    private static string IdleCalling(string call) =>
+        LinkMuxIdlePage.Replace("{ action: Queue Event, kind: subroutine }", $"{{ action: {call}, kind: subroutine }}");
+
+    [Theory]
+    [InlineData("Queue Event")]
+    [InlineData("QUEUE EVENT")]
+    [InlineData("Queue Event (Now)")]   // a bracketed argument is not part of the name
+    public void A_call_that_names_a_subroutine_of_the_machine_passes(string call)
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleCalling(call));
+        r.WritePage("link-multiplexer/subroutines.sdl.yaml", LinkMuxSubroutines);
+
+        var result = r.Run();
+
+        result.Stderr.Should().NotContain("names no subroutine");
+    }
+
+    [Fact]
+    public void A_call_that_names_no_subroutine_is_an_error_unless_listed()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleCalling("Queue Evnet"));
+        r.WritePage("link-multiplexer/subroutines.sdl.yaml", LinkMuxSubroutines);
+
+        var unlisted = r.Run();
+        unlisted.ExitCode.Should().NotBe(0);
+        unlisted.Stderr.Should().Contain("subroutine call \"Queue Evnet\" names no subroutine of `link_mux`");
+
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - kind: unknown_subroutine
+                machine: link_mux
+                call: Queue Evnet
+                issue: https://github.com/packethacking/ax25spec/issues/144
+            """);
+        var listed = r.Run();
+        listed.Stderr.Should().NotContain("names no subroutine");
+        listed.Stderr.Should().Contain("::warning::").And.Contain("calls subroutine \"Queue Evnet\", which it does not define");
+    }
+
+    [Fact]
+    public void An_unknown_subroutine_entry_for_a_call_that_resolves_is_stale()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", LinkMuxIdlePage);
+        r.WritePage("link-multiplexer/subroutines.sdl.yaml", LinkMuxSubroutines);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - kind: unknown_subroutine
+                machine: link_mux
+                call: Queue Event
+                issue: https://github.com/packethacking/ax25spec/issues/144
+            """);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("calls subroutine \"Queue Event\"").And.Contain("no longer occurs");
+    }
+
+    [Fact]
+    public void An_unknown_subroutine_entry_must_name_a_call_and_nothing_else()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", LinkMuxIdlePage);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - kind: unknown_subroutine
+                machine: link_mux
+                state: Idle
+                call: Queue Event
+                issue: https://github.com/packethacking/ax25spec/issues/144
+            """);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("needs machine and call");
+    }
+
     [Fact]
     public void A_machine_that_is_not_in_Annex_C_is_an_error()
     {

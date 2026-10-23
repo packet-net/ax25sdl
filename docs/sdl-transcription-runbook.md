@@ -223,7 +223,18 @@ A second kind covers a state whose figure draws no catch-all input (no "All Othe
     issue: https://github.com/packethacking/ax25spec/issues/<n>
 ```
 
-It names a state, not a transition. The page is exempt from the catch-all lint and the machine still generates, with partial coverage: events the state doesn't handle have no transition, as with a `coverage: partial` page. It is reported as a warning, and is stale (an error) once the page gains a catch-all. This is the only kind a published machine (Data Link, Management Data Link) may carry, because it changes no transition. Any other defect on a published machine still fails, because those machines are never withheld.
+It names a state, not a transition. The page is exempt from the catch-all lint and the machine still generates, with partial coverage: events the state doesn't handle have no transition, as with a `coverage: partial` page. It is reported as a warning, and is stale (an error) once the page gains a catch-all. This and `unknown_subroutine` (below) are the only kinds a published machine (Data Link, Management Data Link) may carry, because they change no transition. Any other defect on a published machine still fails, because those machines are never withheld.
+
+A third kind covers a subroutine call that names no subroutine of its machine. Codegen checks every call against the machine's subroutines pages, ignoring case, spaces, punctuation and a trailing bracketed argument ("Enquiry Response (F = 1)" calls Enquiry_Response), either as drawn or through its actions.yaml canonical name. A call the figure really draws under another name is listed with its label exactly as drawn:
+
+```yaml
+  - kind: unknown_subroutine
+    machine: data_link
+    call: Select T1 Value
+    issue: https://github.com/packethacking/ax25spec/issues/144
+```
+
+It warns, changes nothing that is generated, and so is allowed on a published machine. It is stale once the call resolves or is no longer drawn. A machine whose Annex C subroutines page is not transcribed yet is skipped.
 
 ## After the transcription
 

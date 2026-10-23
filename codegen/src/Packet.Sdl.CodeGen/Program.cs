@@ -122,6 +122,10 @@ internal static class Program
             pages.Add(Loader.LoadPage(path));
         }
 
+        // Subroutine calls as drawn, collected before action normalisation
+        // rewrites them to canonical verbs (the lint matches either form).
+        var subroutineCalls = CollectSubroutineCalls(pages, subroutinePages);
+
         var errors = new List<string>();
         foreach (var page in pages)
         {
@@ -201,6 +205,9 @@ internal static class Program
         // coverage; deciding which events a state should handle is the
         // spec author's call, not codegen's.
         LintCatchallCoverage(pages, knownDefects, errors);
+
+        // Every subroutine call must name a subroutine of its own machine.
+        LintSubroutineCalls(subroutineCalls, subroutinePages, actions, knownDefects, errors);
 
         if (errors.Count > 0)
         {
@@ -1146,6 +1153,98 @@ internal static class Program
             errors.Add(
                 $"pages {string.Join(", ", group.Select(g => g.SourcePath).Order(StringComparer.Ordinal))} would all generate " +
                 $"files named `{group.Key}.g.*`, so each would overwrite the others. Rename one *.sdl.yaml.");
+        }
+    }
+
+    // ─── Subroutine-call lint ─────────────────────────────────────────
+
+    private sealed record SubroutineCall(string Machine, string SourcePath, string Label);
+
+    private static List<SubroutineCall> CollectSubroutineCalls(List<SdlPage> pages, List<SubroutinePage> subPages)
+    {
+        var calls = new List<SubroutineCall>();
+        void Walk(string machine, string source, IEnumerable<SdlPathStep>? steps)
+        {
+            foreach (var st in steps ?? Enumerable.Empty<SdlPathStep>())
+            {
+                if (st.Kind == "subroutine" && !string.IsNullOrWhiteSpace(st.Action))
+                    calls.Add(new SubroutineCall(machine, source, st.Action!));
+                Walk(machine, source, st.Body);
+            }
+        }
+        foreach (var p in pages)
+            foreach (var t in p.Transitions) Walk(p.Machine, p.SourcePath, t.Path);
+        foreach (var sp in subPages)
+            foreach (var sub in sp.Subroutines)
+                foreach (var path in sub.Paths) Walk(sp.Machine, sp.SourcePath, path.Path);
+        return calls;
+    }
+
+    /// <summary>
+    /// The name a call and a subroutine are compared by: a trailing
+    /// bracketed argument dropped ("Enquiry Response (F = 1)" calls
+    /// Enquiry_Response), then case, spaces and punctuation ignored, so
+    /// "N(r) Error Recovery" matches N_r_Error_Recovery.
+    /// </summary>
+    private static string SubroutineKey(string name)
+    {
+        var s = System.Text.RegularExpressions.Regex.Replace(name, @"\s*\([^()]*\)\s*$", "");
+        return System.Text.RegularExpressions.Regex.Replace(s.ToLowerInvariant(), "[^a-z0-9]", "");
+    }
+
+    /// <summary>
+    /// Every subroutine call must name a subroutine defined on one of its
+    /// machine's subroutines pages, either as drawn or through its
+    /// actions.yaml canonical name. A call the figures really draw with a
+    /// name the subroutines page doesn't use is listed in
+    /// known-figure-defects.yaml as unknown_subroutine (warned, never
+    /// silently passed); such an entry for a call that now resolves, or no
+    /// longer occurs, is stale. A machine whose Annex C subroutines page is
+    /// not transcribed yet is skipped.
+    /// </summary>
+    private static void LintSubroutineCalls(
+        List<SubroutineCall> calls, List<SubroutinePage> subPages, ActionCatalog actions,
+        List<KnownFigureDefect> knownDefects, List<string> errors)
+    {
+        var defined = subPages
+            .GroupBy(p => p.Machine, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.SelectMany(p => p.Subroutines).Select(s => SubroutineKey(s.Name)).ToHashSet(StringComparer.Ordinal),
+                          StringComparer.Ordinal);
+        var listed = knownDefects.Where(d => d.Kind == KnownFigureDefect.UnknownSubroutine).ToList();
+        var matched = new HashSet<KnownFigureDefect>();
+        var reported = new HashSet<(string, string)>();
+
+        foreach (var call in calls)
+        {
+            var hasPageInAnnexC = AnnexC.Pages.Any(p => p.Machine == call.Machine && p.IsSubroutines);
+            if (!defined.TryGetValue(call.Machine, out var names))
+            {
+                if (hasPageInAnnexC) continue;   // subroutines page not transcribed yet
+                names = new HashSet<string>(StringComparer.Ordinal);
+            }
+            var canonical = actions.CanonicalLookup.TryGetValue(call.Label, out var c) ? c : call.Label;
+            if (names.Contains(SubroutineKey(call.Label)) || names.Contains(SubroutineKey(canonical))) continue;
+
+            var known = listed.FirstOrDefault(d => d.Machine == call.Machine && d.Call == call.Label);
+            if (!reported.Add((call.Machine, call.Label))) continue;
+            if (known is not null)
+            {
+                matched.Add(known);
+                Console.Error.WriteLine($"::warning::{call.SourcePath}: known figure defect: {known.Describe()}.");
+                continue;
+            }
+            errors.Add(
+                $"{call.SourcePath}: subroutine call \"{call.Label}\" names no subroutine of `{call.Machine}`" +
+                (hasPageInAnnexC ? "" : " (Annex C draws no subroutines page for it)") +
+                ". Typo, OR the figure calls it by another name: raise it as an ax25spec issue and list it in " +
+                $"spec-sdl/{KnownFigureDefects.FileName} as {KnownFigureDefect.UnknownSubroutine}.");
+        }
+
+        foreach (var d in listed.Where(d => !matched.Contains(d)))
+        {
+            errors.Add(
+                $"spec-sdl/{KnownFigureDefects.FileName}: {d.Describe()} no longer occurs: the call now resolves, or is not " +
+                "drawn. Remove the entry.");
         }
     }
 

@@ -22,8 +22,18 @@ public sealed class KnownFigureDefect
     /// </summary>
     public const string MissingCatchall = "missing_catchall";
 
-    /// <summary><see cref="UnknownNextState"/> (the default) or <see cref="MissingCatchall"/>.</summary>
+    /// <summary>
+    /// A subroutine call, as drawn, names no subroutine of its machine. The
+    /// machine still generates (the call stays a named verb, as before). It
+    /// changes no transition, so it is allowed on a published machine.
+    /// </summary>
+    public const string UnknownSubroutine = "unknown_subroutine";
+
+    /// <summary><see cref="UnknownNextState"/> (the default), <see cref="MissingCatchall"/> or <see cref="UnknownSubroutine"/>.</summary>
     public string Kind { get; set; } = UnknownNextState;
+
+    /// <summary>unknown_subroutine only: the call's label exactly as drawn (e.g. "Select T1 Value").</summary>
+    public string Call { get; set; } = "";
 
     /// <summary>The page's <c>machine:</c>.</summary>
     public string Machine { get; set; } = "";
@@ -37,9 +47,12 @@ public sealed class KnownFigureDefect
     public string Issue { get; set; } = "";
     public string? Note { get; set; }
 
-    public string Describe() => Kind == MissingCatchall
-        ? $"{Machine} {State} has no catch-all input ({Issue})"
-        : $"{Machine} {State} transition `{Transition}` leads to `{Next}` ({Issue})";
+    public string Describe() => Kind switch
+    {
+        MissingCatchall => $"{Machine} {State} has no catch-all input ({Issue})",
+        UnknownSubroutine => $"{Machine} calls subroutine \"{Call}\", which it does not define ({Issue})",
+        _ => $"{Machine} {State} transition `{Transition}` leads to `{Next}` ({Issue})",
+    };
 }
 
 /// <summary>Top-level shape of the allowlist file.</summary>
@@ -93,14 +106,28 @@ public static class KnownFigureDefects
         var seen = new HashSet<(string, string, string)>();
         foreach (var d in file.Defects ?? new List<KnownFigureDefect>())
         {
-            if (d.Kind is not (KnownFigureDefect.UnknownNextState or KnownFigureDefect.MissingCatchall))
+            if (d.Kind is not (KnownFigureDefect.UnknownNextState or KnownFigureDefect.MissingCatchall or KnownFigureDefect.UnknownSubroutine))
             {
-                errors.Add($"{path}: unknown kind `{d.Kind}`; use {KnownFigureDefect.UnknownNextState} or {KnownFigureDefect.MissingCatchall}.");
+                errors.Add($"{path}: unknown kind `{d.Kind}`; use {KnownFigureDefect.UnknownNextState}, {KnownFigureDefect.MissingCatchall} or {KnownFigureDefect.UnknownSubroutine}.");
                 continue;
             }
-            if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.State))
+            if (d.Kind == KnownFigureDefect.UnknownSubroutine)
+            {
+                if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.Call)
+                    || !string.IsNullOrWhiteSpace(d.State) || !string.IsNullOrWhiteSpace(d.Transition) || !string.IsNullOrWhiteSpace(d.Next))
+                {
+                    errors.Add($"{path}: an {KnownFigureDefect.UnknownSubroutine} entry needs machine and call (the label as drawn), and nothing else.");
+                    continue;
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.State))
             {
                 errors.Add($"{path}: every entry needs machine and state.");
+                continue;
+            }
+            else if (!string.IsNullOrWhiteSpace(d.Call))
+            {
+                errors.Add($"{path}: `call` belongs only to {KnownFigureDefect.UnknownSubroutine} entries.");
                 continue;
             }
             if (d.Kind == KnownFigureDefect.UnknownNextState
@@ -121,7 +148,7 @@ public static class KnownFigureDefects
                            "(https://github.com/packethacking/ax25spec/issues/<number>).");
                 continue;
             }
-            if (!seen.Add((d.Kind + ":" + d.Machine, d.State, d.Transition)))
+            if (!seen.Add((d.Kind + ":" + d.Machine, d.State + d.Call, d.Transition)))
             {
                 errors.Add($"{path}: {d.Describe()} is listed twice.");
                 continue;

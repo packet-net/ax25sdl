@@ -702,6 +702,22 @@ public class TranscribeTests
     }
 
     [Fact]
+    public void A_save_inside_a_subroutine_path_is_an_error_not_a_silent_drop()
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Queue Event", 0, 0),
+            new("n1", "Save a signal until a new state is reached", "Requeue", 0, 1),
+            new("n2", "Return from Subroutine", "",            0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+
+        var act = () => SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*subroutine 'Queue_Event'*can't appear inside a subroutine path*");
+    }
+
+    [Fact]
     public void A_subroutine_start_with_no_edge_is_an_error()
     {
         var nodes = new List<GraphmlNode>
