@@ -10,18 +10,7 @@ def test_source_figure() -> None:
 
 
 def test_transitions_are_present() -> None:
-    assert len(DATA_LINK_AWAITING_CONNECTION.transitions) == 25
-
-
-def test_t01_dl_disconnect_request() -> None:
-    t = next(
-        (x for x in DATA_LINK_AWAITING_CONNECTION.transitions if x.id == "t01_dl_disconnect_request"),
-        None,
-    )
-    assert t is not None, "transition t01_dl_disconnect_request not found"
-    assert t.on == "DL_DISCONNECT_request"
-    assert t.next == "AwaitingConnection"
-    assert len(t.actions) == 0
+    assert len(DATA_LINK_AWAITING_CONNECTION.transitions) == 24
 
 
 def test_t02_disc_received() -> None:

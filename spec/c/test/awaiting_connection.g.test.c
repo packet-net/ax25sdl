@@ -25,24 +25,8 @@ static int test_source_figure(void) {
 }
 
 static int test_transitions_count(void) {
-  ASSERT(data_link_awaiting_connection.transitions_len == 25,
+  ASSERT(data_link_awaiting_connection.transitions_len == 24,
          "transitions count");
-  return 0;
-}
-
-static int test_t01_dl_disconnect_request(void) {
-  const TransitionSpec *t = NULL;
-  for (size_t i = 0; i < data_link_awaiting_connection.transitions_len; i++) {
-    if (strcmp(data_link_awaiting_connection.transitions[i].id,
-               "t01_dl_disconnect_request") == 0) {
-      t = &data_link_awaiting_connection.transitions[i];
-      break;
-    }
-  }
-  ASSERT(t != NULL, "t01_dl_disconnect_request not found");
-  ASSERT_STREQ(t->on, "DL_DISCONNECT_request", "on");
-  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
-  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -558,7 +542,6 @@ int main(void) {
   int rc = 0;
   rc |= test_source_figure();
   rc |= test_transitions_count();
-  rc |= test_t01_dl_disconnect_request();
   rc |= test_t02_disc_received();
   rc |= test_t03_dm_received_yes();
   rc |= test_t03_dm_received_no();

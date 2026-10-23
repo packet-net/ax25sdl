@@ -10,16 +10,7 @@ describe("DataLinkAwaitingConnection", () => {
   });
 
   it("transitions are present", () => {
-    expect(DataLinkAwaitingConnection.transitions).toHaveLength(25);
-  });
-
-  it("t01_dl_disconnect_request", () => {
-    const t = DataLinkAwaitingConnection.transitions.find((x) => x.id === "t01_dl_disconnect_request");
-    expect(t, "transition t01_dl_disconnect_request not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("DL_DISCONNECT_request");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.actions).toHaveLength(0);
+    expect(DataLinkAwaitingConnection.transitions).toHaveLength(24);
   });
 
   it("t02_disc_received", () => {

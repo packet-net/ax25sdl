@@ -6,281 +6,133 @@
 #include "ax25sdl.h"
 
 static const ActionStep
-    management_data_link_negotiating_t01_xid_response_received_yes_actions[] = {
-        {.verb = "Apply Negotiated Parameters",
-         .kind = AX25SDL_KIND_SUBROUTINE},
-        {.verb = "Stop TM201", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "MDL_NEGOTIATE_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-};
-
-static const ImplementationReference
-    management_data_link_negotiating_t01_xid_response_received_yes_references
-        [] = {
-            {.source = "spec_prose",
-             .cite = "§C5.3 ¶3",
-             .quote = "If the other station is using version 2.2 or better, it "
-                      "will respond with an XID response.",
-             .path = "",
-             .function = "",
-             .line = 0,
-             .note = ""},
-            {.source = "spec_prose",
-             .cite = "§6.3.2 ¶7",
-             .quote = "The distant TNC chooses to accept the values offered, "
-                      "or other acceptable values, and places these values in "
-                      "the XID response. Both TNCs set up based on the values "
-                      "used in the XID response.",
-             .path = "",
-             .function = "",
-             .line = 0,
-             .note = ""},
-            {.source = "spec_prose",
-             .cite = "§5.1",
-             .quote = "MDL-NEGOTIATE Confirm. The Management Data-link State "
-                      "Machine uses this primitive to notify the Layer 3 "
-                      "entity that notification/negotiation is complete.",
-             .path = "",
-             .function = "",
-             .line = 0,
-             .note = ""},
-};
-
-static const ActionStep
-    management_data_link_negotiating_t01_xid_response_received_no_actions[] = {
-        {.verb = "MDL_ERROR_indicate_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-};
-
-static const ImplementationReference
-    management_data_link_negotiating_t01_xid_response_received_no_references[] =
-        {
-            {.source = "spec_prose",
-             .cite = "§C5.3 Error Codes",
-             .quote = "D — XID response without F=1.",
-             .path = "",
-             .function = "",
-             .line = 0,
-             .note = ""},
-};
-
-static const ActionStep
-    management_data_link_negotiating_t02_frmr_received_actions[] = {
-        {.verb = "set_version_2_0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "Stop TM201", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "MDL_NEGOTIATE_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
-};
-
-static const ImplementationReference
-    management_data_link_negotiating_t02_frmr_received_references[] = {
-        {.source = "spec_prose",
-         .cite = "§6.3.2 ¶1",
-         .quote =
-             "Implementations of AX.25 prior to version 2.2 respond to an XID "
-             "command frame with a FRMR response frame. The TNC receiving the "
-             "FRMR uses a default set of parameters compatible with previous "
-             "versions of AX.25 and a version 2.0 connection is made.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-        {.source = "spec_prose",
-         .cite = "§C5.3 ¶3",
-         .quote = "If the other station is using a version of AX.25 earlier "
-                  "than 2.2, it will respond with an FRMR of the XID command, "
-                  "and the default version 2.0 parameters will be used.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-};
-
-static const ActionStep
-    management_data_link_negotiating_t03_tm201_expiry_yes_actions[] = {
+    management_data_link_negotiating_t02_tm201_expiry_yes_actions[] = {
+        {.verb = "RC := RC + 1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "MDL_ERROR_indicate_C", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
-static const ImplementationReference
-    management_data_link_negotiating_t03_tm201_expiry_yes_references[] = {
-        {.source = "spec_prose",
-         .cite = "§C5.3 Error Codes",
-         .quote = "C — Management retry limit exceeded.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-        {.source = "spec_prose",
-         .cite = "§C5.3 Variables",
-         .quote = "RC — Retry count. NM201 — Maximum number of retries of the "
-                  "XID command.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-};
-
 static const ActionStep
-    management_data_link_negotiating_t03_tm201_expiry_no_actions[] = {
+    management_data_link_negotiating_t02_tm201_expiry_no_actions[] = {
         {.verb = "RC := RC + 1", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "XID_command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Retransmit XID Command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
         {.verb = "Start TM201", .kind = AX25SDL_KIND_PROCESSING},
 };
 
-static const ImplementationReference
-    management_data_link_negotiating_t03_tm201_expiry_no_references[] = {
-        {.source = "spec_prose",
-         .cite = "§C5.3 Variables",
-         .quote = "RC — Retry count. NM201 — Maximum number of retries of the "
-                  "XID command.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-        {.source = "spec_prose",
-         .cite = "§6.3.1 ¶2",
-         .quote = "If the distant TNC doesn't respond before T1 times out, the "
-                  "originating TNC resends the SABM frame and starts T1 "
-                  "running again. The originating TNC tries to establish a "
-                  "connection until it has tried unsuccessfully N2 times.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
+static const ActionStep
+    management_data_link_negotiating_t04_xid_response_received_yes_actions[] = {
+        {.verb = "Complete Classes of Procedures Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Complete Optional Functions Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Complete N1 Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Complete Window Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Complete Retry Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Complete T1 Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Stop TM201", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "MDL_NEGOTIATE_confirm", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+};
+
+static const ActionStep
+    management_data_link_negotiating_t04_xid_response_received_no_actions[] = {
+        {.verb = "MDL_ERROR_indicate_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+};
+
+static const ActionStep
+    management_data_link_negotiating_t05_frmr_response_received_yes_actions[] =
+        {
+            {.verb = "Set Segmentor Off", .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "Set Version 2.0 Defaults",
+             .kind = AX25SDL_KIND_PROCESSING},
+            {.verb = "MDL_ERROR_indicate_E", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const TransitionSpec management_data_link_negotiating_transitions[] = {
     {
-        .id = "t01_xid_response_received_yes",
+        .id = "t02_tm201_expiry_yes",
+        .from = "Negotiating",
+        .on = "TM201_expiry",
+        .guard = "AC_gt_NM201",
+        .actions =
+            management_data_link_negotiating_t02_tm201_expiry_yes_actions,
+        .actions_len = 2,
+        .next = "Ready",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t02_tm201_expiry_no",
+        .from = "Negotiating",
+        .on = "TM201_expiry",
+        .guard = "not AC_gt_NM201",
+        .actions = management_data_link_negotiating_t02_tm201_expiry_no_actions,
+        .actions_len = 3,
+        .next = "Ready",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t04_xid_response_received_yes",
         .from = "Negotiating",
         .on = "XID_response_received",
         .guard = "F_eq_1",
         .actions =
-            management_data_link_negotiating_t01_xid_response_received_yes_actions,
-        .actions_len = 3,
+            management_data_link_negotiating_t04_xid_response_received_yes_actions,
+        .actions_len = 8,
         .next = "Ready",
-        .notes =
-            "verification_pending (prose-derived bootstrap; figc5.2 graphml "
-            "redraw pending — see backfill task). Derived from §C5.3 ¶3 (\"If "
-            "the other station is using version 2.2 or better, it will respond "
-            "with an XID response\") + §6.3.2 (\"Both TNCs set up based on the "
-            "values used in the XID response\") + the §C5.3 MDL-NEGOTIATE "
-            "Confirm primitive. The F==1 split is inferred from error code D "
-            "(\"XID response without F=1\") — the diamond's presence/placement "
-            "is NOT figure-verified. `Apply Negotiated Parameters` is a "
-            "placeholder for the figc5.3–figc5.8 per-parameter \"reverts to\" "
-            "subroutines (Classes of Procedures → half-duplex; Optional "
-            "Functions → lesser of REJ/SREJ and modulo 8/128; Ack Timer & "
-            "Retries → greater; N1 & k → notification/min), which are NOT "
-            "decomposed here. Whether the figure stops T1 (a data-link timer) "
-            "in addition to TM201 is UNKNOWN: the §C5.3 timer list names only "
-            "TM201 for this machine, so only TM201 is stopped here; the task "
-            "brief's mention of \"stop T1/TM201\" is flagged as "
-            "figc5.2-dependent and unverified.",
-        .references =
-            management_data_link_negotiating_t01_xid_response_received_yes_references,
-        .references_len = 3,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
     {
-        .id = "t01_xid_response_received_no",
+        .id = "t04_xid_response_received_no",
         .from = "Negotiating",
         .on = "XID_response_received",
         .guard = "not F_eq_1",
         .actions =
-            management_data_link_negotiating_t01_xid_response_received_no_actions,
+            management_data_link_negotiating_t04_xid_response_received_no_actions,
         .actions_len = 1,
         .next = "Negotiating",
-        .notes = "verification_pending (prose-derived bootstrap; figc5.2 "
-                 "graphml redraw pending — see backfill task). The error-D "
-                 "condition (\"XID response without F=1\", §C5.3 Error Codes) "
-                 "is prose-clear. The destination state after error D (here: "
-                 "stay in Negotiating, TM201 still running) and whether any "
-                 "frame is emitted are NOT figure-verified — this is the most "
-                 "defensible reading of the error-code list.",
-        .references =
-            management_data_link_negotiating_t01_xid_response_received_no_references,
-        .references_len = 1,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
     {
-        .id = "t02_frmr_received",
+        .id = "t05_frmr_response_received_yes",
         .from = "Negotiating",
-        .on = "FRMR_received",
-        .guard = "",
-        .actions = management_data_link_negotiating_t02_frmr_received_actions,
-        .actions_len = 3,
-        .next = "Ready",
-        .notes =
-            "verification_pending (prose-derived bootstrap; figc5.2 graphml "
-            "redraw pending — see backfill task). Derived from §6.3.2 ¶1 "
-            "(\"Implementations of AX.25 prior to version 2.2 respond to an "
-            "XID command frame with a FRMR response frame. The TNC receiving "
-            "the FRMR uses a default set of parameters compatible with "
-            "previous versions of AX.25 and a version 2.0 connection is "
-            "made\") and §C5.3 ¶3. `Set Version 2.0` stands in for installing "
-            "the §6.3.2 version-2.0 default parameter set (half duplex; "
-            "implicit reject, modulo 8; N1=2048 bits; k=7; T1=3000 ms; "
-            "retries=10). The exact action set/order (does the figure draw a "
-            "distinct \"load v2.0 defaults\" box vs reuse the data-link `Set "
-            "Version 2.0` verb? does it stop TM201 before or after "
-            "confirming?) is figc5.2 detail and unverified. The `Set Version "
-            "2.0` verb is shared with the data-link figc4.6 FRMR path.",
-        .references =
-            management_data_link_negotiating_t02_frmr_received_references,
-        .references_len = 2,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
-        .id = "t03_tm201_expiry_yes",
-        .from = "Negotiating",
-        .on = "TM201_expiry",
-        .guard = "RC_eq_NM201",
+        .on = "FRMR_response_received",
+        .guard = "XID_rejected",
         .actions =
-            management_data_link_negotiating_t03_tm201_expiry_yes_actions,
-        .actions_len = 1,
+            management_data_link_negotiating_t05_frmr_response_received_yes_actions,
+        .actions_len = 3,
         .next = "Ready",
-        .notes = "verification_pending (prose-derived bootstrap; figc5.2 "
-                 "graphml redraw pending — see backfill task). Derived from "
-                 "§C5.3 Error Codes (\"C — Management retry limit exceeded\"), "
-                 "the §C5.3 Variables (RC, NM201) and Timer (TM201). The "
-                 "retry-limit FSM shape (compare RC to the maximum, give up vs "
-                 "retransmit) is the standard AX.25 retransmit pattern drawn "
-                 "for T1/N2 in the data-link figures (figc4.3 t02, figc4.6 "
-                 "t13); it is reconstructed here for the management timer by "
-                 "analogy and is NOT figure-verified for figc5.2. The "
-                 "destination state on give-up (Ready) and the exact RC "
-                 "comparison sense (== vs >=) are unverified figure detail.",
-        .references =
-            management_data_link_negotiating_t03_tm201_expiry_yes_references,
-        .references_len = 2,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
     {
-        .id = "t03_tm201_expiry_no",
+        .id = "t05_frmr_response_received_no",
         .from = "Negotiating",
-        .on = "TM201_expiry",
-        .guard = "not RC_eq_NM201",
-        .actions = management_data_link_negotiating_t03_tm201_expiry_no_actions,
-        .actions_len = 3,
-        .next = "Negotiating",
-        .notes =
-            "verification_pending (prose-derived bootstrap; figc5.2 graphml "
-            "redraw pending — see backfill task). Derived from the §C5.3 "
-            "Variables (RC, NM201) and Timer (TM201) plus the §6.3.1 "
-            "link-establishment retry analogue (\"If the distant TNC doesn't "
-            "respond before T1 times out, the originating TNC resends ... and "
-            "starts T1 running again. The originating TNC tries to establish a "
-            "connection until it has tried unsuccessfully N2 times\"). The "
-            "action set/order (RC:=RC+1, resend XID, restart TM201) mirrors "
-            "the data-link figc4.3/figc4.6 T1-expiry retransmit column; it is "
-            "reconstructed by analogy and NOT figure-verified for figc5.2. The "
-            "resent XID command's P-bit is unverified (see Ready t01 note re "
-            "error A / P=1).",
-        .references =
-            management_data_link_negotiating_t03_tm201_expiry_no_references,
-        .references_len = 2,
+        .on = "FRMR_response_received",
+        .guard = "not XID_rejected",
+        .actions = NULL,
+        .actions_len = 0,
+        .next = "Ready",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
@@ -289,10 +141,7 @@ static const TransitionSpec management_data_link_negotiating_transitions[] = {
 const StatePage management_data_link_negotiating = {
     .machine = "management_data_link",
     .state = "Negotiating",
-    .source = {.spec = "ax.25.2.2.4_Oct_25",
-               .figure = "figc5.2",
-               .url = "https://raw.githubusercontent.com/packethacking/"
-                      "ax25spec/main/doc/ax.25.2.2.4_Oct_25.md"},
+    .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc5.2", .url = ""},
     .transitions = management_data_link_negotiating_transitions,
-    .transitions_len = 5,
+    .transitions_len = 6,
 };

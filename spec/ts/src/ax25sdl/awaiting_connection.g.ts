@@ -13,17 +13,6 @@ export const DataLinkAwaitingConnection: StatePage = {
   source: { spec: "ax.25.2.2.4_Oct_25", figure: "figc4.2", url: "" },
   transitions: [
     {
-      id: "t01_dl_disconnect_request",
-      from: "AwaitingConnection",
-      on: "DL_DISCONNECT_request",
-      guard: [],
-      actions: [],
-      next: "AwaitingConnection",
-      notes: "",
-      references: [],
-      loops: [],
-    },
-    {
       id: "t02_disc_received",
       from: "AwaitingConnection",
       on: "DISC_received",

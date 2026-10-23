@@ -14,15 +14,7 @@ public class DataLink_AwaitingConnection_GeneratedTests
 {
     [Fact] public void SourceFigure() => DataLink_AwaitingConnection.Source.Figure.Should().Be("figc4.2");
 
-    [Fact] public void TransitionsArePresent() => DataLink_AwaitingConnection.Transitions.Count.Should().Be(25);
-
-    [Fact] public void t01_dl_disconnect_request()
-    {
-        var t = DataLink_AwaitingConnection.Transitions.Single(x => x.Id == "t01_dl_disconnect_request");
-        t.On.Should().Be(Ax25Event.DLDISCONNECTRequest);
-        t.Next.Should().Be("AwaitingConnection");
-        t.Actions.Count.Should().Be(0);
-    }
+    [Fact] public void TransitionsArePresent() => DataLink_AwaitingConnection.Transitions.Count.Should().Be(24);
 
     [Fact] public void t02_disc_received()
     {

@@ -12,30 +12,8 @@ func TestDataLinkAwaitingConnection_SourceFigure(t *testing.T) {
 }
 
 func TestDataLinkAwaitingConnection_TransitionsArePresent(t *testing.T) {
-	if got := len(DataLinkAwaitingConnection.Transitions); got != 25 {
-		t.Errorf("len(Transitions) = %d, want 25", got)
-	}
-}
-
-func TestDataLinkAwaitingConnection_t01_dl_disconnect_request(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkAwaitingConnection.Transitions {
-		if DataLinkAwaitingConnection.Transitions[i].ID == "t01_dl_disconnect_request" {
-			tx = &DataLinkAwaitingConnection.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t01_dl_disconnect_request not found")
-	}
-	if tx.On != "DL_DISCONNECT_request" {
-		t.Errorf("On = %q, want DL_DISCONNECT_request", tx.On)
-	}
-	if tx.Next != "AwaitingConnection" {
-		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
-	}
-	if got := len(tx.Actions); got != 0 {
-		t.Fatalf("len(Actions) = %d, want 0", got)
+	if got := len(DataLinkAwaitingConnection.Transitions); got != 24 {
+		t.Errorf("len(Transitions) = %d, want 24", got)
 	}
 }
 

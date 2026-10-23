@@ -1,0 +1,302 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "management_data_link",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.4",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Initiate_OF_Negotiation",
+      "paths": [
+        {
+          "id": "t01_initiate_of_negotiation_yes",
+          "guard": "OF_negotiation_requested",
+          "actions": [
+            {
+              "verb": "Select Required Functions",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Command",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_initiate_of_negotiation_no",
+          "guard": "not OF_negotiation_requested",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "OF_Negotiation_Response",
+      "paths": [
+        {
+          "id": "t01_of_negotiation_response_yes_yes_yes",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and SREJ_or_REJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject/Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_of_negotiation_response_yes_yes_no_yes",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and not SREJ_or_REJ_acceptable and SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_of_negotiation_response_yes_yes_no_no",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and not SREJ_or_REJ_acceptable and not SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Implicit Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t04_of_negotiation_response_yes_no_yes",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and SREJ_or_REJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject/Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t05_of_negotiation_response_yes_no_no_yes",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and not SREJ_or_REJ_acceptable and SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t06_of_negotiation_response_yes_no_no_no",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and not SREJ_or_REJ_acceptable and not SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Implicit Reject",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive OF Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t07_of_negotiation_response_no",
+          "guard": "not OF_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Complete_OF_Negotiation",
+      "paths": [
+        {
+          "id": "t01_complete_of_negotiation_yes_yes_yes",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and SREJ_or_REJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject/Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_complete_of_negotiation_yes_yes_no_yes",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and not SREJ_or_REJ_acceptable and SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_complete_of_negotiation_yes_yes_no_no",
+          "guard": "OF_parameter_field_present and modulo_128_acceptable and not SREJ_or_REJ_acceptable and not SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Extended",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Implicit Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t04_complete_of_negotiation_yes_no_yes",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and SREJ_or_REJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject/Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t05_complete_of_negotiation_yes_no_no_yes",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and not SREJ_or_REJ_acceptable and SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Selective Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t06_complete_of_negotiation_yes_no_no_no",
+          "guard": "OF_parameter_field_present and not modulo_128_acceptable and not SREJ_or_REJ_acceptable and not SREJ_acceptable",
+          "actions": [
+            {
+              "verb": "Set Normal",
+              "kind": "processing"
+            },
+            {
+              "verb": "Set Implicit Reject",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t07_complete_of_negotiation_no",
+          "guard": "not OF_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

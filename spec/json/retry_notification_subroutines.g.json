@@ -1,0 +1,130 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "management_data_link",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.7",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Initiate_Retry_Notification",
+      "paths": [
+        {
+          "id": "t01_initiate_retry_notification_yes",
+          "guard": "N2_notification_requested",
+          "actions": [
+            {
+              "verb": "Add Receive N2 Parameter field to XID Command",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_initiate_retry_notification_no",
+          "guard": "not N2_notification_requested",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Retry_Notification_Response",
+      "paths": [
+        {
+          "id": "t01_retry_notification_response_yes_yes",
+          "guard": "N2_parameter_field_present and transmit_N2_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Transmit N2 From XID Command",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive N2 Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_retry_notification_response_yes_no",
+          "guard": "N2_parameter_field_present and not transmit_N2_acceptable",
+          "actions": [
+            {
+              "verb": "Set Transmit N2 to Default",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive N2 Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_retry_notification_response_no",
+          "guard": "not N2_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Complete_Retry_Notification",
+      "paths": [
+        {
+          "id": "t01_complete_retry_notification_yes_yes",
+          "guard": "N2_parameter_field_present and transmit_N2_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Receive N2 from XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_complete_retry_notification_yes_no",
+          "guard": "N2_parameter_field_present and not transmit_N2_acceptable",
+          "actions": [
+            {
+              "verb": "Set Receive N2 to Default",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_complete_retry_notification_no",
+          "guard": "not N2_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

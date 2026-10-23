@@ -19,18 +19,6 @@ public static class DataLink_AwaitingConnection
     public static IReadOnlyList<TransitionSpec> Transitions { get; } = new TransitionSpec[]
     {
         new TransitionSpec(
-            Id: "t01_dl_disconnect_request",
-            From: "AwaitingConnection",
-            On: Ax25Event.DLDISCONNECTRequest,
-            Guard: null,
-            Actions: new ActionStep[] {  },
-            Next: "AwaitingConnection",
-            Notes: null,
-            References: new ImplementationReference[] {  },
-            Loops: new LoopRange[] {  },
-            UndefinedBranches: null,
-            OnLabel: "DL-DISCONNECT Request"),
-        new TransitionSpec(
             Id: "t02_disc_received",
             From: "AwaitingConnection",
             On: Ax25Event.DISCReceived,

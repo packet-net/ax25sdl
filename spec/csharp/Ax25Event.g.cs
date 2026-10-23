@@ -30,6 +30,8 @@ public enum Ax25Event
     DMReceived,
     /// <summary><c>FRMR_received</c></summary>
     FRMRReceived,
+    /// <summary><c>FRMR_response_received</c></summary>
+    FRMRResponseReceived,
     /// <summary><c>I_frame_pops_off_queue</c></summary>
     IFramePopsOffQueue,
     /// <summary><c>I_received</c></summary>
@@ -68,6 +70,8 @@ public enum Ax25Event
     UAReceived,
     /// <summary><c>UI_received</c></summary>
     UIReceived,
+    /// <summary><c>XID_command_received</c></summary>
+    XIDCommandReceived,
     /// <summary><c>XID_received</c></summary>
     XIDReceived,
     /// <summary><c>XID_response_received</c></summary>

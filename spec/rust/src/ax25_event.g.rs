@@ -25,6 +25,8 @@ pub enum Ax25Event {
     DMReceived,
     /// `FRMR_received`
     FRMRReceived,
+    /// `FRMR_response_received`
+    FRMRResponseReceived,
     /// `I_frame_pops_off_queue`
     IFramePopsOffQueue,
     /// `I_received`
@@ -63,6 +65,8 @@ pub enum Ax25Event {
     UAReceived,
     /// `UI_received`
     UIReceived,
+    /// `XID_command_received`
+    XIDCommandReceived,
     /// `XID_received`
     XIDReceived,
     /// `XID_response_received`
