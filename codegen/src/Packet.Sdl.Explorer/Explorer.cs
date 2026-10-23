@@ -27,6 +27,14 @@ public sealed record ExplorationResult(
     bool StateBoundHit,
     string? Note)
 {
+    /// <summary>
+    /// The table transitions fired on any edge the search applied (including a
+    /// violating one), as "State/transition id", for arm-coverage reporting.
+    /// Stub-peer rules and the pinned retransmission are not table rows and
+    /// are left out.
+    /// </summary>
+    public IReadOnlySet<string> FiredTransitions { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
     /// <summary>Number of steps in the counterexample (0 when there is none).</summary>
     public int CounterexampleLength => Trace.Count;
 
@@ -102,6 +110,7 @@ public static class Explorer
 
         var edges = 0;
         var maxDepth = 0;
+        var fired = new HashSet<string>(StringComparer.Ordinal);
         var depthBoundHit = false;
         var stateBoundHit = false;
 
@@ -124,12 +133,14 @@ public static class Explorer
             {
                 var outcome = stepper.Apply(state, move, node.Depth + 1);
                 edges++;
+                if (outcome.Record.Transition is { } tid && !tid.StartsWith("v20:", StringComparison.Ordinal) && tid != DataLinkMachine.RetransmitTransitionId)
+                    fired.Add(state.Machine(move.Station).State + "/" + tid);
                 if (outcome.Violation is not null)
                 {
                     var path = PathTo(nodes, idx);
                     path.Add(move);
                     var (trace, _) = Replay(stepper, path);
-                    return new ExplorationResult(Outcome.Violation, outcome.Violation, trace, nodes.Count, edges, Math.Max(maxDepth, node.Depth + 1), depthBoundHit, stateBoundHit, null);
+                    return new ExplorationResult(Outcome.Violation, outcome.Violation, trace, nodes.Count, edges, Math.Max(maxDepth, node.Depth + 1), depthBoundHit, stateBoundHit, null) with { FiredTransitions = fired };
                 }
 
                 var fp = outcome.Next.Fingerprint();
@@ -164,7 +175,7 @@ public static class Explorer
                     var (trace, final) = Replay(stepper, PathTo(nodes, i));
                     var v = new Violation(Invariants.Deadlock, null,
                         "deadlock: this state has no enabled move and is not quiescent (" + Describe(stepper, final) + ")");
-                    return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit, null);
+                    return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit, null) with { FiredTransitions = fired };
                 }
             }
         }
@@ -182,7 +193,7 @@ public static class Explorer
             return new ExplorationResult(Outcome.BoundHit, null, witness, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit,
                 depthBoundHit
                     ? "some states at the depth bound were not expanded; raise --max-depth or shrink the scenario (the trace below is a witness path to one such state)"
-                    : "the visited-state cap was reached; raise --max-states or shrink the scenario");
+                    : "the visited-state cap was reached; raise --max-states or shrink the scenario") with { FiredTransitions = fired };
         }
 
         // Liveness over the whole reachable graph, following non-fault edges
@@ -198,7 +209,7 @@ public static class Explorer
                 var v = new Violation(Invariants.Quiescence, null,
                     "quiescence unreachable: from this state no fault-free path leads to a quiescent state (both Connected, nothing in flight or queued, V(s)=V(a) on both, all data delivered). " +
                     Describe(stepper, final));
-                return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null);
+                return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null) with { FiredTransitions = fired };
             }
 
             if (options.Invariants.HasFlag(Invariants.SelectiveProgress))
@@ -211,12 +222,12 @@ public static class Explorer
                     var v = new Violation(Invariants.SelectiveProgress, null,
                         "timer-free progress: from this state quiescence is reachable only through a T1 expiry; no fault-free, timer-free path completes the recovery (data phase) or the connection (connect phase). " +
                         Describe(stepper, final));
-                    return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null);
+                    return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, false, false, null) with { FiredTransitions = fired };
                 }
             }
         }
 
-        return new ExplorationResult(Outcome.NoViolation, null, Array.Empty<StepRecord>(), nodes.Count, edges, maxDepth, false, false, null);
+        return new ExplorationResult(Outcome.NoViolation, null, Array.Empty<StepRecord>(), nodes.Count, edges, maxDepth, false, false, null) with { FiredTransitions = fired };
     }
 
     /// <summary>

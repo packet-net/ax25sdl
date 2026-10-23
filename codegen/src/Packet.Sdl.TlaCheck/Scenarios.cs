@@ -11,10 +11,15 @@ public enum TableSetKind
     Pre40,
     /// <summary>The explorer fixture <c>tables-pre38</c> (ax25spec fb727db: SREJ go-back-N, no #40 guard).</summary>
     Pre38,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ack-broken): the in-sequence I-frame arms acknowledge without delivering.</summary>
+    AckBroken,
+    /// <summary>A seeded-defect fixture (fixtures/tables-livelock): in-sequence I frames are discarded and TimerRecovery never counts RC up.</summary>
+    Livelock,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
-public sealed record Scenario(string Name, string Defect, TableSetKind Tables, ExplorerOptions Options, string Expect);
+/// <param name="DepthBound">The row relies on the explorer's depth bound (an infinite space); TLC applies the same bound as a state constraint.</param>
+public sealed record Scenario(string Name, string Defect, TableSetKind Tables, ExplorerOptions Options, string Expect, bool DepthBound = false);
 
 /// <summary>
 /// The explorer's calibration suite (codegen/tests/Packet.Sdl.Explorer.Tests/CalibrationTests.cs),
@@ -29,8 +34,8 @@ public static class Scenarios
     {
         ExplorerOptions O(TableSetKind t) => new() { TablesDir = dir(t) };
         var list = new List<Scenario>();
-        void Add(string name, string defect, TableSetKind t, Func<ExplorerOptions, ExplorerOptions> with, string expect) =>
-            list.Add(new Scenario(name, defect, t, with(O(t)), expect));
+        void Add(string name, string defect, TableSetKind t, Func<ExplorerOptions, ExplorerOptions> with, string expect, bool depthBound = false) =>
+            list.Add(new Scenario(name, defect, t, with(O(t)), expect, depthBound));
 
         // #40: out-of-window duplicate raises an unclearable exception.
         ExplorerOptions S40(ExplorerOptions o, bool srej) => o with { FramesAb = 2, FramesBa = 0, K = 4, Srej = srej, Budget = 1, Faults = FaultKinds.Duplicate };
@@ -53,7 +58,7 @@ public static class Scenarios
         {
             Invariants = (Default | Invariants.SelectiveProgress) & ~(Invariants.RejectCoherence | Invariants.SequenceSanity),
             MaxDepth = 60,
-        }, "depth bound hit (the runaway)");
+        }, "depth bound hit (the runaway)", depthBound: true);
 
         // #47: TimerRecovery drain decrements V(r).
         Add("d47-rc-off", "#47", TableSetKind.Current, o => o with
@@ -118,6 +123,12 @@ public static class Scenarios
         ExplorerOptions H1(ExplorerOptions o) => o with { FramesAb = 2, FramesBa = 1, K = 4, Srej = false, Budget = 2, Faults = FaultKinds.Drop };
         Add("h1", "H1", TableSetKind.Current, H1, "Deadlock, 19");
         Add("h1-tr-quiescent", "H1 control", TableSetKind.Current, o => H1(o) with { TimerRecoveryIsQuiescent = true }, "clean");
+
+        // Seeded defects (fixtures/README.md): no real defect fails these two
+        // checks on any table set, so each has a deliberately broken table to
+        // prove it can fire, in both tools.
+        Add("seeded-ack", "seeded (AckCoherence)", TableSetKind.AckBroken, o => o with { FramesAb = 1 }, "AckCoherence at A, 4");
+        Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, "Quiescence");
 
         return list;
     }

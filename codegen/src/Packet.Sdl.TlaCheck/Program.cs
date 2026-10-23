@@ -61,7 +61,9 @@ string Dir(TableSetKind t) => t switch
 {
     TableSetKind.Current => Path.Combine(root, "spec", "json"),
     TableSetKind.Pre40 => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre40"),
-    _ => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38"),
+    TableSetKind.Pre38 => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38"),
+    TableSetKind.AckBroken => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ack-broken"),
+    _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
 var scenarios = (grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow) : Scenarios.Calibration(Dir)).Where(s => only is null || only.Contains(s.Name)).ToList();
@@ -98,6 +100,8 @@ for (var idx = 0; idx < scenarios.Count; idx++)
     sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Agree ? "yes" : "**no**: " + r.Why)} |\n");
 }
 Console.WriteLine(sb.ToString());
+Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current),
+    scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList()));
 return results.Values.All(r => r.Agree) ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
@@ -124,7 +128,7 @@ Row Compare(Scenario s)
     var dir = Path.Combine(work, s.Name);
     if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
     tlc.Prepare(dir, o.TablesDir);
-    var depthBound = s.Name == "d42-both-off";
+    var depthBound = s.DepthBound;
     var elapsed = TimeSpan.Zero;
 
     var safety = tlc.Run(dir, o, Phase.Safety, depthBound);
@@ -151,6 +155,11 @@ Row Compare(Scenario s)
         }
     }
 
+    // Coverage: rerun the safety search without the VIEW and read the arms fired.
+    var cov = tlc.Run(dir, o, Phase.Coverage, depthBound);
+    elapsed += cov.Elapsed;
+    var tlcArms = Tlc.ReadArms(dir);
+
     var secs = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
     var tlcText = kind switch
     {
@@ -169,10 +178,18 @@ Row Compare(Scenario s)
     else if (kind is "clean" or "bound")
     {
         if (states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
+        // On a clean, unbounded run both searched the whole graph, so both
+        // fired exactly the same table transitions.
+        if (kind == "clean")
+        {
+            var tlcTransitions = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
+            if (!tlcTransitions.SetEquals(ex.FiredTransitions))
+                why.Add($"transitions fired: {ex.FiredTransitions.Count} by the explorer, {tlcTransitions.Count} by TLC, {ex.FiredTransitions.Except(tlcTransitions).Union(tlcTransitions.Except(ex.FiredTransitions)).Count()} differ");
+        }
     }
     else if (kind is not ("Quiescence" or "SelectiveProgress"))
     {
-        if (exStation.Length > 0 && exStation != station) why.Add($"station {exStation} vs {station}");
+        if (exStation != station) why.Add($"station '{exStation}' vs '{station}'");
         if (steps != ex.CounterexampleLength) why.Add($"length {ex.CounterexampleLength} vs {steps}");
         else if (tids.Count != steps) why.Add($"TLC trace has {tids.Count} steps, expected {steps}");
         else
@@ -181,7 +198,7 @@ Row Compare(Scenario s)
             if (first >= 0) why.Add($"step {first + 1}: transition {exTids[first]} vs {tids[first]}");
         }
     }
-    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why));
+    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why), ex.FiredTransitions, tlcArms);
 }
 
 static (string Kind, string Station, int Steps, List<string> Tids, string Note) Verdict(TlcResult r, Phase phase, ExplorerOptions o, bool depthBound)
@@ -220,7 +237,9 @@ static string Tables(TableSetKind t) => t switch
 {
     TableSetKind.Current => "current",
     TableSetKind.Pre40 => "pre-40",
-    _ => "pre-38",
+    TableSetKind.Pre38 => "pre-38",
+    TableSetKind.AckBroken => "seeded ack-broken",
+    _ => "seeded livelock",
 };
 
 static string RepoRoot()
@@ -230,4 +249,4 @@ static string RepoRoot()
     return d?.FullName ?? throw new InvalidOperationException("run from inside the ax25sdl checkout: no spec-sdl/ in any ancestor of the working directory");
 }
 
-internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why);
+internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms);

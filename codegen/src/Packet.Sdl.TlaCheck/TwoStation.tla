@@ -31,13 +31,13 @@ CONSTANTS
     StepChecks,        \* the per-step invariants switched on (see below)
     TimerRecoveryQuiescent, \* triage aid: count TimerRecovery as quiescent
     RejMayEqualVs,     \* receiver-side reject coherence accepts REJ N(r) = V(s)
-    ShowSteps,         \* record each move in last (off for liveness runs)
     MaxDepth           \* depth bound, used only through the WithinDepth constraint
 
 VARIABLES
     sys,   \* the composed system state (the explorer's SystemState)
     viol,  \* the per-step invariant that fired on the step into this state
-    last   \* the move into this state, for reading counterexamples; outside VIEW
+    last   \* the move into this state: for reading counterexamples, for coverage,
+           \* and for the liveness check; outside VIEW
 vars == <<sys, viol, last>>
 View == <<sys, viol>>
 
@@ -55,7 +55,7 @@ KnownStates == {"Disconnected", "AwaitingConnection", "AwaitingV22Connection", "
 
 NoViol == [kind |-> "none", at |-> "", msg |-> ""]
 Viol(kind, s, msg) == [kind |-> kind, at |-> s, msg |-> msg]
-NoStep == [move |-> "", at |-> "", frame |-> NoFrm, tid |-> ""]
+NoStep == [move |-> "", at |-> "", frame |-> NoFrm, tid |-> "", arms |-> {}, tick |-> 0]
 
 N(num) == ToString(num)
 FrameText(f) ==
@@ -178,7 +178,8 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
          viol |-> v2,
-         tid |-> IF ok THEN c.tid ELSE ""]
+         tid |-> IF ok THEN c.tid ELSE "",
+         arms |-> IF ok THEN c.arms ELSE {}]
 
 (***************************************************************************)
 (* The v2.0 stub peer as station B (V20Peer.cs, pinned semantic 10)        *)
@@ -207,7 +208,8 @@ StubReceive(S, f, newIn, newBudget) ==
                           ELSE say(up, <<dm1>>, "v20:command_while_disconnected_dm_f1")
     IN  [sys |-> [S EXCEPT !.stub.up = r.up, !.ch["B"] = newIn, !.ch["A"] = @ \o r.out, !.budget = newBudget],
          viol |-> IF r.err # "" THEN Viol("MachineError", "B", "v2.0 stub peer at station B: " \o r.err) ELSE NoViol,
-         tid |-> r.rule]
+         tid |-> r.rule,
+         arms |-> {}]
 
 (***************************************************************************)
 (* Seed (Stepper.Seed)                                                     *)
@@ -253,9 +255,12 @@ SeedState == [Submit(Submit(S1, "A", 1), "B", 1) EXCEPT !.budget = Budget, !.ack
 Take(r, move, s, f) ==
     /\ sys' = r.sys
     /\ viol' = r.viol
-    /\ last' = IF ShowSteps THEN [move |-> move, at |-> s, frame |-> f, tid |-> r.tid] ELSE NoStep
+    \* tick flips on every move, so no move is ever a stuttering step: a move
+    \* that changes nothing else (a self-loop) still counts as taken for the
+    \* liveness fairness, and cannot discharge it by stuttering.
+    /\ last' = [move |-> move, at |-> s, frame |-> f, tid |-> r.tid, arms |-> r.arms, tick |-> 1 - last.tick]
 
-TakeChannel(S2, move, s, f) == Take([sys |-> S2, viol |-> NoViol, tid |-> ""], move, s, f)
+TakeChannel(S2, move, s, f) == Take([sys |-> S2, viol |-> NoViol, tid |-> "", arms |-> {}], move, s, f)
 
 Table(s) == ~(s = "B" /\ StubB)
 
@@ -425,7 +430,11 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* needs ENABLED <<A>>_vars, which TLC evaluates without its usual caching
 \* and did not finish on 3 states. So the fairness is written out: the
 \* enabledness is the moves' own guards, and "a progress move was taken" is
-\* read off the step's record in last (these runs set ShowSteps).
+\* read off the step's record in last.
+\*
+\* The argument needs every progress move to be a real (non-stuttering) step,
+\* or a move that changes nothing could be "taken" without TLC seeing it and
+\* the fairness would be discharged falsely. The tick in last guarantees it.
 ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off"}
 
 CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s)

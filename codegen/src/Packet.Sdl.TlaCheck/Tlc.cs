@@ -40,6 +40,13 @@ public enum Phase
     Quiescence,
     /// <summary>The same with no fairness for T1 (the explorer's SelectiveProgress).</summary>
     TimerFree,
+    /// <summary>
+    /// The safety search again without the VIEW, dumping every state, so the
+    /// step record of every edge survives and the table arms fired can be read
+    /// off (TwoStation.tla's last.arms). For coverage only; it stops at the
+    /// first violation, as the explorer does.
+    /// </summary>
+    Coverage,
 }
 
 /// <summary>Writes a TLC model for an explorer scenario and runs it.</summary>
@@ -130,15 +137,13 @@ public sealed class Tlc
         C("StepChecks", Set(stepChecks));
         C("TimerRecoveryQuiescent", Bool(o.TimerRecoveryIsQuiescent));
         C("RejMayEqualVs", Bool(o.RejMayEqualVs));
-        // Every phase records the move: the liveness phases read "a progress
-        // move was taken" off it (TwoStation.tla, Liveness).
-        C("ShowSteps", "TRUE");
         C("MaxDepth", Inv(o.MaxDepth));
 
         switch (phase)
         {
             case Phase.Safety:
             case Phase.Deadlock:
+            case Phase.Coverage:
                 sb.Append("INIT Init\nNEXT Next\n");
                 sb.Append("INVARIANTS NoStepViolation");
                 if (On(Invariants.DefinedState)) sb.Append(" DefinedState");
@@ -146,7 +151,7 @@ public sealed class Tlc
                 if (On(Invariants.AckCoherence)) sb.Append(" AckCoherence");
                 sb.Append('\n');
                 // The VIEW leaves out `last`, so distinct states are the explorer's.
-                sb.Append("VIEW View\n");
+                if (phase != Phase.Coverage) sb.Append("VIEW View\n");
                 break;
             case Phase.Quiescence:
                 sb.Append("SPECIFICATION Spec\nPROPERTY QuiescenceLive\n");
@@ -191,6 +196,11 @@ public sealed class Tlc
         // The harness's Rest stutter means TLC's deadlock check is exactly the
         // explorer's; every other phase leaves it to the Deadlock phase.
         if (phase != Phase.Deadlock) psi.ArgumentList.Add("-deadlock");
+        if (phase == Phase.Coverage)
+        {
+            psi.ArgumentList.Add("-dump");
+            psi.ArgumentList.Add("states");
+        }
         if (phase is Phase.Quiescence or Phase.TimerFree)
         {
             psi.ArgumentList.Add("-lncheck");
@@ -212,6 +222,21 @@ public sealed class Tlc
         var text = stdout.Result + stderr.Result;
         File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
         return Parse(text, sw.Elapsed);
+    }
+
+    private static readonly Regex ArmsField = new(@"arms \|->\s*\{([^}]*)\}", RegexOptions.Singleline);
+    private static readonly Regex Quoted = new(@"""((?:[^""\\]|\\.)*)""");
+
+    /// <summary>The table arms (State/transition, Subroutine:path) on any state of a Coverage run's dump.</summary>
+    public static HashSet<string> ReadArms(string workDir)
+    {
+        var arms = new HashSet<string>(StringComparer.Ordinal);
+        var dump = Path.Combine(workDir, "states.dump");
+        if (!File.Exists(dump)) return arms;
+        foreach (Match m in ArmsField.Matches(File.ReadAllText(dump)))
+            foreach (Match q in Quoted.Matches(m.Groups[1].Value))
+                arms.Add(q.Groups[1].Value);
+        return arms;
     }
 
     private static readonly Regex StatesLine = new(@"^(\d+) states generated, (\d+) distinct states found", RegexOptions.Multiline);

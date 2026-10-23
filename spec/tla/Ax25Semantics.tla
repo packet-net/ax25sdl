@@ -78,14 +78,16 @@ NewMachine(st) ==
 \* registers, x the figc4.7 X, qi the head-insert index, pop the popped
 \* queue head (hasPop), dd the label the next DL_DATA_indication carries,
 \* fx the effects, err the error (the interpreter would have thrown), tid
-\* the transition that fired.
+\* the transition that fired, arms every table row the dispatch ran (the
+\* transition as "State/id" and each subroutine path as "Subroutine:id"),
+\* for coverage.
 Begin(m, e) ==
     [st |-> m.st, vs |-> m.vs, vr |-> m.vr, va |-> m.va, rc |-> m.rc, mod |-> m.mod, k |-> m.k, n2 |-> m.n2,
      v22 |-> m.v22, srej |-> m.srej, hd |-> m.hd, l3 |-> m.l3, own |-> m.own, peer |-> m.peer,
      rej |-> m.rej, srejx |-> m.srejx, ack |-> m.ack, t1 |-> m.t1, t3 |-> m.t3,
      q |-> m.q, saved |-> m.saved, ret |-> m.ret,
      pP |-> 0, pF |-> 0, pNr |-> None, pNs |-> None, x |-> None, qi |-> 0,
-     hasPop |-> FALSE, pop |-> NoQEntry, dd |-> e.data, fx |-> <<>>, err |-> "", tid |-> ""]
+     hasPop |-> FALSE, pop |-> NoQEntry, dd |-> e.data, fx |-> <<>>, err |-> "", tid |-> "", arms |-> {}]
 
 Persist(c) ==
     [st |-> c.st, vs |-> c.vs, vr |-> c.vr, va |-> c.va, rc |-> c.rc, mod |-> c.mod, k |-> c.k, n2 |-> c.n2,
@@ -475,13 +477,13 @@ CallSubroutine(c, e, name) ==
     ELSE LET paths == Subroutines[name]
              sel == SelectGuard(c, e, [j \in 1..Len(paths) |-> paths[j].guard])
          IN  IF sel.err # "" THEN Fail(c, "subroutine " \o name \o ": " \o sel.err)
-             ELSE RunActions(c, e, paths[sel.i].actions, paths[sel.i].loops, 1)
+             ELSE RunActions([c EXCEPT !.arms = @ \cup {name \o ":" \o paths[sel.i].id}], e, paths[sel.i].actions, paths[sel.i].loops, 1)
 
 \* Leave a transition: move to its next state, recording which one fired.
 Goto(c, next, tid) ==
     IF c.err # "" THEN c
     ELSE IF next \notin DataLinkStates THEN Fail(c, "transition " \o tid \o " targets unknown state '" \o next \o "'")
-    ELSE [c EXCEPT !.st = next, !.tid = tid]
+    ELSE [c EXCEPT !.st = next, !.tid = tid, !.arms = @ \cup {c.st \o "/" \o tid}]
 
 \* Select the one transition of the current page on this event whose guard
 \* holds (evaluated against the pre-transition state) and run it.
