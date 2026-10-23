@@ -24,6 +24,12 @@
       "figure": "figc4.6"
     },
     {
+      "file": "classes_of_procedures_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.3"
+    },
+    {
       "file": "connected.g.json",
       "kind": "state",
       "machine": "data_link",
@@ -38,11 +44,23 @@
       "figure": "figc4.1"
     },
     {
+      "file": "n1_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.5"
+    },
+    {
       "file": "negotiating.g.json",
       "kind": "state",
       "machine": "management_data_link",
       "state": "Negotiating",
       "figure": "figc5.2"
+    },
+    {
+      "file": "optional_functions_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.4"
     },
     {
       "file": "ready.g.json",
@@ -52,10 +70,22 @@
       "figure": "figc5.1"
     },
     {
+      "file": "retry_notification_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.7"
+    },
+    {
       "file": "subroutines.g.json",
       "kind": "subroutines",
       "machine": "data_link",
       "figure": "figc4.7"
+    },
+    {
+      "file": "t1_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.8"
     },
     {
       "file": "timer_recovery.g.json",
@@ -63,6 +93,12 @@
       "machine": "data_link",
       "state": "TimerRecovery",
       "figure": "figc4.5"
+    },
+    {
+      "file": "window_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.6"
     }
   ]
 }

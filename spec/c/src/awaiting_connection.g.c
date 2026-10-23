@@ -134,20 +134,6 @@ static const ActionStep
 
 static const TransitionSpec data_link_awaiting_connection_transitions[] = {
     {
-        .id = "t01_dl_disconnect_request",
-        .from = "AwaitingConnection",
-        .on = "DL_DISCONNECT_request",
-        .guard = "",
-        .actions = NULL,
-        .actions_len = 0,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t02_disc_received",
         .from = "AwaitingConnection",
         .on = "DISC_received",
@@ -499,5 +485,5 @@ const StatePage data_link_awaiting_connection = {
     .state = "AwaitingConnection",
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.2", .url = ""},
     .transitions = data_link_awaiting_connection_transitions,
-    .transitions_len = 25,
+    .transitions_len = 24,
 };

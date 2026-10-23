@@ -14,10 +14,28 @@ namespace Packet.Ax25.Sdl;
 /// </summary>
 public enum Ax25Guard
 {
+    /// <summary><c>AC_gt_NM201</c></summary>
+    ACGtNM201,
+    /// <summary><c>COP_negotiation_requested</c></summary>
+    COPNegotiationRequested,
+    /// <summary><c>COP_parameter_field_present</c></summary>
+    COPParameterFieldPresent,
     /// <summary><c>F_eq_1</c></summary>
     FEq1,
     /// <summary><c>F_eq_1_and_frame_eq_RR_or_frame_eq_RNR_or_frame_eq_I</c></summary>
     FEq1AndFrameEqRROrFrameEqRNROrFrameEqI,
+    /// <summary><c>N1_notification_requested</c></summary>
+    N1NotificationRequested,
+    /// <summary><c>N1_parameter_field_present</c></summary>
+    N1ParameterFieldPresent,
+    /// <summary><c>N2_notification_requested</c></summary>
+    N2NotificationRequested,
+    /// <summary><c>N2_parameter_field_present</c></summary>
+    N2ParameterFieldPresent,
+    /// <summary><c>OF_negotiation_requested</c></summary>
+    OFNegotiationRequested,
+    /// <summary><c>OF_parameter_field_present</c></summary>
+    OFParameterFieldPresent,
     /// <summary><c>P_eq_1</c></summary>
     PEq1,
     /// <summary><c>P_or_F_eq_1</c></summary>
@@ -26,14 +44,22 @@ public enum Ax25Guard
     RCEq0,
     /// <summary><c>RC_eq_N2</c></summary>
     RCEqN2,
-    /// <summary><c>RC_eq_NM201</c></summary>
-    RCEqNM201,
+    /// <summary><c>SREJ_acceptable</c></summary>
+    SREJAcceptable,
     /// <summary><c>SREJ_enabled</c></summary>
     SREJEnabled,
+    /// <summary><c>SREJ_or_REJ_acceptable</c></summary>
+    SREJOrREJAcceptable,
     /// <summary><c>T1_expired</c></summary>
     T1Expired,
+    /// <summary><c>T1_negotiation_requested</c></summary>
+    T1NegotiationRequested,
+    /// <summary><c>T1_parameter_field_present</c></summary>
+    T1ParameterFieldPresent,
     /// <summary><c>T1_running</c></summary>
     T1Running,
+    /// <summary><c>XID_rejected</c></summary>
+    XIDRejected,
     /// <summary><c>able_to_establish</c></summary>
     AbleToEstablish,
     /// <summary><c>ack_pending</c></summary>
@@ -42,14 +68,22 @@ public enum Ax25Guard
     Command,
     /// <summary><c>command_and_P_eq_1</c></summary>
     CommandAndPEq1,
+    /// <summary><c>full_duplex_acceptable</c></summary>
+    FullDuplexAcceptable,
     /// <summary><c>info_field_length_le_N1_and_content_is_octet_aligned</c></summary>
     InfoFieldLengthLeN1AndContentIsOctetAligned,
+    /// <summary><c>k_notification_requested</c></summary>
+    KNotificationRequested,
+    /// <summary><c>k_parameter_field_present</c></summary>
+    KParameterFieldPresent,
     /// <summary><c>layer_3_initiated</c></summary>
     Layer3Initiated,
     /// <summary><c>mod_128</c></summary>
     Mod128,
     /// <summary><c>mod_8</c></summary>
     Mod8,
+    /// <summary><c>modulo_128_acceptable</c></summary>
+    Modulo128Acceptable,
     /// <summary><c>nr_eq_va</c></summary>
     NrEqVa,
     /// <summary><c>nr_eq_vs</c></summary>
@@ -72,6 +106,14 @@ public enum Ax25Guard
     ResponseAndFEq1,
     /// <summary><c>sreject_exception_gt_0</c></summary>
     SrejectExceptionGt0,
+    /// <summary><c>transmit_N1_acceptable</c></summary>
+    TransmitN1Acceptable,
+    /// <summary><c>transmit_N2_acceptable</c></summary>
+    TransmitN2Acceptable,
+    /// <summary><c>transmit_T1_acceptable</c></summary>
+    TransmitT1Acceptable,
+    /// <summary><c>transmit_k_acceptable</c></summary>
+    TransmitKAcceptable,
     /// <summary><c>va_le_nr_le_vs</c></summary>
     VaLeNrLeVs,
     /// <summary><c>version_2_2</c></summary>

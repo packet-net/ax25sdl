@@ -16,5 +16,15 @@ extern const StatePage data_link_timer_recovery;
 extern const StatePage management_data_link_negotiating;
 extern const StatePage management_data_link_ready;
 extern const SubroutinesPage data_link_subroutines;
+extern const SubroutinesPage
+    management_data_link_classes_of_procedures_negotiation_subroutines;
+extern const SubroutinesPage management_data_link_n1_negotiation_subroutines;
+extern const SubroutinesPage
+    management_data_link_optional_functions_subroutines;
+extern const SubroutinesPage
+    management_data_link_retry_notification_subroutines;
+extern const SubroutinesPage management_data_link_t1_negotiation_subroutines;
+extern const SubroutinesPage
+    management_data_link_window_negotiation_subroutines;
 
 #endif // AX25SDL_GENERATED_H

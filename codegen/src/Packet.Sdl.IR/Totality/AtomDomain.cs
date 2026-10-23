@@ -241,6 +241,42 @@ public sealed class AtomDomain
 
         // ── Frame content ──────────────────────────────────────────────
         Free("info_field_length_le_N1_and_content_is_octet_aligned", "§6.7.2.1 N1 and §3.x octet alignment: a property of the received frame the spec relates to no state variable"),
+
+        // ── Link Multiplexer (figc3.4). Each is a property of a received
+        //    frame, station configuration or queue state that the spec
+        //    relates to no other variable here.
+        Free("FCS_OK", "figc3.4 Frame Received \"FCS OK?\": a property of the received frame"),
+        Free("digipeat_enabled", "figc3.4 Frame Received \"Digipeat Enabled?\": station configuration"),
+        Free("am_I_to_digipeat_frame", "figc3.4 Frame Received \"Am I to Digipeat Frame?\": a property of the received frame's address field"),
+        Free("addressed_to_me", "figc3.4 Frame Received \"Addres-sed to Me?\": a property of the received frame's address field"),
+        Free("requestor_eq_current_DL", "figc3.4 Queue Event \"Requestor == Current DL?\": which Data Link machine raised the event"),
+        Free("requestor_on_served_list", "figc3.4 Queue Event \"Requestor on Served List?\": Link Multiplexer queue state"),
+
+        // ── Management Data Link (figc5.2 to figc5.8). Configuration,
+        //    capability and received-XID properties, unrelated by
+        //    definition to anything else here.
+        Free("AC_gt_NM201", "figc5.2 TM 201 Expiry \"AC > NM201?\". The box above it increments RC, and AC is defined nowhere (packethacking/ax25spec#126), so it is not tied to RC here"),
+        Free("XID_rejected", "figc5.2 FRMR Response \"XID Rejected?\": whether the FRMR rejects the XID command"),
+        Free("COP_negotiation_requested", "figc5.3 \"COP Negotiation Requested?\": station configuration"),
+        Free("COP_parameter_field_present", "figc5.3 \"COP Parameter Field Present?\": a property of the received XID"),
+        Free("full_duplex_acceptable", "figc5.3 \"Full Duplex Acceptable ?\": station capability"),
+        Free("OF_negotiation_requested", "figc5.4 \"OF Negotiation Requested?\": station configuration"),
+        Free("OF_parameter_field_present", "figc5.4 \"OF Parameter Field Present?\": a property of the received XID"),
+        Free("modulo_128_acceptable", "figc5.4 \"Modulo 128 Acceptable ?\": station capability"),
+        Free("SREJ_or_REJ_acceptable", "figc5.4 \"SREJ/REJ Acceptable ?\": station capability"),
+        Free("SREJ_acceptable", "figc5.4 \"SREJ Acceptable ?\": station capability"),
+        Free("N1_notification_requested", "figc5.5 \"N1 Notification Requested?\": station configuration"),
+        Free("N1_parameter_field_present", "figc5.5 \"N1 Parameter Field Present?\": a property of the received XID"),
+        Free("transmit_N1_acceptable", "figc5.5 \"Transmit N1 Acceptable ?\": station capability"),
+        Free("k_notification_requested", "figc5.6 \"k Notification Requested?\": station configuration"),
+        Free("k_parameter_field_present", "figc5.6 \"k Parameter Field Present?\": a property of the received XID"),
+        Free("transmit_k_acceptable", "figc5.6 \"Transmit k Acceptable ?\": station capability"),
+        Free("N2_notification_requested", "figc5.7 \"N2 Notification Requested?\": station configuration"),
+        Free("N2_parameter_field_present", "figc5.7 \"N2 Parameter Field Present?\": a property of the received XID"),
+        Free("transmit_N2_acceptable", "figc5.7 \"Transmit N2 Acceptable ?\": station capability"),
+        Free("T1_negotiation_requested", "figc5.8 \"T1 Negotiation Requested?\": station configuration"),
+        Free("T1_parameter_field_present", "figc5.8 \"T1 Parameter Field Present?\": a property of the received XID"),
+        Free("transmit_T1_acceptable", "figc5.8 \"Transmit T1 Acceptable ?\": station capability"),
     };
 
     // ─── Event-derived constraints ─────────────────────────────────────

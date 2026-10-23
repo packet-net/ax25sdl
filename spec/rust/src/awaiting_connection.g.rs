@@ -15,17 +15,6 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
     },
     transitions: &[
         TransitionSpec {
-            id: "t01_dl_disconnect_request",
-            from: "AwaitingConnection",
-            on: Ax25Event::DLDISCONNECTRequest,
-            guard: &[],
-            actions: &[],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t02_disc_received",
             from: "AwaitingConnection",
             on: Ax25Event::DISCReceived,
@@ -578,19 +567,7 @@ mod tests {
 
     #[test]
     fn transitions_are_present() {
-        assert_eq!(DATA_LINK_AWAITING_CONNECTION.transitions.len(), 25);
-    }
-
-    #[test]
-    fn t01_dl_disconnect_request() {
-        let tx = DATA_LINK_AWAITING_CONNECTION
-            .transitions
-            .iter()
-            .find(|x| x.id == "t01_dl_disconnect_request")
-            .expect("transition t01_dl_disconnect_request not found");
-        assert_eq!(tx.on, Ax25Event::DLDISCONNECTRequest);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(DATA_LINK_AWAITING_CONNECTION.transitions.len(), 24);
     }
 
     #[test]

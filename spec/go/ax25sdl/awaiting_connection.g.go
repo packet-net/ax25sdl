@@ -11,17 +11,6 @@ var DataLinkAwaitingConnection = StatePage{
 	Source:  SdlSource{Spec: "ax.25.2.2.4_Oct_25", Figure: "figc4.2", URL: ""},
 	Transitions: []TransitionSpec{
 		{
-			ID:         "t01_dl_disconnect_request",
-			From:       "AwaitingConnection",
-			On:         "DL_DISCONNECT_request",
-			Guard:      "",
-			Actions:    []ActionStep{},
-			Next:       "AwaitingConnection",
-			Notes:      "",
-			References: []ImplementationReference{},
-			Loops:      []LoopRange{},
-		},
-		{
 			ID:    "t02_disc_received",
 			From:  "AwaitingConnection",
 			On:    "DISC_received",

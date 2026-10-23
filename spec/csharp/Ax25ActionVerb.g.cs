@@ -11,14 +11,56 @@ namespace Packet.Ax25.Sdl;
 /// </summary>
 public enum Ax25ActionVerb
 {
-    /// <summary><c>Apply Negotiated Parameters</c></summary>
-    ApplyNegotiatedParameters,
+    /// <summary><c>AV := 0</c></summary>
+    AVAssign0,
+    /// <summary><c>Accept Receive N1 from XID Response</c></summary>
+    AcceptReceiveN1FromXIDResponse,
+    /// <summary><c>Accept Receive N2 from XID Response</c></summary>
+    AcceptReceiveN2FromXIDResponse,
+    /// <summary><c>Accept Receive T1 from XID Response</c></summary>
+    AcceptReceiveT1FromXIDResponse,
+    /// <summary><c>Accept Receive k from XID Response</c></summary>
+    AcceptReceiveKFromXIDResponse,
+    /// <summary><c>Accept Transmit N1 From XID Command</c></summary>
+    AcceptTransmitN1FromXIDCommand,
+    /// <summary><c>Accept Transmit N2 From XID Command</c></summary>
+    AcceptTransmitN2FromXIDCommand,
+    /// <summary><c>Accept Transmit T1 From XID Command</c></summary>
+    AcceptTransmitT1FromXIDCommand,
+    /// <summary><c>Accept Transmit k From XID Command</c></summary>
+    AcceptTransmitKFromXIDCommand,
+    /// <summary><c>Add Receive COP Parameter field to XID Command</c></summary>
+    AddReceiveCOPParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive COP Parameter field to XID Response</c></summary>
+    AddReceiveCOPParameterFieldToXIDResponse,
+    /// <summary><c>Add Receive N1 Parameter field to XID Command</c></summary>
+    AddReceiveN1ParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive N1 Parameter field to XID Response</c></summary>
+    AddReceiveN1ParameterFieldToXIDResponse,
+    /// <summary><c>Add Receive N2 Parameter field to XID Command</c></summary>
+    AddReceiveN2ParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive N2 Parameter field to XID Response</c></summary>
+    AddReceiveN2ParameterFieldToXIDResponse,
+    /// <summary><c>Add Receive OF Parameter field to XID Command</c></summary>
+    AddReceiveOFParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive OF Parameter field to XID Response</c></summary>
+    AddReceiveOFParameterFieldToXIDResponse,
+    /// <summary><c>Add Receive T1 Parameter field to XID Command</c></summary>
+    AddReceiveT1ParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive T1 Parameter field to XID Response</c></summary>
+    AddReceiveT1ParameterFieldToXIDResponse,
+    /// <summary><c>Add Receive k Parameter field to XID Command</c></summary>
+    AddReceiveKParameterFieldToXIDCommand,
+    /// <summary><c>Add Receive k Parameter field to XID Response</c></summary>
+    AddReceiveKParameterFieldToXIDResponse,
     /// <summary><c>Backtrack</c></summary>
     Backtrack,
     /// <summary><c>Check Need For Response</c></summary>
     CheckNeedForResponse,
     /// <summary><c>Check_I_Frame_Acknowledged</c></summary>
     CheckIFrameAcknowledged,
+    /// <summary><c>Classes of Procedures Negotiation Response</c></summary>
+    ClassesOfProceduresNegotiationResponse,
     /// <summary><c>Clear Acknowledge Pending</c></summary>
     ClearAcknowledgePending,
     /// <summary><c>Clear Exception Conditions</c></summary>
@@ -33,6 +75,18 @@ public enum Ax25ActionVerb
     ClearRejectException,
     /// <summary><c>Clear Sreject Condition</c></summary>
     ClearSrejectCondition,
+    /// <summary><c>Complete Classes of Procedures Negotiation</c></summary>
+    CompleteClassesOfProceduresNegotiation,
+    /// <summary><c>Complete N1 Negotiation</c></summary>
+    CompleteN1Negotiation,
+    /// <summary><c>Complete Optional Functions Negotiation</c></summary>
+    CompleteOptionalFunctionsNegotiation,
+    /// <summary><c>Complete Retry Negotiation</c></summary>
+    CompleteRetryNegotiation,
+    /// <summary><c>Complete T1 Negotiation</c></summary>
+    CompleteT1Negotiation,
+    /// <summary><c>Complete Window Negotiation</c></summary>
+    CompleteWindowNegotiation,
     /// <summary><c>DISC (P = 1)</c></summary>
     DISCPEq1,
     /// <summary><c>DL-ERROR Indication (A)</c></summary>
@@ -119,6 +173,18 @@ public enum Ax25ActionVerb
     ICommand,
     /// <summary><c>Increment Sreject Exception</c></summary>
     IncrementSrejectException,
+    /// <summary><c>Initiate Classes of Procedures Negotiation</c></summary>
+    InitiateClassesOfProceduresNegotiation,
+    /// <summary><c>Initiate N1 Negotiation</c></summary>
+    InitiateN1Negotiation,
+    /// <summary><c>Initiate Optional Functions Negotiation</c></summary>
+    InitiateOptionalFunctionsNegotiation,
+    /// <summary><c>Initiate Retry Negotiation</c></summary>
+    InitiateRetryNegotiation,
+    /// <summary><c>Initiate T1 Negotiation</c></summary>
+    InitiateT1Negotiation,
+    /// <summary><c>Initiate Window Negotiation</c></summary>
+    InitiateWindowNegotiation,
     /// <summary><c>Invoke Retransmission</c></summary>
     InvokeRetransmission,
     /// <summary><c>LM_data_request</c></summary>
@@ -129,12 +195,16 @@ public enum Ax25ActionVerb
     LMSeizeRequest,
     /// <summary><c>MDL-NEGOTIATE Request</c></summary>
     MDLNEGOTIATERequest,
+    /// <summary><c>MDL_ERROR_indicate_A</c></summary>
+    MDLERRORIndicateA,
     /// <summary><c>MDL_ERROR_indicate_B</c></summary>
     MDLERRORIndicateB,
     /// <summary><c>MDL_ERROR_indicate_C</c></summary>
     MDLERRORIndicateC,
     /// <summary><c>MDL_ERROR_indicate_D</c></summary>
     MDLERRORIndicateD,
+    /// <summary><c>MDL_ERROR_indicate_E</c></summary>
+    MDLERRORIndicateE,
     /// <summary><c>MDL_NEGOTIATE_confirm</c></summary>
     MDLNEGOTIATEConfirm,
     /// <summary><c>Modulo := 128</c></summary>
@@ -153,12 +223,16 @@ public enum Ax25ActionVerb
     NSAssignVS,
     /// <summary><c>N1 := 2048</c></summary>
     N1Assign2048,
+    /// <summary><c>N1 Negotiation Response</c></summary>
+    N1NegotiationResponse,
     /// <summary><c>N2 := 10</c></summary>
     N2Assign10,
     /// <summary><c>Next T1 := (RC*0.25)+SRT*2</c></summary>
     NextT1AssignRCTimes025PlusSRTTimes2,
     /// <summary><c>Next T1 := 2 * SRT</c></summary>
     NextT1Assign2TimesSRT,
+    /// <summary><c>Optional Functions Negotiation Response</c></summary>
+    OptionalFunctionsNegotiationResponse,
     /// <summary><c>P := 0</c></summary>
     PAssign0,
     /// <summary><c>P := 1</c></summary>
@@ -197,8 +271,12 @@ public enum Ax25ActionVerb
     RRCommandPEq0,
     /// <summary><c>RR Response</c></summary>
     RRResponse,
+    /// <summary><c>Retransmit XID Command</c></summary>
+    RetransmitXIDCommand,
     /// <summary><c>Retrieve Stored V(r) I Frame</c></summary>
     RetrieveStoredVRIFrame,
+    /// <summary><c>Retry Negotiation Response</c></summary>
+    RetryNegotiationResponse,
     /// <summary><c>SABM</c></summary>
     SABM,
     /// <summary><c>SABM (P == 1)</c></summary>
@@ -215,20 +293,52 @@ public enum Ax25ActionVerb
     SRTAssignInitialDefault,
     /// <summary><c>Save Contents of I Frame</c></summary>
     SaveContentsOfIFrame,
+    /// <summary><c>Select Required Functions</c></summary>
+    SelectRequiredFunctions,
     /// <summary><c>Select_T1_Value</c></summary>
     SelectT1Value,
+    /// <summary><c>Set Extended</c></summary>
+    SetExtended,
+    /// <summary><c>Set Full Duplex</c></summary>
+    SetFullDuplex,
+    /// <summary><c>Set Full or Half Duplex</c></summary>
+    SetFullOrHalfDuplex,
     /// <summary><c>Set Half Duplex</c></summary>
     SetHalfDuplex,
     /// <summary><c>Set Implicit Reject</c></summary>
     SetImplicitReject,
     /// <summary><c>Set Layer 3 Initiated</c></summary>
     SetLayer3Initiated,
+    /// <summary><c>Set Normal</c></summary>
+    SetNormal,
     /// <summary><c>Set Own Receiver Busy</c></summary>
     SetOwnReceiverBusy,
+    /// <summary><c>Set Receive N1 to Default</c></summary>
+    SetReceiveN1ToDefault,
+    /// <summary><c>Set Receive N2 to Default</c></summary>
+    SetReceiveN2ToDefault,
+    /// <summary><c>Set Receive T1 to Default</c></summary>
+    SetReceiveT1ToDefault,
+    /// <summary><c>Set Receive k to Default</c></summary>
+    SetReceiveKToDefault,
     /// <summary><c>Set Reject Exception</c></summary>
     SetRejectException,
+    /// <summary><c>Set Segmentor Off</c></summary>
+    SetSegmentorOff,
     /// <summary><c>Set Selective Reject</c></summary>
     SetSelectiveReject,
+    /// <summary><c>Set Selective Reject/Reject</c></summary>
+    SetSelectiveRejectReject,
+    /// <summary><c>Set Transmit N1 to Default</c></summary>
+    SetTransmitN1ToDefault,
+    /// <summary><c>Set Transmit N2 to Default</c></summary>
+    SetTransmitN2ToDefault,
+    /// <summary><c>Set Transmit T1 to Default</c></summary>
+    SetTransmitT1ToDefault,
+    /// <summary><c>Set Transmit k to Default</c></summary>
+    SetTransmitKToDefault,
+    /// <summary><c>Set Version 2.0 Defaults</c></summary>
+    SetVersion20Defaults,
     /// <summary><c>Set Version 2.2</c></summary>
     SetVersion22,
     /// <summary><c>Sreject := Sreject + 1</c></summary>
@@ -245,6 +355,8 @@ public enum Ax25ActionVerb
     StopT3,
     /// <summary><c>Stop TM201</c></summary>
     StopTM201,
+    /// <summary><c>T1 Negotiation Response</c></summary>
+    T1NegotiationResponse,
     /// <summary><c>T1V := 2 * SRT</c></summary>
     T1VAssign2TimesSRT,
     /// <summary><c>T2 := 3000</c></summary>
@@ -275,10 +387,14 @@ public enum Ax25ActionVerb
     VSAssignNR,
     /// <summary><c>V(s) := V(s) + 1</c></summary>
     VSAssignVSPlus1,
+    /// <summary><c>Window Negotiation Response</c></summary>
+    WindowNegotiationResponse,
     /// <summary><c>X := V(s)</c></summary>
     XAssignVS,
-    /// <summary><c>XID_command</c></summary>
+    /// <summary><c>XID Command</c></summary>
     XIDCommand,
+    /// <summary><c>XID Response</c></summary>
+    XIDResponse,
     /// <summary><c>clear_peer_receiver_busy</c></summary>
     ClearPeerReceiverBusy,
     /// <summary><c>discard_I_frame_queue</c></summary>

@@ -9,10 +9,28 @@
 /// every atom exhaustively.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Ax25Guard {
+    /// `AC_gt_NM201`
+    ACGtNM201,
+    /// `COP_negotiation_requested`
+    COPNegotiationRequested,
+    /// `COP_parameter_field_present`
+    COPParameterFieldPresent,
     /// `F_eq_1`
     FEq1,
     /// `F_eq_1_and_frame_eq_RR_or_frame_eq_RNR_or_frame_eq_I`
     FEq1AndFrameEqRROrFrameEqRNROrFrameEqI,
+    /// `N1_notification_requested`
+    N1NotificationRequested,
+    /// `N1_parameter_field_present`
+    N1ParameterFieldPresent,
+    /// `N2_notification_requested`
+    N2NotificationRequested,
+    /// `N2_parameter_field_present`
+    N2ParameterFieldPresent,
+    /// `OF_negotiation_requested`
+    OFNegotiationRequested,
+    /// `OF_parameter_field_present`
+    OFParameterFieldPresent,
     /// `P_eq_1`
     PEq1,
     /// `P_or_F_eq_1`
@@ -21,14 +39,22 @@ pub enum Ax25Guard {
     RCEq0,
     /// `RC_eq_N2`
     RCEqN2,
-    /// `RC_eq_NM201`
-    RCEqNM201,
+    /// `SREJ_acceptable`
+    SREJAcceptable,
     /// `SREJ_enabled`
     SREJEnabled,
+    /// `SREJ_or_REJ_acceptable`
+    SREJOrREJAcceptable,
     /// `T1_expired`
     T1Expired,
+    /// `T1_negotiation_requested`
+    T1NegotiationRequested,
+    /// `T1_parameter_field_present`
+    T1ParameterFieldPresent,
     /// `T1_running`
     T1Running,
+    /// `XID_rejected`
+    XIDRejected,
     /// `able_to_establish`
     AbleToEstablish,
     /// `ack_pending`
@@ -37,14 +63,22 @@ pub enum Ax25Guard {
     Command,
     /// `command_and_P_eq_1`
     CommandAndPEq1,
+    /// `full_duplex_acceptable`
+    FullDuplexAcceptable,
     /// `info_field_length_le_N1_and_content_is_octet_aligned`
     InfoFieldLengthLeN1AndContentIsOctetAligned,
+    /// `k_notification_requested`
+    KNotificationRequested,
+    /// `k_parameter_field_present`
+    KParameterFieldPresent,
     /// `layer_3_initiated`
     Layer3Initiated,
     /// `mod_128`
     Mod128,
     /// `mod_8`
     Mod8,
+    /// `modulo_128_acceptable`
+    Modulo128Acceptable,
     /// `nr_eq_va`
     NrEqVa,
     /// `nr_eq_vs`
@@ -67,6 +101,14 @@ pub enum Ax25Guard {
     ResponseAndFEq1,
     /// `sreject_exception_gt_0`
     SrejectExceptionGt0,
+    /// `transmit_N1_acceptable`
+    TransmitN1Acceptable,
+    /// `transmit_N2_acceptable`
+    TransmitN2Acceptable,
+    /// `transmit_T1_acceptable`
+    TransmitT1Acceptable,
+    /// `transmit_k_acceptable`
+    TransmitKAcceptable,
     /// `va_le_nr_le_vs`
     VaLeNrLeVs,
     /// `version_2_2`

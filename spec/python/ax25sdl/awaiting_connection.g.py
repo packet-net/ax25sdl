@@ -19,17 +19,6 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
     ),
     transitions=(
         TransitionSpec(
-            id="t01_dl_disconnect_request",
-            from_="AwaitingConnection",
-            on="DL_DISCONNECT_request",
-            guard="",
-            actions=(),
-            next="AwaitingConnection",
-            notes="",
-            references=(),
-            loops=(),
-        ),
-        TransitionSpec(
             id="t02_disc_received",
             from_="AwaitingConnection",
             on="DISC_received",
