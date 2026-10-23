@@ -44,10 +44,11 @@ public static class Walker
             var triggerNode = trigger.Node;
             var triggerEvent = EventResolver.ResolveTriggerEvent(triggerNode.Label, triggerNode.ShapeClass);
 
-            // Save column: the trigger feeds directly into a Save shape with
-            // no further outgoing edges. The event is queued, no transition
-            // fires.
-            if (LeadsToSaveTerminus(graph, triggerNode))
+            // Save column: the trigger feeds directly into a Save shape, which
+            // either ends there or leads back to this page's own state (C4.2
+            // and C5.2 draw the arrow; C4.6 doesn't). Either way the event is
+            // saved until the state changes, and no transition fires.
+            if (IsSaveColumn(graph, triggerNode, state))
             {
                 if (!page.Save.Contains(triggerEvent))
                     page.Save.Add(triggerEvent);
@@ -342,6 +343,10 @@ public static class Walker
                  Dictionary<string, Decision> decisionsSeen,
                  IReadOnlyDictionary<string, LoopRecovery.LoopInfo> loops)
     {
+        if (current.ShapeClass == SaveShape)
+            throw new InvalidDataException(
+                $"Save {current.Id} ('{current.Label}') is not directly after a trigger. A Save may only follow the " +
+                "trigger it saves; anything drawn before it would be lost.");
         var outEdges = graph.OutgoingByNodeId[current.Id];
 
         // Reached a State terminus → yield the path.
@@ -516,7 +521,10 @@ public static class Walker
         decisionsSeen[contextualId] = new Decision
         {
             Id = contextualId,
-            Question = node.Label.Trim(),
+            // One line: a "?" the figure sets on its own line is typed (or
+            // wrapped) either way, and both read as " ?". The space before a
+            // detached "?" is kept as drawn; the predicate ignores it.
+            Question = Regex.Replace(node.Label.Trim(), @"[ \t]*[\r\n]+[ \t]*", " "),
             Predicate = DecisionPredicate(node.Label),
         };
     }
@@ -687,24 +695,32 @@ public static class Walker
     private static List<string> ResolveBranchLabels(GraphmlNode decision, List<GraphmlEdge> outEdges)
         => outEdges.Select(e => e.Label).ToList();
 
+    private const string SaveShape = "Save a signal until a new state is reached";
+
     /// <summary>
-    /// True if walking from the trigger reaches a "Save a signal until a
-    /// new state is reached" shape with no further outgoing edges, optionally
-    /// after passing through (single-out-edge) intermediate nodes.
+    /// True if the trigger leads straight to a Save symbol that either has no
+    /// outgoing edge, or one edge to a State symbol naming this page's own
+    /// state: the SDL "save this signal until a new state is reached", drawn
+    /// with or without the arrow back to the state it stays in. Any other
+    /// use of a Save (actions before it, an arrow from it to a different
+    /// state or to anything else) is an error rather than a silent drop.
     /// </summary>
-    private static bool LeadsToSaveTerminus(GraphmlGraph graph, GraphmlNode trigger)
+    private static bool IsSaveColumn(GraphmlGraph graph, GraphmlNode trigger, string pageState)
     {
-        var cur = trigger;
-        var guard = 0;
-        while (true)
-        {
-            if (++guard > 50) return false;  // pathological case, fall through to normal walk
-            var outs = graph.OutgoingByNodeId[cur.Id];
-            if (outs.Count != 1) return false;
-            cur = graph.NodesById[outs[0].Target];
-            if (cur.ShapeClass == "Save a signal until a new state is reached")
-                return graph.OutgoingByNodeId[cur.Id].Count == 0;
-        }
+        var outs = graph.OutgoingByNodeId[trigger.Id];
+        if (outs.Count != 1) return false;
+        var save = graph.NodesById[outs[0].Target];
+        if (save.ShapeClass != SaveShape) return false;
+
+        var after = graph.OutgoingByNodeId[save.Id];
+        if (after.Count == 0) return true;
+        if (after.Count == 1
+            && graph.NodesById[after[0].Target] is { ShapeClass: "State" } target
+            && ParseStateName(target.Label) == pageState)
+            return true;
+        throw new InvalidDataException(
+            $"Save {save.Id} ('{save.Label}') after trigger '{trigger.Label}' must end there or lead only to this page's " +
+            $"own state ({pageState}); it leads to {string.Join(", ", after.Select(e => $"'{graph.NodesById[e.Target].Label}'"))}.");
     }
 
     private static string BuildTransitionId(int triggerIndex, string triggerEvent, List<string> branchLabels)

@@ -24,7 +24,9 @@ public class TranscribeTests
     public static IEnumerable<object[]> StatePageGraphmls()
     {
         yield return ["DataLink_Disconnected.graphml",         "data_link", "Disconnected",          17, 3];
-        yield return ["DataLink_AwaitingConnection.graphml",   "data_link", "AwaitingConnection",    25, 8];
+        // 24: the DL-DISCONNECT Request column is a Save (requeue), drawn
+        // with an arrow back to the state, so it is a save: entry.
+        yield return ["DataLink_AwaitingConnection.graphml",   "data_link", "AwaitingConnection",    24, 8];
         yield return ["DataLink_AwaitingV22Connection.graphml","data_link", "AwaitingV22Connection", 25, 8];
         yield return ["DataLink_AwaitingRelease.graphml",      "data_link", "AwaitingRelease",       20, 5];
         yield return ["DataLink_Connected.graphml",            "data_link", "Connected",             68, 39];
@@ -538,6 +540,89 @@ public class TranscribeTests
         var act = () => Walker.Walk(graph, "DataLink_Connected.graphml");
 
         act.Should().Throw<System.IO.InvalidDataException>().WithMessage("*guarded*");
+    }
+
+    // ─── Save columns ─────────────────────────────────────────────────
+
+    private const string Save = "Save a signal until a new state is reached";
+
+    private static GraphmlGraph SaveColumn(string? after, string afterShape = "State")
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "1 Negotiating", 0, 0),
+            new("n1", "Signal reception from upper layer", "MDL-NEGOTIATE Request", 0, 1),
+            new("n2", Save, "Requeue", 0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+        if (after is not null)
+        {
+            nodes.Add(new("n3", afterShape, after, 0, 3));
+            edges.Add(new("e2", "n2", "n3", ""));
+        }
+        return new GraphmlGraph("synthetic", nodes, edges);
+    }
+
+    [Theory]
+    [InlineData(null)]              // C4.6: the Save ends the column
+    [InlineData("1 Negotiating")]   // C4.2, C5.2: an arrow back to the page's own state
+    public void A_save_column_becomes_a_save_entry_not_a_transition(string? after)
+    {
+        var page = Walker.Walk(SaveColumn(after), "ManagementDataLink_Negotiating.graphml");
+
+        page.Save.Should().Equal("MDL_NEGOTIATE_request");
+        page.Transitions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_save_leading_to_another_state_is_an_error()
+    {
+        var act = () => Walker.Walk(SaveColumn("0 Ready"), "ManagementDataLink_Negotiating.graphml");
+        act.Should().Throw<InvalidDataException>().WithMessage("*must end there or lead only to this page's own state*");
+    }
+
+    [Fact]
+    public void A_save_after_other_boxes_is_an_error()
+    {
+        // Trigger -> processing -> Save: the walker used to drop the box.
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "1 Negotiating", 0, 0),
+            new("n1", "Signal reception from upper layer", "MDL-NEGOTIATE Request", 0, 1),
+            new("n2", "Processing description", "Stop TM201", 0, 2),
+            new("n3", Save, "Requeue", 0, 3),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", ""), new("e2", "n2", "n3", "") };
+
+        var act = () => Walker.Walk(new GraphmlGraph("synthetic", nodes, edges), "ManagementDataLink_Negotiating.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*not directly after a trigger*");
+    }
+
+    [Theory]
+    [InlineData("Full Duplex Acceptable ?")]
+    [InlineData("Full Duplex\nAcceptable\n?")]
+    [InlineData("Full Duplex Acceptable\n?")]
+    public void A_question_with_line_breaks_reads_as_one_line(string label)
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Initiate COP Negotiation", 0, 0),
+            new("n1", "Test or decision",       label,                      0, 1),
+            new("n2", "Return from Subroutine", "",                         0, 2),
+            new("n3", "Return from Subroutine", "",                         1, 2),
+        };
+        var edges = new List<GraphmlEdge>
+        {
+            new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "Yes"), new("e2", "n1", "n3", "No"),
+        };
+
+        var page = SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges),
+                                          "ManagementDataLink_ClassesOfProceduresNegotiationSubroutines.graphml");
+
+        var d = page.Subroutines.Single().Decisions.Single();
+        d.Question.Should().Be("Full Duplex Acceptable ?");
+        d.Predicate.Should().Be("full_duplex_acceptable");
     }
 
     // ─── Branch order and subroutine failures ─────────────────────────

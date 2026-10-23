@@ -309,6 +309,93 @@ public class PartlyTranscribedMachineTests
         result.Stdout.Should().Contain("totality/determinism: 3 (state, event) arm(s)");
     }
 
+    // ─── missing_catchall: a published machine whose figure draws none ──
+
+    private const string MdlReadyWithoutCatchall = """
+        machine: management_data_link
+        state: Ready
+        source: { spec: test, figure: figc5.1 }
+        transitions:
+          - id: t01_dl_disconnect_request
+            on: DL_DISCONNECT_request
+            path: []
+            next: Ready
+        """;
+
+    private const string MissingCatchallEntry = """
+        defects:
+          - kind: missing_catchall
+            machine: management_data_link
+            state: Ready
+            issue: https://github.com/packethacking/ax25spec/issues/130
+        """;
+
+    [Fact]
+    public void A_listed_missing_catchall_lets_a_published_machine_generate()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("management-data-link/ready.sdl.yaml", MdlReadyWithoutCatchall);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), MissingCatchallEntry);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}\nstdout: {result.Stdout}");
+        result.Stderr.Should().Contain("::warning::").And.Contain("has no catch-all input").And.Contain("partial coverage");
+        result.Stdout.Should().NotContain("withheld");
+        r.GeneratedExists("ManagementDataLink_Ready.g.cs").Should().BeTrue();
+    }
+
+    [Fact]
+    public void An_unlisted_missing_catchall_is_still_an_error()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("management-data-link/ready.sdl.yaml", MdlReadyWithoutCatchall);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("has no transition triggered by any of").And.Contain("missing_catchall");
+    }
+
+    [Fact]
+    public void A_missing_catchall_entry_for_a_page_that_has_one_is_stale()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("management-data-link/ready.sdl.yaml", MdlReadyWithoutCatchall + "\n" + """
+              - id: t02_all_other_primitives__from_upper_layer
+                on: all_other_primitives__from_upper_layer
+                path: []
+                next: Ready
+            """);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), MissingCatchallEntry);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("has no catch-all input").And.Contain("no longer occurs");
+    }
+
+    [Theory]
+    [InlineData("kind: missing_catchall", "kind: something_else", "unknown kind")]
+    [InlineData("    state: Ready\n", "    state: Ready\n    transition: t01_dl_disconnect_request\n", "names a state, not a transition")]
+    public void A_malformed_missing_catchall_entry_is_an_error(string from, string to, string expected)
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("management-data-link/ready.sdl.yaml", MdlReadyWithoutCatchall);
+        var entry = MissingCatchallEntry.Replace(from, to);
+        entry.Should().NotBe(MissingCatchallEntry);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), entry);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain(expected);
+    }
+
     [Fact]
     public void A_machine_that_is_not_in_Annex_C_is_an_error()
     {

@@ -11,20 +11,35 @@ namespace Packet.Sdl.IR;
 /// </summary>
 public sealed class KnownFigureDefect
 {
+    /// <summary>A transition's <c>next:</c> names a state that does not exist. The machine is withheld.</summary>
+    public const string UnknownNextState = "unknown_next_state";
+
+    /// <summary>
+    /// The figure draws no catch-all input for this state. The page is
+    /// exempt from the catch-all lint, as a <c>coverage: partial</c> page
+    /// is, and the machine still generates. The only kind allowed on a
+    /// published machine, because it changes no transition.
+    /// </summary>
+    public const string MissingCatchall = "missing_catchall";
+
+    /// <summary><see cref="UnknownNextState"/> (the default) or <see cref="MissingCatchall"/>.</summary>
+    public string Kind { get; set; } = UnknownNextState;
+
     /// <summary>The page's <c>machine:</c>.</summary>
     public string Machine { get; set; } = "";
     /// <summary>The page's <c>state:</c>.</summary>
     public string State { get; set; } = "";
-    /// <summary>The transition id, exactly as generated.</summary>
+    /// <summary>unknown_next_state only: the transition id, exactly as generated.</summary>
     public string Transition { get; set; } = "";
-    /// <summary>The <c>next:</c> value the figure draws.</summary>
+    /// <summary>unknown_next_state only: the <c>next:</c> value the figure draws.</summary>
     public string Next { get; set; } = "";
     /// <summary>Required. The ax25spec issue that records the defect.</summary>
     public string Issue { get; set; } = "";
     public string? Note { get; set; }
 
-    public string Describe() =>
-        $"{Machine} {State} transition `{Transition}` leads to `{Next}` ({Issue})";
+    public string Describe() => Kind == MissingCatchall
+        ? $"{Machine} {State} has no catch-all input ({Issue})"
+        : $"{Machine} {State} transition `{Transition}` leads to `{Next}` ({Issue})";
 }
 
 /// <summary>Top-level shape of the allowlist file.</summary>
@@ -78,10 +93,26 @@ public static class KnownFigureDefects
         var seen = new HashSet<(string, string, string)>();
         foreach (var d in file.Defects ?? new List<KnownFigureDefect>())
         {
-            if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.State)
-                || string.IsNullOrWhiteSpace(d.Transition) || string.IsNullOrWhiteSpace(d.Next))
+            if (d.Kind is not (KnownFigureDefect.UnknownNextState or KnownFigureDefect.MissingCatchall))
             {
-                errors.Add($"{path}: every entry needs machine, state, transition and next.");
+                errors.Add($"{path}: unknown kind `{d.Kind}`; use {KnownFigureDefect.UnknownNextState} or {KnownFigureDefect.MissingCatchall}.");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(d.Machine) || string.IsNullOrWhiteSpace(d.State))
+            {
+                errors.Add($"{path}: every entry needs machine and state.");
+                continue;
+            }
+            if (d.Kind == KnownFigureDefect.UnknownNextState
+                && (string.IsNullOrWhiteSpace(d.Transition) || string.IsNullOrWhiteSpace(d.Next)))
+            {
+                errors.Add($"{path}: an {KnownFigureDefect.UnknownNextState} entry needs transition and next.");
+                continue;
+            }
+            if (d.Kind == KnownFigureDefect.MissingCatchall
+                && (!string.IsNullOrWhiteSpace(d.Transition) || !string.IsNullOrWhiteSpace(d.Next)))
+            {
+                errors.Add($"{path}: a {KnownFigureDefect.MissingCatchall} entry names a state, not a transition; remove transition and next.");
                 continue;
             }
             if (!IssueUrl.IsMatch(d.Issue))
@@ -90,7 +121,7 @@ public static class KnownFigureDefects
                            "(https://github.com/packethacking/ax25spec/issues/<number>).");
                 continue;
             }
-            if (!seen.Add((d.Machine, d.State, d.Transition)))
+            if (!seen.Add((d.Kind + ":" + d.Machine, d.State, d.Transition)))
             {
                 errors.Add($"{path}: {d.Describe()} is listed twice.");
                 continue;

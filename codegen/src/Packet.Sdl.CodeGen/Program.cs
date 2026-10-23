@@ -200,7 +200,7 @@ internal static class Program
         // tolerant: it only requires SOME catchall, not full event
         // coverage; deciding which events a state should handle is the
         // spec author's call, not codegen's.
-        LintCatchallCoverage(pages, errors);
+        LintCatchallCoverage(pages, knownDefects, errors);
 
         if (errors.Count > 0)
         {
@@ -1077,7 +1077,7 @@ internal static class Program
                 // spec-sdl/known-figure-defects.yaml: warn, and keep the
                 // machine withheld while the entry is present.
                 var known = knownDefects.FirstOrDefault(d =>
-                    d.Machine == page.Machine && d.State == page.State && d.Transition == t.Id && d.Next == t.Next);
+                    d.Kind == KnownFigureDefect.UnknownNextState && d.Machine == page.Machine && d.State == page.State && d.Transition == t.Id && d.Next == t.Next);
                 if (known is not null && AnnexC.PublishedMachines.Contains(page.Machine))
                 {
                     // Listing it would withhold a published machine, which is
@@ -1114,7 +1114,7 @@ internal static class Program
         // Like a strict xfail: an entry whose defect no longer occurs (the
         // figure was fixed, or the transition id changed) fails the run, so
         // the list can't go stale and can't keep a fixed machine withheld.
-        foreach (var d in knownDefects.Where(d => !matchedDefects.Contains(d)))
+        foreach (var d in knownDefects.Where(d => d.Kind == KnownFigureDefect.UnknownNextState && !matchedDefects.Contains(d)))
         {
             errors.Add(
                 $"spec-sdl/{KnownFigureDefects.FileName}: {d.Describe()} no longer occurs. " +
@@ -1168,8 +1168,10 @@ internal static class Program
         "all_other_commands",
     };
 
-    private static void LintCatchallCoverage(List<SdlPage> pages, List<string> errors)
+    private static void LintCatchallCoverage(List<SdlPage> pages, List<KnownFigureDefect> knownDefects, List<string> errors)
     {
+        var exempt = knownDefects.Where(d => d.Kind == KnownFigureDefect.MissingCatchall).ToList();
+        var matched = new HashSet<KnownFigureDefect>();
         foreach (var page in pages)
         {
             // Skip pages explicitly marked partial. `coverage: partial`
@@ -1178,14 +1180,42 @@ internal static class Program
             if (string.Equals(page.Coverage, "partial", StringComparison.OrdinalIgnoreCase)) continue;
 
             bool hasCatchall = page.Transitions.Any(t => CatchallEvents.Contains(t.On, StringComparer.Ordinal));
+            var known = exempt.FirstOrDefault(d => d.Machine == page.Machine && d.State == page.State);
+            if (known is not null)
+            {
+                matched.Add(known);
+                if (hasCatchall)
+                {
+                    errors.Add(
+                        $"spec-sdl/{KnownFigureDefects.FileName}: {known.Describe()} no longer occurs: the page now has a " +
+                        "catch-all input. Remove the entry.");
+                }
+                else
+                {
+                    // A figure gap, filed upstream: the page generates with
+                    // partial coverage, as the prose bootstrap's did.
+                    Console.Error.WriteLine($"::warning::{page.SourcePath}: known figure defect: {known.Describe()}. " +
+                                            "It generates with partial coverage: events it doesn't handle have no transition.");
+                }
+                continue;
+            }
+
             if (!hasCatchall)
             {
                 errors.Add(
                     $"{page.SourcePath}: state `{page.State}` has no transition triggered by any of " +
                     $"`{string.Join("` / `", CatchallEvents)}`. Add a catchall transition (or mark the page " +
                     "`coverage: partial` if this is a work-in-progress transcription) so events not " +
-                    "explicitly handled don't silently no-op at runtime.");
+                    "explicitly handled don't silently no-op at runtime. If the figure itself draws none, raise it " +
+                    $"as an ax25spec issue and list it in spec-sdl/{KnownFigureDefects.FileName} as {KnownFigureDefect.MissingCatchall}.");
             }
+        }
+
+        foreach (var d in exempt.Where(d => !matched.Contains(d)))
+        {
+            errors.Add(
+                $"spec-sdl/{KnownFigureDefects.FileName}: {d.Describe()} no longer occurs: no such page, or the page is " +
+                "marked coverage: partial. Remove the entry.");
         }
     }
 
