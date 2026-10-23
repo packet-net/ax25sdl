@@ -179,7 +179,9 @@ public static class YamlEmitter
     private static readonly System.Buffers.SearchValues<char> QuoteForcing =
         System.Buffers.SearchValues.Create("\"\\");
     private static readonly System.Buffers.SearchValues<char> PlainScalarTroublemakers =
-        System.Buffers.SearchValues.Create(":#,[]{}&*!|>%@`");
+        // '?' too: inside a flow map ({ action: Start T106 (T108?), ... }) a
+        // strict YAML parser reads it as a mapping-key indicator (C2a.5).
+        System.Buffers.SearchValues.Create(":#,[]{}&*!|>%@`?");
 
     private static string YamlQuote(string s)
     {
