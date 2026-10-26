@@ -46,6 +46,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check the tools this job needs
+        run: scripts/ci-require-tools.sh cc:build-essential python3:python3
+
       - name: resolve version from tag
         id: parse
         run: |

@@ -30,6 +30,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: dotnet --version
         run: dotnet --version
       - name: build
@@ -49,6 +60,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: regenerate C#
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --csharp
       - name: assert no diff
@@ -68,6 +90,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -104,6 +137,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - uses: actions/setup-go@v6
         with:
           go-version: 'stable'
@@ -146,6 +190,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: regenerate JSON
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
       - name: assert no diff
@@ -170,6 +225,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule; the regenerate step reads the SDL sources.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: regenerate JSON
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
       - name: run golden-trace suite against the regenerated tables
@@ -185,30 +251,23 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
-      # rustfmt disappeared from the runner around 2026-06-14 (job red on
-      # main since 0a47223): the codegen emitter warns-and-continues without
-      # it, emitting non-canonically-formatted output that fails the drift
-      # check with a misleading 9-file diff. Re-add the rustup toolchain dir,
-      # self-heal via rustup where possible, and otherwise fail fast with an
-      # actionable message.
-      - name: ensure rustfmt on PATH
-        run: |
-          [ -d "$HOME/.cargo/bin" ] && echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/.cargo/bin:$PATH"
-          # NB: test that rustfmt RUNS, not merely that it is on PATH. rustup
-          # installs a shim at ~/.cargo/bin/rustfmt that exists even when the
-          # rustfmt component is not installed for the active toolchain, so
-          # `command -v rustfmt` is a false positive and this self-heal never
-          # fired. That is why this job stayed red from 2026-06-14.
-          if ! rustfmt --version >/dev/null 2>&1; then
-            if command -v rustup >/dev/null 2>&1; then
-              rustup component add rustfmt
-            else
-              echo "::error::rustfmt is unavailable and rustup is not installed on this runner. Install the Rust toolchain (with the rustfmt component) on the runner; this job has been red on main since 2026-06-14 because of it."
-              exit 1
-            fi
-          fi
-          rustfmt --version
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
+      - name: Install Rust (+ rustfmt)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check the tools this job needs
+        run: scripts/ci-require-tools.sh cc:build-essential
       - name: regenerate Rust
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --rust
       - name: assert no diff
@@ -240,6 +299,19 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
+      - name: Check the tools this job needs
+        run: scripts/ci-require-tools.sh git:git cmake:cmake cc:build-essential python3:python3
       # Not every self-hosted runner has a system clang-format (the emitter
       # warns-and-continues without it, emitting non-canonically-formatted C
       # that fails the drift check). Self-heal with a pinned pip venv —
@@ -278,6 +350,19 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
+      - name: Check the tools this job needs
+        run: scripts/ci-require-tools.sh git:git python3:python3
       - name: regenerate Python
         run: dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --python
       - name: assert no diff
@@ -319,6 +404,17 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule — every job that reads the SDL sources needs it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: regenerate yaml from graphml (out-of-tree)
         run: |
           out="$RUNNER_TEMP/transcribe-out"
@@ -354,5 +450,16 @@ jobs:
           # spec-sdl is a symlink into the packethacking/ax25spec
           # submodule; the suite locates the repo root through it.
           submodules: true
+      # Self-hosted runners: put the SDK under the runner account's home, which it can always
+      # write, never in the system install (which it cannot).
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      # Install the SDK in the job instead of trusting the runner's, at the version global.json pins.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
       - name: run the explorer calibration suite
         run: dotnet test codegen/tests/Packet.Sdl.Explorer.Tests --nologo
