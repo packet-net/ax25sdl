@@ -330,6 +330,34 @@ jobs:
           global-json-file: global.json
           cache: ${{ runner.environment == 'github-hosted' }}
           cache-dependency-path: Directory.Packages.props
+      # This repo only lets GitHub-owned actions run, so when the runner has no cmake, Kitware's
+      # official prebuilt tarball is fetched by hand: pinned version, SHA-256 checked against
+      # Kitware's published checksum file, unpacked into the runner account's home. No root needed.
+      - name: Ensure cmake
+        run: |
+          CMAKE_VERSION=4.4.4
+          if ! command -v cmake >/dev/null 2>&1; then
+            dir="$HOME/.local/cmake-$CMAKE_VERSION"
+            if [ ! -x "$dir/bin/cmake" ]; then
+              base="https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION"
+              tarball="cmake-$CMAKE_VERSION-linux-x86_64.tar.gz"
+              tmp="$(mktemp -d)"
+              curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/$tarball" "$base/$tarball"
+              curl --proto '=https' --tlsv1.2 -fsSL -o "$tmp/SHA-256.txt" "$base/cmake-$CMAKE_VERSION-SHA-256.txt"
+              expected="$(awk -v f="$tarball" '$2 == f {print $1}' "$tmp/SHA-256.txt")"
+              actual="$(sha256sum "$tmp/$tarball" | awk '{print $1}')"
+              if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+                echo "::error::cmake $CMAKE_VERSION tarball SHA-256 does not match Kitware's published checksum"
+                exit 1
+              fi
+              mkdir -p "$dir"
+              tar -xzf "$tmp/$tarball" -C "$dir" --strip-components=1
+              rm -rf "$tmp"
+            fi
+            echo "$dir/bin" >> "$GITHUB_PATH"
+            export PATH="$dir/bin:$PATH"
+          fi
+          cmake --version
       - name: Check the tools this job needs
         run: scripts/ci-require-tools.sh git:git cmake:cmake cc:build-essential python3:python3
       # Not every self-hosted runner has a system clang-format (the emitter
