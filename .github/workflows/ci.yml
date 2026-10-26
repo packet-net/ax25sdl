@@ -43,6 +43,19 @@ jobs:
           cache-dependency-path: Directory.Packages.props
       - name: dotnet --version
         run: dotnet --version
+      # The codegen tests check emitted Rust formatting, so they need rustfmt on PATH.
+      # This repo only lets GitHub-owned actions run, so rustup is installed by hand when the
+      # runner has none: into the runner account's home, never the system, no root needed.
+      - name: Ensure Rust with rustfmt
+        run: |
+          if ! command -v rustup >/dev/null 2>&1 && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup component add rustfmt
+          rustfmt --version
+
       - name: build
         run: dotnet build codegen/ax25sdl.slnx --nologo
       - name: test
