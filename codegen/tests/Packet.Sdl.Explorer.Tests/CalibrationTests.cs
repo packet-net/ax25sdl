@@ -255,8 +255,9 @@ public class CalibrationTests(ITestOutputHelper output)
         // A (modulo 128) sends SABME; B is a v2.0 peer that answers DM(F=1)
         // but would accept SABM. #44: A is in AwaitingConnection, not
         // AwaitingV22Connection. #48: the DM tears the attempt down instead
-        // of degrading to SABM. Either way the link never comes up and A's
-        // queued data is discarded: a deadlock, two steps from the seed.
+        // of degrading to SABM. Either way the link never comes up: a
+        // deadlock, two steps from the seed. (A's frame was never queued:
+        // figc4.2 drops it while layer 3 initiated, ax25spec#161.)
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,

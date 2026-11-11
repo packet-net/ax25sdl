@@ -122,7 +122,7 @@ public sealed class Stepper
     /// Build the seeded state. All data is submitted up front (DL_DATA_request
     /// per frame) so the queues start full; the Disconnected seed additionally
     /// has A issue DL_CONNECT_request first (so its SABM/SABME is in flight and
-    /// its data queues behind the connection attempt).
+    /// its data is submitted behind the connection attempt, where figc4.2 drops it while layer 3 initiated: ax25spec#161).
     /// </summary>
     public SystemState Seed()
     {
