@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Packet.Sdl.CodeGen.Tla</RootNamespace>
+    <Description>TLA+ emitter backend. Renders one machine's emitted JSON tables (spec/json) as a TLA+ module of table structure (guards, action chains, loops, subroutine paths, next states) for the TLC model checker; verb and atom semantics live in the hand-written spec/tla/Ax25Semantics.tla.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Packet.Sdl.IR\Packet.Sdl.IR.csproj" />
+  </ItemGroup>
+
+</Project>

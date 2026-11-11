@@ -10,11 +10,13 @@
     <Project Path="src/Packet.Sdl.CodeGen.Json/Packet.Sdl.CodeGen.Json.csproj" />
     <Project Path="src/Packet.Sdl.CodeGen.Python/Packet.Sdl.CodeGen.Python.csproj" />
     <Project Path="src/Packet.Sdl.CodeGen.Rust/Packet.Sdl.CodeGen.Rust.csproj" />
+    <Project Path="src/Packet.Sdl.CodeGen.Tla/Packet.Sdl.CodeGen.Tla.csproj" />
     <Project Path="src/Packet.Sdl.CodeGen.Ts/Packet.Sdl.CodeGen.Ts.csproj" />
     <Project Path="src/Packet.Sdl.Explorer/Packet.Sdl.Explorer.csproj" />
     <Project Path="src/Packet.Sdl.IR/Packet.Sdl.IR.csproj" />
     <Project Path="src/Packet.Sdl.Interpreter/Packet.Sdl.Interpreter.csproj" />
     <Project Path="src/Packet.Sdl.Lint/Packet.Sdl.Lint.csproj" />
+    <Project Path="src/Packet.Sdl.TlaCheck/Packet.Sdl.TlaCheck.csproj" />
     <Project Path="src/Packet.Sdl.Transcribe/Packet.Sdl.Transcribe.csproj" />
   </Folder>
   <Folder Name="/tests/">
