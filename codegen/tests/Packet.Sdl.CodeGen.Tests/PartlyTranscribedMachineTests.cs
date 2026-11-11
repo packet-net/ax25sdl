@@ -71,7 +71,7 @@ public class PartlyTranscribedMachineTests
         var result = r.Run();
 
         result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}\nstdout: {result.Stdout}");
-        result.Stdout.Should().Contain("withheld  link_mux").And.Contain("SiezePending");
+        result.Stdout.Should().Contain("withheld  link_mux: no page yet for SiezePending");
         r.GeneratedExists("DataLink_Connected.g.cs").Should().BeTrue();
         r.GeneratedExists("LinkMux_Idle.g.cs").Should().BeFalse();
 
@@ -186,6 +186,127 @@ public class PartlyTranscribedMachineTests
 
         result.ExitCode.Should().NotBe(0);
         result.Stderr.Should().Contain("would all generate files named `connected.g.*`");
+    }
+
+    // ─── Known figure defects (spec-sdl/known-figure-defects.yaml) ─────
+
+    private const string SizedDefect = """
+        defects:
+          - machine: link_mux
+            state: Idle
+            transition: t01_lm_data_request
+            next: Sized
+            issue: https://github.com/packethacking/ax25spec/issues/121
+        """;
+
+    private static string IdleLeadingToSized() =>
+        LinkMuxIdlePage.Replace("next: SiezePending", "next: Sized");
+
+    [Fact]
+    public void A_listed_figure_defect_warns_and_keeps_the_machine_withheld()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("data-link/connected.sdl.yaml", DataLinkPage);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleLeadingToSized());
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), SizedDefect);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}\nstdout: {result.Stdout}");
+        result.Stderr.Should().Contain("::warning::").And.Contain("known figure defect").And.Contain("issues/121");
+        result.Stdout.Should().Contain("withheld  link_mux: Sized (known figure defect");
+        r.GeneratedExists("LinkMux_Idle.g.cs").Should().BeFalse();
+        r.GeneratedExists("DataLink_Connected.g.cs").Should().BeTrue();
+    }
+
+    [Fact]
+    public void An_unlisted_figure_defect_is_an_error()
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleLeadingToSized());
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("targets state `Sized`").And.Contain("known-figure-defects.yaml");
+    }
+
+    [Fact]
+    public void A_listed_defect_that_no_longer_occurs_is_an_error()
+    {
+        // The figure was fixed: the page now leads to SiezePending, but the
+        // entry is still there. Like a strict xfail, that fails the run.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", LinkMuxIdlePage);
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), SizedDefect);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("`t01_lm_data_request` leads to `Sized`").And.Contain("no longer occurs");
+    }
+
+    [Theory]
+    [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: 121", "needs `issue:`")]
+    [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: https://github.com/packet-net/ax25sdl/issues/121", "packethacking/ax25spec issue")]
+    [InlineData("issue: https://github.com/packethacking/ax25spec/issues/121", "issue: https://github.com/packethacking/ax25spec/pull/121", "packethacking/ax25spec issue")]
+    [InlineData("next: Sized", "nxet: Sized", "known-figure-defects.yaml")]
+    public void A_malformed_defect_entry_is_an_error(string from, string to, string expected)
+    {
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", IdleLeadingToSized());
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), SizedDefect.Replace(from, to));
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain(expected);
+    }
+
+    [Fact]
+    public void A_figure_defect_on_a_published_machine_is_still_an_error()
+    {
+        // Listing it would withhold Data Link, which is never allowed.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("data-link/connected.sdl.yaml", DataLinkPage.Replace(
+            "kind: signal_lower }\n    next: Connected", "kind: signal_lower }\n    next: Conected"));
+        File.WriteAllText(Path.Combine(r.SpecDir, "known-figure-defects.yaml"), """
+            defects:
+              - machine: data_link
+                state: Connected
+                transition: t01_dl_disconnect_request
+                next: Conected
+                issue: https://github.com/packethacking/ax25spec/issues/1
+            """);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().NotBe(0);
+        result.Stderr.Should().Contain("`data_link` is published and is never withheld, so a defect on it can't be allowlisted");
+        // Not reported as withheld, and not as missing pages.
+        result.Stderr.Should().NotContain("::warning::");
+        result.Stderr.Should().NotContain("submodule checkout");
+    }
+
+    [Fact]
+    public void A_withheld_machine_still_gets_the_totality_lint()
+    {
+        // Only generation is withheld: the totality / determinism lint
+        // checks the withheld page's three (state, event) arms.
+        using var r = new CodegenRunner();
+        r.WriteEventsCatalog(Events);
+        r.WritePage("link-multiplexer/idle.sdl.yaml", LinkMuxIdlePage);
+
+        var result = r.Run();
+
+        result.ExitCode.Should().Be(0, $"stderr: {result.Stderr}");
+        result.Stdout.Should().Contain("withheld  link_mux");
+        result.Stdout.Should().Contain("totality/determinism: 3 (state, event) arm(s)");
     }
 
     [Fact]
