@@ -15,6 +15,8 @@ dotnet run --project codegen/src/Packet.Sdl.Explorer -- --help
 dotnet test codegen/tests/Packet.Sdl.Explorer.Tests        # the calibration suite
 ```
 
+A second checker, TLC over a TLA+ model generated from the same JSON tables, reproduces this explorer move for move and is compared with it row by row: see `docs/tla.md`.
+
 Exit code 0 means no violation in the exhaustively explored bounded space, 1 means an invariant fired (the counterexample is printed), 2 means a depth or visited-state bound was hit before the space was exhausted (the liveness checks were skipped; this is never reported as "no violation").
 
 ## The model

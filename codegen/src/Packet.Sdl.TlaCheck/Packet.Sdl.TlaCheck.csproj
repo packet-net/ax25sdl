@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Packet.Sdl.TlaCheck</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <Description>Cross-check of the two-station explorer against the TLC model checker: renders the TLA+ tables for each calibration scenario's JSON tables, runs the explorer and TLC (over TwoStation.tla) on the same scenario, and reports where they agree. See docs/tla.md.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Packet.Sdl.Explorer\Packet.Sdl.Explorer.csproj" />
+    <ProjectReference Include="..\Packet.Sdl.CodeGen.Tla\Packet.Sdl.CodeGen.Tla.csproj" />
+  </ItemGroup>
+
+</Project>

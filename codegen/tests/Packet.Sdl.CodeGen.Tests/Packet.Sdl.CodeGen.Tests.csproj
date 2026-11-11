@@ -20,6 +20,8 @@
     <ProjectReference Include="..\..\src\Packet.Sdl.Transcribe\Packet.Sdl.Transcribe.csproj" />
     <!-- IR is API-tested directly: ResolverStaleReadTests drives Resolver.Resolve. -->
     <ProjectReference Include="..\..\src\Packet.Sdl.IR\Packet.Sdl.IR.csproj" />
+    <!-- The TLA+ emitter is API-tested directly: TlaEmitterTests renders spec/json and compares it with the committed spec/tla. -->
+    <ProjectReference Include="..\..\src\Packet.Sdl.CodeGen.Tla\Packet.Sdl.CodeGen.Tla.csproj" />
   </ItemGroup>
 
   <ItemGroup>
