@@ -198,9 +198,7 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "DL_DATA_request",
       guard: [{ atom: "layer_3_initiated", negate: false }],
-      actions: [
-        { verb: "push_frame_on_queue", kind: "internal_out" },
-      ],
+      actions: [],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -211,7 +209,9 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "DL_DATA_request",
       guard: [{ atom: "layer_3_initiated", negate: true }],
-      actions: [],
+      actions: [
+        { verb: "push_frame_on_queue", kind: "internal_out" },
+      ],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -222,9 +222,7 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "I_frame_pops_off_queue",
       guard: [{ atom: "layer_3_initiated", negate: false }],
-      actions: [
-        { verb: "push_frame_on_queue", kind: "internal_out" },
-      ],
+      actions: [],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -235,7 +233,9 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "I_frame_pops_off_queue",
       guard: [{ atom: "layer_3_initiated", negate: true }],
-      actions: [],
+      actions: [
+        { verb: "push_frame_on_queue", kind: "internal_out" },
+      ],
       next: "AwaitingConnection",
       notes: "",
       references: [],

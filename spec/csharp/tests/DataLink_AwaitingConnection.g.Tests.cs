@@ -204,9 +204,7 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.On.Should().Be(Ax25Event.DLDATARequest);
         t.Next.Should().Be("AwaitingConnection");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.Layer3Initiated, false) });
-        t.Actions.Count.Should().Be(1);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.PushFrameOnQueue);
-        t.Actions[0].Kind.Should().Be(ActionKind.InternalOut);
+        t.Actions.Count.Should().Be(0);
     }
 
     [Fact] public void t09_dl_data_request_no()
@@ -215,7 +213,9 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.On.Should().Be(Ax25Event.DLDATARequest);
         t.Next.Should().Be("AwaitingConnection");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.Layer3Initiated, true) });
-        t.Actions.Count.Should().Be(0);
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.PushFrameOnQueue);
+        t.Actions[0].Kind.Should().Be(ActionKind.InternalOut);
     }
 
     [Fact] public void t10_i_frame_pops_off_queue_yes()
@@ -224,9 +224,7 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.On.Should().Be(Ax25Event.IFramePopsOffQueue);
         t.Next.Should().Be("AwaitingConnection");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.Layer3Initiated, false) });
-        t.Actions.Count.Should().Be(1);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.PushFrameOnQueue);
-        t.Actions[0].Kind.Should().Be(ActionKind.InternalOut);
+        t.Actions.Count.Should().Be(0);
     }
 
     [Fact] public void t10_i_frame_pops_off_queue_no()
@@ -235,7 +233,9 @@ public class DataLink_AwaitingConnection_GeneratedTests
         t.On.Should().Be(Ax25Event.IFramePopsOffQueue);
         t.Next.Should().Be("AwaitingConnection");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.Layer3Initiated, true) });
-        t.Actions.Count.Should().Be(0);
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.PushFrameOnQueue);
+        t.Actions[0].Kind.Should().Be(ActionKind.InternalOut);
     }
 
     [Fact] public void t11_all_other_primitives__from_upper_layer()

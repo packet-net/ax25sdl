@@ -312,12 +312,7 @@
       "from": "AwaitingConnection",
       "on": "DL_DATA_request",
       "guard": "layer_3_initiated",
-      "actions": [
-        {
-          "verb": "push_frame_on_queue",
-          "kind": "internal_out"
-        }
-      ],
+      "actions": [],
       "next": "AwaitingConnection",
       "notes": "",
       "references": [],
@@ -328,17 +323,6 @@
       "from": "AwaitingConnection",
       "on": "DL_DATA_request",
       "guard": "not layer_3_initiated",
-      "actions": [],
-      "next": "AwaitingConnection",
-      "notes": "",
-      "references": [],
-      "loops": []
-    },
-    {
-      "id": "t10_i_frame_pops_off_queue_yes",
-      "from": "AwaitingConnection",
-      "on": "I_frame_pops_off_queue",
-      "guard": "layer_3_initiated",
       "actions": [
         {
           "verb": "push_frame_on_queue",
@@ -351,11 +335,27 @@
       "loops": []
     },
     {
+      "id": "t10_i_frame_pops_off_queue_yes",
+      "from": "AwaitingConnection",
+      "on": "I_frame_pops_off_queue",
+      "guard": "layer_3_initiated",
+      "actions": [],
+      "next": "AwaitingConnection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
       "id": "t10_i_frame_pops_off_queue_no",
       "from": "AwaitingConnection",
       "on": "I_frame_pops_off_queue",
       "guard": "not layer_3_initiated",
-      "actions": [],
+      "actions": [
+        {
+          "verb": "push_frame_on_queue",
+          "kind": "internal_out"
+        }
+      ],
       "next": "AwaitingConnection",
       "notes": "",
       "references": [],

@@ -326,9 +326,7 @@ static int test_t09_dl_data_request_yes(void) {
   ASSERT_STREQ(t->on, "DL_DATA_request", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -345,7 +343,9 @@ static int test_t09_dl_data_request_no(void) {
   ASSERT_STREQ(t->on, "DL_DATA_request", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "not layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 0, "actions count");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
   return 0;
 }
 
@@ -362,9 +362,7 @@ static int test_t10_i_frame_pops_off_queue_yes(void) {
   ASSERT_STREQ(t->on, "I_frame_pops_off_queue", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -381,7 +379,9 @@ static int test_t10_i_frame_pops_off_queue_no(void) {
   ASSERT_STREQ(t->on, "I_frame_pops_off_queue", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "not layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 0, "actions count");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
   return 0;
 }
 

@@ -240,9 +240,7 @@ def test_t09_dl_data_request_yes() -> None:
     assert t.on == "DL_DATA_request"
     assert t.next == "AwaitingConnection"
     assert t.guard == "layer_3_initiated"
-    assert len(t.actions) == 1
-    assert t.actions[0].verb == "push_frame_on_queue"
-    assert t.actions[0].kind == ActionKind.INTERNAL_OUT
+    assert len(t.actions) == 0
 
 
 def test_t09_dl_data_request_no() -> None:
@@ -254,7 +252,9 @@ def test_t09_dl_data_request_no() -> None:
     assert t.on == "DL_DATA_request"
     assert t.next == "AwaitingConnection"
     assert t.guard == "not layer_3_initiated"
-    assert len(t.actions) == 0
+    assert len(t.actions) == 1
+    assert t.actions[0].verb == "push_frame_on_queue"
+    assert t.actions[0].kind == ActionKind.INTERNAL_OUT
 
 
 def test_t10_i_frame_pops_off_queue_yes() -> None:
@@ -266,9 +266,7 @@ def test_t10_i_frame_pops_off_queue_yes() -> None:
     assert t.on == "I_frame_pops_off_queue"
     assert t.next == "AwaitingConnection"
     assert t.guard == "layer_3_initiated"
-    assert len(t.actions) == 1
-    assert t.actions[0].verb == "push_frame_on_queue"
-    assert t.actions[0].kind == ActionKind.INTERNAL_OUT
+    assert len(t.actions) == 0
 
 
 def test_t10_i_frame_pops_off_queue_no() -> None:
@@ -280,7 +278,9 @@ def test_t10_i_frame_pops_off_queue_no() -> None:
     assert t.on == "I_frame_pops_off_queue"
     assert t.next == "AwaitingConnection"
     assert t.guard == "not layer_3_initiated"
-    assert len(t.actions) == 0
+    assert len(t.actions) == 1
+    assert t.actions[0].verb == "push_frame_on_queue"
+    assert t.actions[0].kind == ActionKind.INTERNAL_OUT
 
 
 def test_t11_all_other_primitives__from_upper_layer() -> None:

@@ -366,10 +366,7 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: false,
             }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::PushFrameOnQueue,
-                kind: ActionKind::InternalOut,
-            }],
+            actions: &[],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -383,7 +380,10 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: true,
             }],
-            actions: &[],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::PushFrameOnQueue,
+                kind: ActionKind::InternalOut,
+            }],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -397,10 +397,7 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: false,
             }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::PushFrameOnQueue,
-                kind: ActionKind::InternalOut,
-            }],
+            actions: &[],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -414,7 +411,10 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: true,
             }],
-            actions: &[],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::PushFrameOnQueue,
+                kind: ActionKind::InternalOut,
+            }],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -890,9 +890,7 @@ mod tests {
                 negate: false
             },]
         );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
-        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
+        assert_eq!(tx.actions.len(), 0);
     }
 
     #[test]
@@ -911,7 +909,9 @@ mod tests {
                 negate: true
             },]
         );
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
+        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
     }
 
     #[test]
@@ -930,9 +930,7 @@ mod tests {
                 negate: false
             },]
         );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
-        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
+        assert_eq!(tx.actions.len(), 0);
     }
 
     #[test]
@@ -951,7 +949,9 @@ mod tests {
                 negate: true
             },]
         );
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
+        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
     }
 
     #[test]

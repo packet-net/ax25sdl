@@ -559,14 +559,8 @@ func TestDataLinkAwaitingConnection_t09_dl_data_request_yes(t *testing.T) {
 	if tx.Guard != "layer_3_initiated" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "layer_3_initiated")
 	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "push_frame_on_queue" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "push_frame_on_queue")
-	}
-	if tx.Actions[0].Kind != InternalOut {
-		t.Errorf("Actions[0].Kind = %v, want InternalOut", tx.Actions[0].Kind)
+	if got := len(tx.Actions); got != 0 {
+		t.Fatalf("len(Actions) = %d, want 0", got)
 	}
 }
 
@@ -590,8 +584,14 @@ func TestDataLinkAwaitingConnection_t09_dl_data_request_no(t *testing.T) {
 	if tx.Guard != "not layer_3_initiated" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "not layer_3_initiated")
 	}
-	if got := len(tx.Actions); got != 0 {
-		t.Fatalf("len(Actions) = %d, want 0", got)
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "push_frame_on_queue" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "push_frame_on_queue")
+	}
+	if tx.Actions[0].Kind != InternalOut {
+		t.Errorf("Actions[0].Kind = %v, want InternalOut", tx.Actions[0].Kind)
 	}
 }
 
@@ -615,14 +615,8 @@ func TestDataLinkAwaitingConnection_t10_i_frame_pops_off_queue_yes(t *testing.T)
 	if tx.Guard != "layer_3_initiated" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "layer_3_initiated")
 	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "push_frame_on_queue" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "push_frame_on_queue")
-	}
-	if tx.Actions[0].Kind != InternalOut {
-		t.Errorf("Actions[0].Kind = %v, want InternalOut", tx.Actions[0].Kind)
+	if got := len(tx.Actions); got != 0 {
+		t.Fatalf("len(Actions) = %d, want 0", got)
 	}
 }
 
@@ -646,8 +640,14 @@ func TestDataLinkAwaitingConnection_t10_i_frame_pops_off_queue_no(t *testing.T) 
 	if tx.Guard != "not layer_3_initiated" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "not layer_3_initiated")
 	}
-	if got := len(tx.Actions); got != 0 {
-		t.Fatalf("len(Actions) = %d, want 0", got)
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "push_frame_on_queue" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "push_frame_on_queue")
+	}
+	if tx.Actions[0].Kind != InternalOut {
+		t.Errorf("Actions[0].Kind = %v, want InternalOut", tx.Actions[0].Kind)
 	}
 }
 
