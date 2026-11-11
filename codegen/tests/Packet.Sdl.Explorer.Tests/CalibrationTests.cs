@@ -1828,4 +1828,235 @@ public class CalibrationTests(ITestOutputHelper output)
         var b = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { UnitData = FlowControlAt.A });
         b.Should().Throw<ArgumentException>();
     }
+    // ─── Coverage batch 6, part 1: frame errors ─────────────────────────
+
+    private const FrameErrors FE3 = FrameErrors.ControlField | FrameErrors.InfoNotPermitted | FrameErrors.Length;
+    private const FrameErrors FE5 = FE3 | FrameErrors.N1 | FrameErrors.IResponse;
+
+    /// <summary>One frame error (one corrupted frame), no other fault.</summary>
+    private static ExplorerOptions Fe(FrameErrors fe, string? tables = null) => new()
+    {
+        TablesDir = tables ?? Fixtures.CurrentDir, FrameErrors = fe, Budget = 1, Faults = FaultKinds.None, FramesAb = 0,
+    };
+
+    [Theory]
+    [InlineData(SeedKind.Disconnected, 11, "Disconnected/t07_control_field_error", "AwaitingConnection/t15_u_or_s_frame_length_error")]
+    [InlineData(SeedKind.AwaitingV22Connection, 11, "AwaitingV22Connection/t07_control_field_error", "AwaitingV22Connection/t09_u_or_s_frame_length_error")]
+    public void Frame_Errors_While_Connecting_Are_Reported_And_Recovered(SeedKind seed, int states, string arm1, string arm2)
+    {
+        // fe-cold, fe-v22: a corrupted SABM(E) or UA is reported (DL-ERROR
+        // L, M or N) and the connect completes on the T1 retry.
+        var result = Run(Fe(FE3) with { Seed = seed });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(new[] { arm1, arm2 });
+    }
+
+    [Fact]
+    public void Frame_Errors_Around_A_Release_Are_Clean_And_An_Honest_Reset_Rests()
+    {
+        // fe-release: a corrupted UA in Awaiting Release is reported; a
+        // corrupted DISC makes B reset honestly (nothing to lose), and the
+        // release still completes.
+        var result = Run(Fe(FE3) with { Release = ReleaseBy.A });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(14);
+        result.FiredTransitions.Should().Contain(new[] { "AwaitingRelease/t08_info_not_permitted_in_frame", "Connected/t09_control_field_error_no" });
+    }
+
+    [Theory]
+    [InlineData(false, 25, "t04_ua_received_yes_yes", "Connected/t26_i_received_yes_no_no")]
+    [InlineData(true, 25, "t12_ua_received_yes_yes", "Connected/t26_i_received_yes_no_yes")]
+    public void A_Frame_Error_Reset_That_Loses_Data_Is_Reset_Loss(bool srej, int states, string confirm, string n1Arm)
+    {
+        // fe-a1, fe-a1-srej: a0 arrives corrupted, B reports DL-ERROR (L),
+        // discards its queue and re-establishes; A takes the SABM in
+        // Connected (DL-ERROR F, DL-CONNECT Indication), B's UA is
+        // confirmed. a0 is gone and both layer 3s were told.
+        var result = Run(Fe(FE5) with { FramesAb = 1, Srej = srej });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.ResetLoss);
+        result.Trace[1].Transition.Should().Be(srej ? "t09_control_field_error_yes" : "t09_control_field_error_no");
+        result.Trace[2].Transition.Should().Be("t14_sabm_received_no");
+        result.Trace[3].Transition.Should().Be(confirm);
+        result.CounterexampleLength.Should().Be(4);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(n1Arm);
+    }
+
+    [Fact]
+    public void A_Reset_Loss_At_Both_Ends_Is_Reset_Loss()
+    {
+        // fe-ab1-ctl: B also loses its queued b0, and is told (the
+        // explicit discard, then DL-CONNECT Confirm on the UA).
+        var result = Run(Fe(FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.ResetLoss);
+        result.CounterexampleLength.Should().Be(4);
+        result.StatesExplored.Should().Be(105);
+    }
+
+    [Fact]
+    public void A_Reset_Loss_At_The_Resetting_Station_Is_Reset_Loss()
+    {
+        // fe-a2-k1-info: B's RR reaches A with an information field; A
+        // resets, discarding a1, and is told on the UA.
+        var result = Run(Fe(FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.ResetLoss);
+        result.Trace[3].Transition.Should().Be("t10_info_not_permitted_in_frame_no");
+        result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_yes");
+        result.CounterexampleLength.Should().Be(6);
+        result.StatesExplored.Should().Be(15);
+    }
+
+    [Fact]
+    public void An_I_Response_In_Connected_Is_Reported_And_Recovered()
+    {
+        // fe-iresp: a0 arrives as a response, figc4.4 reports DL-ERROR (O)
+        // and discards it, A's T1 recovers it.
+        var result = Run(Fe(FrameErrors.IResponse) with { FramesAb = 1 });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(16);
+        result.FiredTransitions.Should().Contain("Connected/t26_i_received_no");
+    }
+
+    [Fact]
+    public void A_Frame_Error_In_Timer_Recovery_Is_Defect167()
+    {
+        // fe-t3-tr, ax25spec#167: the keepalive poll's answer arrives
+        // corrupted in Timer Recovery; figc4.5 sends SABM and stays there, so
+        // the UA answering it is an unexpected UA (t11, a reset nothing
+        // justifies, #114) and the link never rests. With figc4.5's
+        // frame-error arms ending in Awaiting Connection, as the July 1998
+        // edition draws, the row is clean (35 states).
+        var result = Run(Fe(FE3) with { T3 = true });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        result.Trace[^1].Transition.Should().Be("t08_control_field_error");
+        result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery");
+        result.StatesExplored.Should().Be(55);
+        result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t09_info_not_permitted_in_frame", "TimerRecovery/t10_u_or_s_frame_length_error" });
+    }
+
+    [Fact]
+    public void An_I_Frame_Failing_N1_Discards_The_Resetting_Stations_Queue_Unannounced()
+    {
+        // fe-tr-b3, ax25spec#50: a0 fails the N1 check at B, whose arm
+        // re-establishes with Layer 3 Initiated cleared; Establish_Data_Link
+        // discards B's queued b0 and, with V(s) = V(a), the UA brings no
+        // DL-CONNECT Confirm, so B's layer 3 hears only DL-ERROR (O). Not a
+        // reset loss: a deadlock. The search reaches figc4.5's two I frame
+        // error arms on the way.
+        var result = Run(Fe(FrameErrors.N1 | FrameErrors.IResponse) with { FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t26_i_received_yes_no_no");
+        result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_no_yes");
+        result.CounterexampleLength.Should().Be(4);
+        result.StatesExplored.Should().Be(2114);
+        result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t22_i_received_yes_no", "TimerRecovery/t22_i_received_no" });
+    }
+
+    [Fact]
+    public void An_I_Response_In_Timer_Recovery_Goes_To_Connected()
+    {
+        // fe-iresp-trq, the lead from batch 5: figc4.5 t22_i_received_no
+        // reports DL-ERROR (O) and goes to Connected (the 2017 redraw; the
+        // July 1998 edition draws DL-ERROR (S) and stays in Timer Recovery).
+        // Clean with Timer Recovery counted as at rest; the state count pins
+        // the next state (1229 with Timer Recovery).
+        var result = Run(Fe(FrameErrors.IResponse) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop, TimerRecoveryIsQuiescent = true,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(1281);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_no");
+    }
+
+    [Fact]
+    public void A_Busy_Station_In_Timer_Recovery_Discards_An_I_Frame()
+    {
+        // busy-a-tr2: reaches figc4.5's own-busy I frame arm (residue until
+        // this batch); its shortest violation is H1 (#91).
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.A, Budget = 2, Faults = FaultKinds.Drop,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery");
+        result.CounterexampleLength.Should().Be(14);
+        result.StatesExplored.Should().Be(6257);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_yes_no");
+    }
+
+    [Fact]
+    public void Seeded_An_Unreported_Frame_Error_Is_Caught()
+    {
+        var result = Run(Fe(FrameErrors.ControlField, Fixtures.FrameErrorUnreportedDir) with { FramesAb = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.FrameError);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t09_control_field_error_no");
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Seeded_A_Frame_Error_Falling_To_A_Catch_All_Is_Caught()
+    {
+        // Timer Recovery's frame-error arms deleted: the corrupted frame
+        // falls to the lower-layer catch-all. The check keys on the
+        // corruption, not on the event.
+        var result = Run(Fe(FE3, Fixtures.FrameErrorArmsDeletedDir) with { T3 = true });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.FrameError);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[^1].Transition.Should().Be("t25_all_other_primitives__from_lower_layer");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData(FrameErrors.ControlField, 1, 1, 4, 4)]
+    [InlineData(FrameErrors.InfoNotPermitted, 2, 0, 1, 6)]
+    public void Seeded_A_Reset_Loss_Layer_3_Was_Not_Told_Of_Is_A_Deadlock(FrameErrors fe, int ab, int ba, int k, int length)
+    {
+        // Awaiting Connection no longer confirms the connect a frame-error
+        // reset set Layer 3 Initiated for, so the resetting station's layer
+        // 3 is never told of the reset that discarded its data: B's b0 in
+        // the first case, A's a1 in the second. On the real tables both are
+        // reset losses (fe-ab1-ctl, fe-a2-k1-info).
+        var result = Run(Fe(fe, Fixtures.ResetUnconfirmedDir) with { FramesAb = ab, FramesBa = ba, K = k });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(length);
+    }
+
+    [Theory]
+    [InlineData(1, 4, 5)]
+    [InlineData(2, 1, 9)]
+    public void Seeded_A_Reset_No_Frame_Error_Justifies_Never_Rests(int ab, int k, int cleanStates)
+    {
+        // An in-window RR resets the link (reported, layer 3 told). With
+        // nothing lost (one frame) the real tables' run is clean and the
+        // fixture's a deadlock, not a rest; with a1 discarded (k = 1) it is
+        // a deadlock, not a reset loss. No frame is corrupted (budget 0): the
+        // rule is on with the option.
+        var o = Fe(FrameErrors.ControlField) with { FramesAb = ab, K = k, Budget = 0 };
+        Run(o).Outcome.Should().Be(Outcome.NoViolation);
+        Run(o).StatesExplored.Should().Be(cleanStates);
+        var result = Run(o with { TablesDir = Fixtures.RrResetsDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[3].Transition.Should().Be("t21_rr_received_yes");
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void Frame_Errors_Need_The_Table_Driven_Peer()
+    {
+        var a = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { FrameErrors = FrameErrors.ControlField });
+        a.Should().Throw<ArgumentException>();
+    }
 }

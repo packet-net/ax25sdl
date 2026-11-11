@@ -573,6 +573,7 @@ public static class Scenarios
         Add("fe-a1", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1 }, "ResetLoss, 4");
         Add("fe-a1-srej", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1, Srej = true }, "ResetLoss, 4");
         Add("fe-ab1-ctl", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "ResetLoss, 4");
+        Add("fe-a2-k1-info", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, "ResetLoss, 6");
         Add("fe-iresp", "frame-error control", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with { FramesAb = 1 }, "clean");
         Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "Quiescence");
         Add("fe-tr-b3", "ax25spec#50", TableSetKind.Current, o => Fe(o, FrameErrors.N1 | FrameErrors.IResponse) with
@@ -590,6 +591,7 @@ public static class Scenarios
         Add("seeded-fe-unreported", "seeded (frame error reported)", TableSetKind.FrameErrorUnreported, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "FrameError at B, 2");
         Add("seeded-fe-arms-deleted", "seeded (frame error on a catch-all)", TableSetKind.FrameErrorArmsDeleted, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "FrameError at A, 3");
         Add("seeded-reset-unconfirmed", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "Deadlock, 4");
+        Add("seeded-reset-unconfirmed-a", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, "Deadlock, 6");
         Add("seeded-rr-resets", "seeded (unjustified reset never rests)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, Budget = 0 }, "Deadlock, 6");
         Add("seeded-rr-resets-loss", "seeded (unjustified reset is no reset loss)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 2, K = 1, Budget = 0 }, "Deadlock, 6");
 
