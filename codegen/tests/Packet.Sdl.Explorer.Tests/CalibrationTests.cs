@@ -270,13 +270,35 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Connect_Phase_Sanity_A_V20_Connect_Against_The_Same_Peer_Comes_Up_And_Drains()
+    public void Connect_Phase_Sanity_A_V20_Connect_Against_The_Same_Peer_Comes_Up()
     {
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 0, Budget = 0,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    // ─── ax25spec#161: data offered before DL-CONNECT Confirm is dropped ──
+
+    [Fact]
+    public void Defect161_Data_Offered_Before_The_Connect_Confirm_Is_Dropped_Silently()
+    {
+        // The Disconnected seed submits DL_CONNECT_request and then one
+        // DL_DATA_request. figc4.2 draws no Yes/No on "Layer 3 Initiated?";
+        // read as figc4.6 labels it (ax25spec#162), the layer-3-initiated
+        // arm does nothing, so the frame is never queued and no DL_ERROR is
+        // raised. The link comes up and the frame is simply gone: a
+        // deadlock with 0 of 1 delivered, two steps from the seed.
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
         });
-        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t04_ua_received_yes_yes");
+        result.Trace[1].SummaryA.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(2);
     }
 
     // ─── #43: DL-FLOW-OFF acts on the wrong branch ────────────────────

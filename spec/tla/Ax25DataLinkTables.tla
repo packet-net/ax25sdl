@@ -29,13 +29,7 @@ Loop(start, len, pred, atEnd) == [start |-> start, len |-> len, pred |-> pred, a
 (* AwaitingConnection (figc4.2)                                            *)
 (***************************************************************************)
 Page_AwaitingConnection ==
-       ("DL_DISCONNECT_request" :> <<
-        [id |-> "t01_dl_disconnect_request", next |-> "AwaitingConnection",
-         guard |-> << >>,
-         loops |-> << >>,
-         actions |-> << >>]
-    >>)
-    @@ ("DISC_received" :> <<
+       ("DISC_received" :> <<
         [id |-> "t02_disc_received", next |-> "AwaitingConnection",
          guard |-> << >>,
          loops |-> << >>,
@@ -130,21 +124,21 @@ Page_AwaitingConnection ==
         [id |-> "t09_dl_data_request_yes", next |-> "AwaitingConnection",
          guard |-> << Is("layer_3_initiated") >>,
          loops |-> << >>,
-         actions |-> << Box("internal_out", "push_frame_on_queue") >>],
+         actions |-> << >>],
         [id |-> "t09_dl_data_request_no", next |-> "AwaitingConnection",
          guard |-> << Not("layer_3_initiated") >>,
          loops |-> << >>,
-         actions |-> << >>]
+         actions |-> << Box("internal_out", "push_frame_on_queue") >>]
     >>)
     @@ ("I_frame_pops_off_queue" :> <<
         [id |-> "t10_i_frame_pops_off_queue_yes", next |-> "AwaitingConnection",
          guard |-> << Is("layer_3_initiated") >>,
          loops |-> << >>,
-         actions |-> << Box("internal_out", "push_frame_on_queue") >>],
+         actions |-> << >>],
         [id |-> "t10_i_frame_pops_off_queue_no", next |-> "AwaitingConnection",
          guard |-> << Not("layer_3_initiated") >>,
          loops |-> << >>,
-         actions |-> << >>]
+         actions |-> << Box("internal_out", "push_frame_on_queue") >>]
     >>)
     @@ ("all_other_primitives__from_upper_layer" :> <<
         [id |-> "t11_all_other_primitives__from_upper_layer", next |-> "AwaitingConnection",
