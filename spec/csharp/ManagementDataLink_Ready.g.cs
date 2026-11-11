@@ -14,7 +14,7 @@ public static class ManagementDataLink_Ready
     public const string Machine = "management_data_link";
     public const string State = "Ready";
 
-    public static SdlSource Source { get; } = new("ax.25.2.2.4_Oct_25", "figc5.1", "https://raw.githubusercontent.com/packethacking/ax25spec/main/doc/ax.25.2.2.4_Oct_25.md");
+    public static SdlSource Source { get; } = new("ax.25.2.2.4_Oct_25", "figc5.1", null);
 
     public static IReadOnlyList<TransitionSpec> Transitions { get; } = new TransitionSpec[]
     {
@@ -23,24 +23,48 @@ public static class ManagementDataLink_Ready
             From: "Ready",
             On: Ax25Event.MDLNEGOTIATERequest,
             Guard: null,
-            Actions: new ActionStep[] { new ActionStep(Ax25ActionVerb.RCAssign0, ActionKind.Processing), new ActionStep(Ax25ActionVerb.XIDCommand, ActionKind.SignalLower), new ActionStep(Ax25ActionVerb.StartTM201, ActionKind.Processing) },
+            Actions: new ActionStep[] { new ActionStep(Ax25ActionVerb.InitiateClassesOfProceduresNegotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.InitiateOptionalFunctionsNegotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.InitiateN1Negotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.InitiateWindowNegotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.InitiateRetryNegotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.InitiateT1Negotiation, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.AVAssign0, ActionKind.Processing), new ActionStep(Ax25ActionVerb.PAssign1, ActionKind.Processing), new ActionStep(Ax25ActionVerb.StartTM201, ActionKind.Processing), new ActionStep(Ax25ActionVerb.XIDCommand, ActionKind.SignalLower) },
             Next: "Negotiating",
-            Notes: "verification_pending (prose-derived bootstrap; figc5.1 graphml redraw pending — see backfill task). Derived from Appendix C5.3 ¶3 (\"The station initiating the AX.25 connection will send an XID command after it receives the UA frame\") + C5.3 Variables/Timers (RC, NM201, TM201). The ORDER of the three steps (RC:=0, send XID, start TM201) and the XID command's P=1 bit are NOT stated by the prose — error A (\"XID command without P=1\", C5.3 Error Codes) implies the command carries P=1, but the exact action ordering and the P-bit assignment box are figc5.1 detail and unverified. The DL→MDL handoff that raises this input is the data-link figc4.6 (AwaitingV22Connection) UA-received path, which emits `MDL-NEGOTIATE Request` (internal_out) on a successful v2.2 connect — see spec-sdl/.../data-link/yaml/awaiting_v22_connection.sdl.yaml.",
-            References: new ImplementationReference[] { new ImplementationReference(Source: "spec_prose", Cite: "§C5.3 ¶3", Quote: "The station initiating the AX.25 connection will send an XID command after it receives the UA frame.", Path: null, Function: null, Line: null, Note: null), new ImplementationReference(Source: "spec_prose", Cite: "§6.3.2 ¶1", Quote: "Parameter negotiation occurs only before the connection is made. It is accomplished by sending the XID command frame and receiving the XID response frame.", Path: null, Function: null, Line: null, Note: null), new ImplementationReference(Source: "spec_prose", Cite: "§5.1", Quote: "MDL-NEGOTIATE Request. The Layer 3 entity uses this primitive to request the Data-link State Machine to notify/negotiate.", Path: null, Function: null, Line: null, Note: null) },
+            Notes: null,
+            References: new ImplementationReference[] {  },
             Loops: new LoopRange[] {  },
             UndefinedBranches: null,
             OnLabel: "MDL-NEGOTIATE Request"),
         new TransitionSpec(
-            Id: "t02_xid_response_received",
+            Id: "t02_xid_command_received_yes",
+            From: "Ready",
+            On: Ax25Event.XIDCommandReceived,
+            Guard: new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, false) },
+            Actions: new ActionStep[] { new ActionStep(Ax25ActionVerb.ClassesOfProceduresNegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.OptionalFunctionsNegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.N1NegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.WindowNegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.RetryNegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.T1NegotiationResponse, ActionKind.Subroutine), new ActionStep(Ax25ActionVerb.PAssign1, ActionKind.Processing), new ActionStep(Ax25ActionVerb.XIDResponse, ActionKind.SignalLower) },
+            Next: "Ready",
+            Notes: null,
+            References: new ImplementationReference[] {  },
+            Loops: new LoopRange[] {  },
+            UndefinedBranches: null,
+            OnLabel: "XID Command"),
+        new TransitionSpec(
+            Id: "t02_xid_command_received_no",
+            From: "Ready",
+            On: Ax25Event.XIDCommandReceived,
+            Guard: new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) },
+            Actions: new ActionStep[] { new ActionStep(Ax25ActionVerb.MDLERRORIndicateA, ActionKind.SignalUpper) },
+            Next: "Ready",
+            Notes: null,
+            References: new ImplementationReference[] {  },
+            Loops: new LoopRange[] {  },
+            UndefinedBranches: null,
+            OnLabel: "XID Command"),
+        new TransitionSpec(
+            Id: "t03_xid_response_received",
             From: "Ready",
             On: Ax25Event.XIDResponseReceived,
             Guard: null,
             Actions: new ActionStep[] { new ActionStep(Ax25ActionVerb.MDLERRORIndicateB, ActionKind.SignalUpper) },
             Next: "Ready",
-            Notes: "verification_pending (prose-derived bootstrap; figc5.1 graphml redraw pending — see backfill task). The EXISTENCE of error B (\"Unexpected XID response\", §C5.3 Error Codes) is prose-clear, and Ready is the defensible state for it (no XID command outstanding). But the figc5.1 column for a received XID response — whether it is drawn at all in Ready, what (if any) frame is emitted, and the precise MDL-ERROR letter wiring — is unverified figure detail. Encoded as the most defensible reading of the error-code list, NOT from a figure.",
-            References: new ImplementationReference[] { new ImplementationReference(Source: "spec_prose", Cite: "§C5.3 Error Codes", Quote: "B — Unexpected XID response.", Path: null, Function: null, Line: null, Note: null) },
+            Notes: null,
+            References: new ImplementationReference[] {  },
             Loops: new LoopRange[] {  },
             UndefinedBranches: null,
-            OnLabel: "XID"),
+            OnLabel: "XID Response"),
     };
 }

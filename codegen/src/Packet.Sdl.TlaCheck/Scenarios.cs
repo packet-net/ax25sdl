@@ -87,8 +87,15 @@ public static class Scenarios
         }, "Deadlock, 2");
         Add("d44-48-cold-mod8", "#44/#48 control", TableSetKind.Current, o => o with
         {
-            Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
+            Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 0, Budget = 0,
         }, "clean");
+
+        // ax25spec#161: figc4.2 read as figc4.6 labels it drops data offered
+        // before DL-CONNECT Confirm, with no error.
+        Add("d161-data-before-confirm", "ax25spec#161", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
+        }, "Deadlock, 2");
 
         // #43: DL-FLOW-OFF on the wrong branch.
         ExplorerOptions S43(ExplorerOptions o) => o with { FramesAb = 2, FramesBa = 0, K = 4, Budget = 0, FlowControl = FlowControlAt.B };

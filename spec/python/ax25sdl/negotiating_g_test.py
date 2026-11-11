@@ -10,33 +10,77 @@ def test_source_figure() -> None:
 
 
 def test_transitions_are_present() -> None:
-    assert len(MANAGEMENT_DATA_LINK_NEGOTIATING.transitions) == 5
+    assert len(MANAGEMENT_DATA_LINK_NEGOTIATING.transitions) == 6
 
 
-def test_t01_xid_response_received_yes() -> None:
+def test_t02_tm201_expiry_yes() -> None:
     t = next(
-        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t01_xid_response_received_yes"),
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t02_tm201_expiry_yes"),
         None,
     )
-    assert t is not None, "transition t01_xid_response_received_yes not found"
+    assert t is not None, "transition t02_tm201_expiry_yes not found"
+    assert t.on == "TM201_expiry"
+    assert t.next == "Ready"
+    assert t.guard == "AC_gt_NM201"
+    assert len(t.actions) == 2
+    assert t.actions[0].verb == "RC := RC + 1"
+    assert t.actions[0].kind == ActionKind.PROCESSING
+    assert t.actions[1].verb == "MDL_ERROR_indicate_C"
+    assert t.actions[1].kind == ActionKind.SIGNAL_UPPER
+
+
+def test_t02_tm201_expiry_no() -> None:
+    t = next(
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t02_tm201_expiry_no"),
+        None,
+    )
+    assert t is not None, "transition t02_tm201_expiry_no not found"
+    assert t.on == "TM201_expiry"
+    assert t.next == "Ready"
+    assert t.guard == "not AC_gt_NM201"
+    assert len(t.actions) == 3
+    assert t.actions[0].verb == "RC := RC + 1"
+    assert t.actions[0].kind == ActionKind.PROCESSING
+    assert t.actions[1].verb == "Retransmit XID Command"
+    assert t.actions[1].kind == ActionKind.SIGNAL_LOWER
+    assert t.actions[2].verb == "Start TM201"
+    assert t.actions[2].kind == ActionKind.PROCESSING
+
+
+def test_t04_xid_response_received_yes() -> None:
+    t = next(
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t04_xid_response_received_yes"),
+        None,
+    )
+    assert t is not None, "transition t04_xid_response_received_yes not found"
     assert t.on == "XID_response_received"
     assert t.next == "Ready"
     assert t.guard == "F_eq_1"
-    assert len(t.actions) == 3
-    assert t.actions[0].verb == "Apply Negotiated Parameters"
+    assert len(t.actions) == 8
+    assert t.actions[0].verb == "Complete Classes of Procedures Negotiation"
     assert t.actions[0].kind == ActionKind.SUBROUTINE
-    assert t.actions[1].verb == "Stop TM201"
-    assert t.actions[1].kind == ActionKind.PROCESSING
-    assert t.actions[2].verb == "MDL_NEGOTIATE_confirm"
-    assert t.actions[2].kind == ActionKind.SIGNAL_UPPER
+    assert t.actions[1].verb == "Complete Optional Functions Negotiation"
+    assert t.actions[1].kind == ActionKind.SUBROUTINE
+    assert t.actions[2].verb == "Complete N1 Negotiation"
+    assert t.actions[2].kind == ActionKind.SUBROUTINE
+    assert t.actions[3].verb == "Complete Window Negotiation"
+    assert t.actions[3].kind == ActionKind.SUBROUTINE
+    assert t.actions[4].verb == "Complete Retry Negotiation"
+    assert t.actions[4].kind == ActionKind.SUBROUTINE
+    assert t.actions[5].verb == "Complete T1 Negotiation"
+    assert t.actions[5].kind == ActionKind.SUBROUTINE
+    assert t.actions[6].verb == "Stop TM201"
+    assert t.actions[6].kind == ActionKind.PROCESSING
+    assert t.actions[7].verb == "MDL_NEGOTIATE_confirm"
+    assert t.actions[7].kind == ActionKind.SIGNAL_UPPER
 
 
-def test_t01_xid_response_received_no() -> None:
+def test_t04_xid_response_received_no() -> None:
     t = next(
-        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t01_xid_response_received_no"),
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t04_xid_response_received_no"),
         None,
     )
-    assert t is not None, "transition t01_xid_response_received_no not found"
+    assert t is not None, "transition t04_xid_response_received_no not found"
     assert t.on == "XID_response_received"
     assert t.next == "Negotiating"
     assert t.guard == "not F_eq_1"
@@ -45,51 +89,32 @@ def test_t01_xid_response_received_no() -> None:
     assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
 
 
-def test_t02_frmr_received() -> None:
+def test_t05_frmr_response_received_yes() -> None:
     t = next(
-        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t02_frmr_received"),
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t05_frmr_response_received_yes"),
         None,
     )
-    assert t is not None, "transition t02_frmr_received not found"
-    assert t.on == "FRMR_received"
+    assert t is not None, "transition t05_frmr_response_received_yes not found"
+    assert t.on == "FRMR_response_received"
     assert t.next == "Ready"
+    assert t.guard == "XID_rejected"
     assert len(t.actions) == 3
-    assert t.actions[0].verb == "set_version_2_0"
+    assert t.actions[0].verb == "Set Segmentor Off"
     assert t.actions[0].kind == ActionKind.PROCESSING
-    assert t.actions[1].verb == "Stop TM201"
+    assert t.actions[1].verb == "Set Version 2.0 Defaults"
     assert t.actions[1].kind == ActionKind.PROCESSING
-    assert t.actions[2].verb == "MDL_NEGOTIATE_confirm"
+    assert t.actions[2].verb == "MDL_ERROR_indicate_E"
     assert t.actions[2].kind == ActionKind.SIGNAL_UPPER
 
 
-def test_t03_tm201_expiry_yes() -> None:
+def test_t05_frmr_response_received_no() -> None:
     t = next(
-        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t03_tm201_expiry_yes"),
+        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t05_frmr_response_received_no"),
         None,
     )
-    assert t is not None, "transition t03_tm201_expiry_yes not found"
-    assert t.on == "TM201_expiry"
+    assert t is not None, "transition t05_frmr_response_received_no not found"
+    assert t.on == "FRMR_response_received"
     assert t.next == "Ready"
-    assert t.guard == "RC_eq_NM201"
-    assert len(t.actions) == 1
-    assert t.actions[0].verb == "MDL_ERROR_indicate_C"
-    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
-
-
-def test_t03_tm201_expiry_no() -> None:
-    t = next(
-        (x for x in MANAGEMENT_DATA_LINK_NEGOTIATING.transitions if x.id == "t03_tm201_expiry_no"),
-        None,
-    )
-    assert t is not None, "transition t03_tm201_expiry_no not found"
-    assert t.on == "TM201_expiry"
-    assert t.next == "Negotiating"
-    assert t.guard == "not RC_eq_NM201"
-    assert len(t.actions) == 3
-    assert t.actions[0].verb == "RC := RC + 1"
-    assert t.actions[0].kind == ActionKind.PROCESSING
-    assert t.actions[1].verb == "XID_command"
-    assert t.actions[1].kind == ActionKind.SIGNAL_LOWER
-    assert t.actions[2].verb == "Start TM201"
-    assert t.actions[2].kind == ActionKind.PROCESSING
+    assert t.guard == "not XID_rejected"
+    assert len(t.actions) == 0
 

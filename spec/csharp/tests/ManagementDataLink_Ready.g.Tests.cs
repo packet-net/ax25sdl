@@ -14,25 +14,75 @@ public class ManagementDataLink_Ready_GeneratedTests
 {
     [Fact] public void SourceFigure() => ManagementDataLink_Ready.Source.Figure.Should().Be("figc5.1");
 
-    [Fact] public void TransitionsArePresent() => ManagementDataLink_Ready.Transitions.Count.Should().Be(2);
+    [Fact] public void TransitionsArePresent() => ManagementDataLink_Ready.Transitions.Count.Should().Be(4);
 
     [Fact] public void t01_mdl_negotiate_request()
     {
         var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t01_mdl_negotiate_request");
         t.On.Should().Be(Ax25Event.MDLNEGOTIATERequest);
         t.Next.Should().Be("Negotiating");
-        t.Actions.Count.Should().Be(3);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.RCAssign0);
-        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.XIDCommand);
-        t.Actions[1].Kind.Should().Be(ActionKind.SignalLower);
-        t.Actions[2].Verb.Should().Be(Ax25ActionVerb.StartTM201);
-        t.Actions[2].Kind.Should().Be(ActionKind.Processing);
+        t.Actions.Count.Should().Be(10);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.InitiateClassesOfProceduresNegotiation);
+        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.InitiateOptionalFunctionsNegotiation);
+        t.Actions[1].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[2].Verb.Should().Be(Ax25ActionVerb.InitiateN1Negotiation);
+        t.Actions[2].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[3].Verb.Should().Be(Ax25ActionVerb.InitiateWindowNegotiation);
+        t.Actions[3].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[4].Verb.Should().Be(Ax25ActionVerb.InitiateRetryNegotiation);
+        t.Actions[4].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.InitiateT1Negotiation);
+        t.Actions[5].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.AVAssign0);
+        t.Actions[6].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[7].Verb.Should().Be(Ax25ActionVerb.PAssign1);
+        t.Actions[7].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[8].Verb.Should().Be(Ax25ActionVerb.StartTM201);
+        t.Actions[8].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[9].Verb.Should().Be(Ax25ActionVerb.XIDCommand);
+        t.Actions[9].Kind.Should().Be(ActionKind.SignalLower);
     }
 
-    [Fact] public void t02_xid_response_received()
+    [Fact] public void t02_xid_command_received_yes()
     {
-        var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t02_xid_response_received");
+        var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t02_xid_command_received_yes");
+        t.On.Should().Be(Ax25Event.XIDCommandReceived);
+        t.Next.Should().Be("Ready");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, false) });
+        t.Actions.Count.Should().Be(8);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.ClassesOfProceduresNegotiationResponse);
+        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.OptionalFunctionsNegotiationResponse);
+        t.Actions[1].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[2].Verb.Should().Be(Ax25ActionVerb.N1NegotiationResponse);
+        t.Actions[2].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[3].Verb.Should().Be(Ax25ActionVerb.WindowNegotiationResponse);
+        t.Actions[3].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[4].Verb.Should().Be(Ax25ActionVerb.RetryNegotiationResponse);
+        t.Actions[4].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.T1NegotiationResponse);
+        t.Actions[5].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.PAssign1);
+        t.Actions[6].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[7].Verb.Should().Be(Ax25ActionVerb.XIDResponse);
+        t.Actions[7].Kind.Should().Be(ActionKind.SignalLower);
+    }
+
+    [Fact] public void t02_xid_command_received_no()
+    {
+        var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t02_xid_command_received_no");
+        t.On.Should().Be(Ax25Event.XIDCommandReceived);
+        t.Next.Should().Be("Ready");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) });
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.MDLERRORIndicateA);
+        t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
+    }
+
+    [Fact] public void t03_xid_response_received()
+    {
+        var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t03_xid_response_received");
         t.On.Should().Be(Ax25Event.XIDResponseReceived);
         t.Next.Should().Be("Ready");
         t.Actions.Count.Should().Be(1);

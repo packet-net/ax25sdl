@@ -25,47 +25,108 @@ static int test_source_figure(void) {
 }
 
 static int test_transitions_count(void) {
-  ASSERT(management_data_link_negotiating.transitions_len == 5,
+  ASSERT(management_data_link_negotiating.transitions_len == 6,
          "transitions count");
   return 0;
 }
 
-static int test_t01_xid_response_received_yes(void) {
+static int test_t02_tm201_expiry_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
        i++) {
     if (strcmp(management_data_link_negotiating.transitions[i].id,
-               "t01_xid_response_received_yes") == 0) {
+               "t02_tm201_expiry_yes") == 0) {
       t = &management_data_link_negotiating.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t01_xid_response_received_yes not found");
-  ASSERT_STREQ(t->on, "XID_response_received", "on");
+  ASSERT(t != NULL, "t02_tm201_expiry_yes not found");
+  ASSERT_STREQ(t->on, "TM201_expiry", "on");
   ASSERT_STREQ(t->next, "Ready", "next");
-  ASSERT_STREQ(t->guard, "F_eq_1", "guard");
-  ASSERT(t->actions_len == 3, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "Apply Negotiated Parameters",
-               "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "Stop TM201", "actions[1].verb");
-  ASSERT(t->actions[1].kind == AX25SDL_KIND_PROCESSING, "actions[1].kind");
-  ASSERT_STREQ(t->actions[2].verb, "MDL_NEGOTIATE_confirm", "actions[2].verb");
-  ASSERT(t->actions[2].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[2].kind");
+  ASSERT_STREQ(t->guard, "AC_gt_NM201", "guard");
+  ASSERT(t->actions_len == 2, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "RC := RC + 1", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "MDL_ERROR_indicate_C", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[1].kind");
   return 0;
 }
 
-static int test_t01_xid_response_received_no(void) {
+static int test_t02_tm201_expiry_no(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
        i++) {
     if (strcmp(management_data_link_negotiating.transitions[i].id,
-               "t01_xid_response_received_no") == 0) {
+               "t02_tm201_expiry_no") == 0) {
       t = &management_data_link_negotiating.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t01_xid_response_received_no not found");
+  ASSERT(t != NULL, "t02_tm201_expiry_no not found");
+  ASSERT_STREQ(t->on, "TM201_expiry", "on");
+  ASSERT_STREQ(t->next, "Ready", "next");
+  ASSERT_STREQ(t->guard, "not AC_gt_NM201", "guard");
+  ASSERT(t->actions_len == 3, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "RC := RC + 1", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "Retransmit XID Command", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[1].kind");
+  ASSERT_STREQ(t->actions[2].verb, "Start TM201", "actions[2].verb");
+  ASSERT(t->actions[2].kind == AX25SDL_KIND_PROCESSING, "actions[2].kind");
+  return 0;
+}
+
+static int test_t04_xid_response_received_yes(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
+       i++) {
+    if (strcmp(management_data_link_negotiating.transitions[i].id,
+               "t04_xid_response_received_yes") == 0) {
+      t = &management_data_link_negotiating.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t04_xid_response_received_yes not found");
+  ASSERT_STREQ(t->on, "XID_response_received", "on");
+  ASSERT_STREQ(t->next, "Ready", "next");
+  ASSERT_STREQ(t->guard, "F_eq_1", "guard");
+  ASSERT(t->actions_len == 8, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "Complete Classes of Procedures Negotiation",
+               "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "Complete Optional Functions Negotiation",
+               "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SUBROUTINE, "actions[1].kind");
+  ASSERT_STREQ(t->actions[2].verb, "Complete N1 Negotiation",
+               "actions[2].verb");
+  ASSERT(t->actions[2].kind == AX25SDL_KIND_SUBROUTINE, "actions[2].kind");
+  ASSERT_STREQ(t->actions[3].verb, "Complete Window Negotiation",
+               "actions[3].verb");
+  ASSERT(t->actions[3].kind == AX25SDL_KIND_SUBROUTINE, "actions[3].kind");
+  ASSERT_STREQ(t->actions[4].verb, "Complete Retry Negotiation",
+               "actions[4].verb");
+  ASSERT(t->actions[4].kind == AX25SDL_KIND_SUBROUTINE, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "Complete T1 Negotiation",
+               "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_SUBROUTINE, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "Stop TM201", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_PROCESSING, "actions[6].kind");
+  ASSERT_STREQ(t->actions[7].verb, "MDL_NEGOTIATE_confirm", "actions[7].verb");
+  ASSERT(t->actions[7].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[7].kind");
+  return 0;
+}
+
+static int test_t04_xid_response_received_no(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
+       i++) {
+    if (strcmp(management_data_link_negotiating.transitions[i].id,
+               "t04_xid_response_received_no") == 0) {
+      t = &management_data_link_negotiating.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t04_xid_response_received_no not found");
   ASSERT_STREQ(t->on, "XID_response_received", "on");
   ASSERT_STREQ(t->next, "Negotiating", "next");
   ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
@@ -75,70 +136,46 @@ static int test_t01_xid_response_received_no(void) {
   return 0;
 }
 
-static int test_t02_frmr_received(void) {
+static int test_t05_frmr_response_received_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
        i++) {
     if (strcmp(management_data_link_negotiating.transitions[i].id,
-               "t02_frmr_received") == 0) {
+               "t05_frmr_response_received_yes") == 0) {
       t = &management_data_link_negotiating.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t02_frmr_received not found");
-  ASSERT_STREQ(t->on, "FRMR_received", "on");
+  ASSERT(t != NULL, "t05_frmr_response_received_yes not found");
+  ASSERT_STREQ(t->on, "FRMR_response_received", "on");
   ASSERT_STREQ(t->next, "Ready", "next");
+  ASSERT_STREQ(t->guard, "XID_rejected", "guard");
   ASSERT(t->actions_len == 3, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "set_version_2_0", "actions[0].verb");
+  ASSERT_STREQ(t->actions[0].verb, "Set Segmentor Off", "actions[0].verb");
   ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "Stop TM201", "actions[1].verb");
+  ASSERT_STREQ(t->actions[1].verb, "Set Version 2.0 Defaults",
+               "actions[1].verb");
   ASSERT(t->actions[1].kind == AX25SDL_KIND_PROCESSING, "actions[1].kind");
-  ASSERT_STREQ(t->actions[2].verb, "MDL_NEGOTIATE_confirm", "actions[2].verb");
+  ASSERT_STREQ(t->actions[2].verb, "MDL_ERROR_indicate_E", "actions[2].verb");
   ASSERT(t->actions[2].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[2].kind");
   return 0;
 }
 
-static int test_t03_tm201_expiry_yes(void) {
+static int test_t05_frmr_response_received_no(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
        i++) {
     if (strcmp(management_data_link_negotiating.transitions[i].id,
-               "t03_tm201_expiry_yes") == 0) {
+               "t05_frmr_response_received_no") == 0) {
       t = &management_data_link_negotiating.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t03_tm201_expiry_yes not found");
-  ASSERT_STREQ(t->on, "TM201_expiry", "on");
+  ASSERT(t != NULL, "t05_frmr_response_received_no not found");
+  ASSERT_STREQ(t->on, "FRMR_response_received", "on");
   ASSERT_STREQ(t->next, "Ready", "next");
-  ASSERT_STREQ(t->guard, "RC_eq_NM201", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "MDL_ERROR_indicate_C", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
-  return 0;
-}
-
-static int test_t03_tm201_expiry_no(void) {
-  const TransitionSpec *t = NULL;
-  for (size_t i = 0; i < management_data_link_negotiating.transitions_len;
-       i++) {
-    if (strcmp(management_data_link_negotiating.transitions[i].id,
-               "t03_tm201_expiry_no") == 0) {
-      t = &management_data_link_negotiating.transitions[i];
-      break;
-    }
-  }
-  ASSERT(t != NULL, "t03_tm201_expiry_no not found");
-  ASSERT_STREQ(t->on, "TM201_expiry", "on");
-  ASSERT_STREQ(t->next, "Negotiating", "next");
-  ASSERT_STREQ(t->guard, "not RC_eq_NM201", "guard");
-  ASSERT(t->actions_len == 3, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "RC := RC + 1", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "XID_command", "actions[1].verb");
-  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[1].kind");
-  ASSERT_STREQ(t->actions[2].verb, "Start TM201", "actions[2].verb");
-  ASSERT(t->actions[2].kind == AX25SDL_KIND_PROCESSING, "actions[2].kind");
+  ASSERT_STREQ(t->guard, "not XID_rejected", "guard");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -146,10 +183,11 @@ int main(void) {
   int rc = 0;
   rc |= test_source_figure();
   rc |= test_transitions_count();
-  rc |= test_t01_xid_response_received_yes();
-  rc |= test_t01_xid_response_received_no();
-  rc |= test_t02_frmr_received();
-  rc |= test_t03_tm201_expiry_yes();
-  rc |= test_t03_tm201_expiry_no();
+  rc |= test_t02_tm201_expiry_yes();
+  rc |= test_t02_tm201_expiry_no();
+  rc |= test_t04_xid_response_received_yes();
+  rc |= test_t04_xid_response_received_no();
+  rc |= test_t05_frmr_response_received_yes();
+  rc |= test_t05_frmr_response_received_no();
   return rc;
 }

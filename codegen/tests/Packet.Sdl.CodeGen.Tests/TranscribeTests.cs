@@ -24,7 +24,9 @@ public class TranscribeTests
     public static IEnumerable<object[]> StatePageGraphmls()
     {
         yield return ["DataLink_Disconnected.graphml",         "data_link", "Disconnected",          17, 3];
-        yield return ["DataLink_AwaitingConnection.graphml",   "data_link", "AwaitingConnection",    25, 8];
+        // 24: the DL-DISCONNECT Request column is a Save (requeue), drawn
+        // with an arrow back to the state, so it is a save: entry.
+        yield return ["DataLink_AwaitingConnection.graphml",   "data_link", "AwaitingConnection",    24, 8];
         yield return ["DataLink_AwaitingV22Connection.graphml","data_link", "AwaitingV22Connection", 25, 8];
         yield return ["DataLink_AwaitingRelease.graphml",      "data_link", "AwaitingRelease",       20, 5];
         yield return ["DataLink_Connected.graphml",            "data_link", "Connected",             68, 39];
@@ -264,15 +266,20 @@ public class TranscribeTests
     [InlineData("All Other DL Primitives", "Signal reception from lower layer", "all_other_dl_primitives__from_lower_layer")]
     [InlineData("Queue Empty",             "Internal Signal Reception",         "queue_empty")]
     [InlineData("PH-DATA\nIndication",     "Signal reception from lower layer", "PH_DATA_indication")]
+    // A name wrapped at a "-" or "_" joins with no space (C2b.5 draws
+    // "PH-" / "EXPEDITED_" / "DATA" / "Request"), however it was typed.
+    [InlineData("PH-\nEXPEDITED_\nDATA\nRequest", "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
+    [InlineData("PH-EXPEDITED_ DATA Request",  "Signal reception from upper layer", "PH_EXPEDITED_DATA_request")]
+    // C2a.7's input names two timers with a "?"; the id names both.
+    [InlineData("T106 Expiry Or T108?",        "Internal Signal Reception",         "T106_or_T108_expiry")]
+    [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer", "LM_EXPEDITED_DATA_request")]
     public void EventResolver_canonicalises_trigger_labels(string label, string shapeClass, string expected)
     {
         EventResolver.ResolveTriggerEvent(label, shapeClass).Should().Be(expected);
     }
 
     [Theory]
-    [InlineData("T106 Expiry Or T108?", "Internal Signal Reception")]
-    [InlineData("LM-\nEXPEDITED-\nDATA Request", "Signal reception from upper layer")]
-    [InlineData("LM-\nDATA Request",             "Signal reception from upper layer")]
+    [InlineData("T106 Expiry Or T108?", "Signal reception from lower layer")]   // only the C2a.7 shape is mapped
     [InlineData("PH-EXPEDITED DATA Request",      "Signal reception from upper layer")]
     [InlineData("PH-DATA Request Now",            "Signal reception from upper layer")]
     public void EventResolver_rejects_a_label_with_no_rule_rather_than_emit_a_bad_id(string label, string shapeClass)
@@ -540,6 +547,109 @@ public class TranscribeTests
         act.Should().Throw<System.IO.InvalidDataException>().WithMessage("*guarded*");
     }
 
+    [Theory]
+    [InlineData("PH-\nEXPEDITED_\nDATA\nRequest")]
+    [InlineData("PH-EXPEDITED_ DATA Request")]
+    [InlineData("PH-EXPEDITED_DATA  Request")]
+    public void On_label_records_a_wrapped_name_joined(string drawn)
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "2 Transmitting", 0, 0),
+            new("n1", "Signal reception from upper layer", drawn, 0, 1),
+            new("n2", "State", "2 Transmitting", 0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+
+        var t = Walker.Walk(new GraphmlGraph("synthetic", nodes, edges), "DuplexPhy_Transmitting.graphml").Transitions.Single();
+
+        t.On.Should().Be("PH_EXPEDITED_DATA_request");
+        t.OnLabel.Should().Be("PH-EXPEDITED_DATA Request");
+    }
+
+    // ─── Save columns ─────────────────────────────────────────────────
+
+    private const string Save = "Save a signal until a new state is reached";
+
+    private static GraphmlGraph SaveColumn(string? after, string afterShape = "State")
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "1 Negotiating", 0, 0),
+            new("n1", "Signal reception from upper layer", "MDL-NEGOTIATE Request", 0, 1),
+            new("n2", Save, "Requeue", 0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+        if (after is not null)
+        {
+            nodes.Add(new("n3", afterShape, after, 0, 3));
+            edges.Add(new("e2", "n2", "n3", ""));
+        }
+        return new GraphmlGraph("synthetic", nodes, edges);
+    }
+
+    [Theory]
+    [InlineData(null)]              // C4.6: the Save ends the column
+    [InlineData("1 Negotiating")]   // C4.2, C5.2: an arrow back to the page's own state
+    public void A_save_column_becomes_a_save_entry_not_a_transition(string? after)
+    {
+        var page = Walker.Walk(SaveColumn(after), "ManagementDataLink_Negotiating.graphml");
+
+        page.Save.Should().Equal("MDL_NEGOTIATE_request");
+        page.Transitions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_save_leading_to_another_state_is_an_error()
+    {
+        var act = () => Walker.Walk(SaveColumn("0 Ready"), "ManagementDataLink_Negotiating.graphml");
+        act.Should().Throw<InvalidDataException>().WithMessage("*must end there or lead only to this page's own state*");
+    }
+
+    [Fact]
+    public void A_save_after_other_boxes_is_an_error()
+    {
+        // Trigger -> processing -> Save: the walker used to drop the box.
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "State", "1 Negotiating", 0, 0),
+            new("n1", "Signal reception from upper layer", "MDL-NEGOTIATE Request", 0, 1),
+            new("n2", "Processing description", "Stop TM201", 0, 2),
+            new("n3", Save, "Requeue", 0, 3),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", ""), new("e2", "n2", "n3", "") };
+
+        var act = () => Walker.Walk(new GraphmlGraph("synthetic", nodes, edges), "ManagementDataLink_Negotiating.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*not directly after a trigger*");
+    }
+
+    [Theory]
+    [InlineData("Full Duplex Acceptable ?")]
+    [InlineData("Full Duplex\nAcceptable\n?")]
+    [InlineData("Full Duplex Acceptable\n?")]
+    public void A_question_with_line_breaks_reads_as_one_line(string label)
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Initiate COP Negotiation", 0, 0),
+            new("n1", "Test or decision",       label,                      0, 1),
+            new("n2", "Return from Subroutine", "",                         0, 2),
+            new("n3", "Return from Subroutine", "",                         1, 2),
+        };
+        var edges = new List<GraphmlEdge>
+        {
+            new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "Yes"), new("e2", "n1", "n3", "No"),
+        };
+
+        var page = SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges),
+                                          "ManagementDataLink_ClassesOfProceduresNegotiationSubroutines.graphml");
+
+        var d = page.Subroutines.Single().Decisions.Single();
+        d.Question.Should().Be("Full Duplex Acceptable ?");
+        d.Predicate.Should().Be("full_duplex_acceptable");
+    }
+
     // ─── Branch order and subroutine failures ─────────────────────────
 
     [Fact]
@@ -614,6 +724,22 @@ public class TranscribeTests
         var act = () => SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
 
         act.Should().Throw<InvalidDataException>().WithMessage("*subroutine 'Queue_Event'*dead end*");
+    }
+
+    [Fact]
+    public void A_save_inside_a_subroutine_path_is_an_error_not_a_silent_drop()
+    {
+        var nodes = new List<GraphmlNode>
+        {
+            new("n0", "Subroutine start",       "Queue Event", 0, 0),
+            new("n1", "Save a signal until a new state is reached", "Requeue", 0, 1),
+            new("n2", "Return from Subroutine", "",            0, 2),
+        };
+        var edges = new List<GraphmlEdge> { new("e0", "n0", "n1", ""), new("e1", "n1", "n2", "") };
+
+        var act = () => SubroutinesWalker.Walk(new GraphmlGraph("synthetic", nodes, edges), "LinkMux_Subroutines.graphml");
+
+        act.Should().Throw<InvalidDataException>().WithMessage("*subroutine 'Queue_Event'*can't appear inside a subroutine path*");
     }
 
     [Fact]

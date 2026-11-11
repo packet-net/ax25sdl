@@ -442,7 +442,7 @@ public static class JsonEmitter
                 {
                     sb.Append("  at ").Append(detail.InstanceLocation)
                       .Append(" (schema ").Append(detail.EvaluationPath).Append("): ")
-                      .Append(err.Key).Append(" — ").Append(err.Value).Append('\n');
+                      .Append(err.Key).Append(": ").Append(err.Value).Append('\n');
                 }
             }
         }

@@ -10,7 +10,7 @@ describe("ManagementDataLinkReady", () => {
   });
 
   it("transitions are present", () => {
-    expect(ManagementDataLinkReady.transitions).toHaveLength(2);
+    expect(ManagementDataLinkReady.transitions).toHaveLength(4);
   });
 
   it("t01_mdl_negotiate_request", () => {
@@ -19,18 +19,70 @@ describe("ManagementDataLinkReady", () => {
     if (!t) return;
     expect(t.on).toBe("MDL_NEGOTIATE_request");
     expect(t.next).toBe("Negotiating");
-    expect(t.actions).toHaveLength(3);
-    expect(t.actions[0].verb).toBe("RC := 0");
-    expect(t.actions[0].kind).toBe("processing");
-    expect(t.actions[1].verb).toBe("XID_command");
-    expect(t.actions[1].kind).toBe("signal_lower");
-    expect(t.actions[2].verb).toBe("Start TM201");
-    expect(t.actions[2].kind).toBe("processing");
+    expect(t.actions).toHaveLength(10);
+    expect(t.actions[0].verb).toBe("Initiate Classes of Procedures Negotiation");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("Initiate Optional Functions Negotiation");
+    expect(t.actions[1].kind).toBe("subroutine");
+    expect(t.actions[2].verb).toBe("Initiate N1 Negotiation");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("Initiate Window Negotiation");
+    expect(t.actions[3].kind).toBe("subroutine");
+    expect(t.actions[4].verb).toBe("Initiate Retry Negotiation");
+    expect(t.actions[4].kind).toBe("subroutine");
+    expect(t.actions[5].verb).toBe("Initiate T1 Negotiation");
+    expect(t.actions[5].kind).toBe("subroutine");
+    expect(t.actions[6].verb).toBe("AV := 0");
+    expect(t.actions[6].kind).toBe("processing");
+    expect(t.actions[7].verb).toBe("P := 1");
+    expect(t.actions[7].kind).toBe("processing");
+    expect(t.actions[8].verb).toBe("Start TM201");
+    expect(t.actions[8].kind).toBe("processing");
+    expect(t.actions[9].verb).toBe("XID Command");
+    expect(t.actions[9].kind).toBe("signal_lower");
   });
 
-  it("t02_xid_response_received", () => {
-    const t = ManagementDataLinkReady.transitions.find((x) => x.id === "t02_xid_response_received");
-    expect(t, "transition t02_xid_response_received not found").toBeDefined();
+  it("t02_xid_command_received_yes", () => {
+    const t = ManagementDataLinkReady.transitions.find((x) => x.id === "t02_xid_command_received_yes");
+    expect(t, "transition t02_xid_command_received_yes not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("XID_command_received");
+    expect(t.next).toBe("Ready");
+    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: false }]);
+    expect(t.actions).toHaveLength(8);
+    expect(t.actions[0].verb).toBe("Classes of Procedures Negotiation Response");
+    expect(t.actions[0].kind).toBe("subroutine");
+    expect(t.actions[1].verb).toBe("Optional Functions Negotiation Response");
+    expect(t.actions[1].kind).toBe("subroutine");
+    expect(t.actions[2].verb).toBe("N1 Negotiation Response");
+    expect(t.actions[2].kind).toBe("subroutine");
+    expect(t.actions[3].verb).toBe("Window Negotiation Response");
+    expect(t.actions[3].kind).toBe("subroutine");
+    expect(t.actions[4].verb).toBe("Retry Negotiation Response");
+    expect(t.actions[4].kind).toBe("subroutine");
+    expect(t.actions[5].verb).toBe("T1 Negotiation Response");
+    expect(t.actions[5].kind).toBe("subroutine");
+    expect(t.actions[6].verb).toBe("P := 1");
+    expect(t.actions[6].kind).toBe("processing");
+    expect(t.actions[7].verb).toBe("XID Response");
+    expect(t.actions[7].kind).toBe("signal_lower");
+  });
+
+  it("t02_xid_command_received_no", () => {
+    const t = ManagementDataLinkReady.transitions.find((x) => x.id === "t02_xid_command_received_no");
+    expect(t, "transition t02_xid_command_received_no not found").toBeDefined();
+    if (!t) return;
+    expect(t.on).toBe("XID_command_received");
+    expect(t.next).toBe("Ready");
+    expect(t.guard).toEqual([{ atom: "P_eq_1", negate: true }]);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("MDL_ERROR_indicate_A");
+    expect(t.actions[0].kind).toBe("signal_upper");
+  });
+
+  it("t03_xid_response_received", () => {
+    const t = ManagementDataLinkReady.transitions.find((x) => x.id === "t03_xid_response_received");
+    expect(t, "transition t03_xid_response_received not found").toBeDefined();
     if (!t) return;
     expect(t.on).toBe("XID_response_received");
     expect(t.next).toBe("Ready");

@@ -11,7 +11,7 @@ pub static MANAGEMENT_DATA_LINK_READY: StatePage = StatePage {
     source: SdlSource {
         spec: "ax.25.2.2.4_Oct_25",
         figure: "figc5.1",
-        url: "https://raw.githubusercontent.com/packethacking/ax25spec/main/doc/ax.25.2.2.4_Oct_25.md",
+        url: "",
     },
     transitions: &[
         TransitionSpec {
@@ -20,32 +20,128 @@ pub static MANAGEMENT_DATA_LINK_READY: StatePage = StatePage {
             on: Ax25Event::MDLNEGOTIATERequest,
             guard: &[],
             actions: &[
-                ActionStep { verb: Ax25ActionVerb::RCAssign0, kind: ActionKind::Processing },
-                ActionStep { verb: Ax25ActionVerb::XIDCommand, kind: ActionKind::SignalLower },
-                ActionStep { verb: Ax25ActionVerb::StartTM201, kind: ActionKind::Processing },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateClassesOfProceduresNegotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateOptionalFunctionsNegotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateN1Negotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateWindowNegotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateRetryNegotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InitiateT1Negotiation,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::AVAssign0,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::PAssign1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::StartTM201,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::XIDCommand,
+                    kind: ActionKind::SignalLower,
+                },
             ],
             next: "Negotiating",
-            notes: "verification_pending (prose-derived bootstrap; figc5.1 graphml redraw pending — see backfill task). Derived from Appendix C5.3 ¶3 (\"The station initiating the AX.25 connection will send an XID command after it receives the UA frame\") + C5.3 Variables/Timers (RC, NM201, TM201). The ORDER of the three steps (RC:=0, send XID, start TM201) and the XID command's P=1 bit are NOT stated by the prose — error A (\"XID command without P=1\", C5.3 Error Codes) implies the command carries P=1, but the exact action ordering and the P-bit assignment box are figc5.1 detail and unverified. The DL→MDL handoff that raises this input is the data-link figc4.6 (AwaitingV22Connection) UA-received path, which emits `MDL-NEGOTIATE Request` (internal_out) on a successful v2.2 connect — see spec-sdl/.../data-link/yaml/awaiting_v22_connection.sdl.yaml.",
-            references: &[
-                ImplementationReference { source: "spec_prose", cite: "§C5.3 ¶3", quote: "The station initiating the AX.25 connection will send an XID command after it receives the UA frame.", path: "", function: "", line: 0, note: "" },
-                ImplementationReference { source: "spec_prose", cite: "§6.3.2 ¶1", quote: "Parameter negotiation occurs only before the connection is made. It is accomplished by sending the XID command frame and receiving the XID response frame.", path: "", function: "", line: 0, note: "" },
-                ImplementationReference { source: "spec_prose", cite: "§5.1", quote: "MDL-NEGOTIATE Request. The Layer 3 entity uses this primitive to request the Data-link State Machine to notify/negotiate.", path: "", function: "", line: 0, note: "" },
-            ],
+            notes: "",
+            references: &[],
             loops: &[],
         },
         TransitionSpec {
-            id: "t02_xid_response_received",
+            id: "t02_xid_command_received_yes",
+            from: "Ready",
+            on: Ax25Event::XIDCommandReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: false,
+            }],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::ClassesOfProceduresNegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::OptionalFunctionsNegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::N1NegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::WindowNegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::RetryNegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::T1NegotiationResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::PAssign1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::XIDResponse,
+                    kind: ActionKind::SignalLower,
+                },
+            ],
+            next: "Ready",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t02_xid_command_received_no",
+            from: "Ready",
+            on: Ax25Event::XIDCommandReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: true,
+            }],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::MDLERRORIndicateA,
+                kind: ActionKind::SignalUpper,
+            }],
+            next: "Ready",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t03_xid_response_received",
             from: "Ready",
             on: Ax25Event::XIDResponseReceived,
             guard: &[],
-            actions: &[
-                ActionStep { verb: Ax25ActionVerb::MDLERRORIndicateB, kind: ActionKind::SignalUpper },
-            ],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::MDLERRORIndicateB,
+                kind: ActionKind::SignalUpper,
+            }],
             next: "Ready",
-            notes: "verification_pending (prose-derived bootstrap; figc5.1 graphml redraw pending — see backfill task). The EXISTENCE of error B (\"Unexpected XID response\", §C5.3 Error Codes) is prose-clear, and Ready is the defensible state for it (no XID command outstanding). But the figc5.1 column for a received XID response — whether it is drawn at all in Ready, what (if any) frame is emitted, and the precise MDL-ERROR letter wiring — is unverified figure detail. Encoded as the most defensible reading of the error-code list, NOT from a figure.",
-            references: &[
-                ImplementationReference { source: "spec_prose", cite: "§C5.3 Error Codes", quote: "B — Unexpected XID response.", path: "", function: "", line: 0, note: "" },
-            ],
+            notes: "",
+            references: &[],
             loops: &[],
         },
     ],
@@ -62,7 +158,7 @@ mod tests {
 
     #[test]
     fn transitions_are_present() {
-        assert_eq!(MANAGEMENT_DATA_LINK_READY.transitions.len(), 2);
+        assert_eq!(MANAGEMENT_DATA_LINK_READY.transitions.len(), 4);
     }
 
     #[test]
@@ -74,22 +170,110 @@ mod tests {
             .expect("transition t01_mdl_negotiate_request not found");
         assert_eq!(tx.on, Ax25Event::MDLNEGOTIATERequest);
         assert_eq!(tx.next, "Negotiating");
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::RCAssign0);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::XIDCommand);
-        assert_eq!(tx.actions[1].kind, ActionKind::SignalLower);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::StartTM201);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions.len(), 10);
+        assert_eq!(
+            tx.actions[0].verb,
+            Ax25ActionVerb::InitiateClassesOfProceduresNegotiation
+        );
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(
+            tx.actions[1].verb,
+            Ax25ActionVerb::InitiateOptionalFunctionsNegotiation
+        );
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::InitiateN1Negotiation);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+        assert_eq!(
+            tx.actions[3].verb,
+            Ax25ActionVerb::InitiateWindowNegotiation
+        );
+        assert_eq!(tx.actions[3].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::InitiateRetryNegotiation);
+        assert_eq!(tx.actions[4].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::InitiateT1Negotiation);
+        assert_eq!(tx.actions[5].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::AVAssign0);
+        assert_eq!(tx.actions[6].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::PAssign1);
+        assert_eq!(tx.actions[7].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[8].verb, Ax25ActionVerb::StartTM201);
+        assert_eq!(tx.actions[8].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[9].verb, Ax25ActionVerb::XIDCommand);
+        assert_eq!(tx.actions[9].kind, ActionKind::SignalLower);
     }
 
     #[test]
-    fn t02_xid_response_received() {
+    fn t02_xid_command_received_yes() {
         let tx = MANAGEMENT_DATA_LINK_READY
             .transitions
             .iter()
-            .find(|x| x.id == "t02_xid_response_received")
-            .expect("transition t02_xid_response_received not found");
+            .find(|x| x.id == "t02_xid_command_received_yes")
+            .expect("transition t02_xid_command_received_yes not found");
+        assert_eq!(tx.on, Ax25Event::XIDCommandReceived);
+        assert_eq!(tx.next, "Ready");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: false
+            },]
+        );
+        assert_eq!(tx.actions.len(), 8);
+        assert_eq!(
+            tx.actions[0].verb,
+            Ax25ActionVerb::ClassesOfProceduresNegotiationResponse
+        );
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(
+            tx.actions[1].verb,
+            Ax25ActionVerb::OptionalFunctionsNegotiationResponse
+        );
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::N1NegotiationResponse);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+        assert_eq!(
+            tx.actions[3].verb,
+            Ax25ActionVerb::WindowNegotiationResponse
+        );
+        assert_eq!(tx.actions[3].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::RetryNegotiationResponse);
+        assert_eq!(tx.actions[4].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::T1NegotiationResponse);
+        assert_eq!(tx.actions[5].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::PAssign1);
+        assert_eq!(tx.actions[6].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::XIDResponse);
+        assert_eq!(tx.actions[7].kind, ActionKind::SignalLower);
+    }
+
+    #[test]
+    fn t02_xid_command_received_no() {
+        let tx = MANAGEMENT_DATA_LINK_READY
+            .transitions
+            .iter()
+            .find(|x| x.id == "t02_xid_command_received_no")
+            .expect("transition t02_xid_command_received_no not found");
+        assert_eq!(tx.on, Ax25Event::XIDCommandReceived);
+        assert_eq!(tx.next, "Ready");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::PEq1,
+                negate: true
+            },]
+        );
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::MDLERRORIndicateA);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
+    }
+
+    #[test]
+    fn t03_xid_response_received() {
+        let tx = MANAGEMENT_DATA_LINK_READY
+            .transitions
+            .iter()
+            .find(|x| x.id == "t03_xid_response_received")
+            .expect("transition t03_xid_response_received not found");
         assert_eq!(tx.on, Ax25Event::XIDResponseReceived);
         assert_eq!(tx.next, "Ready");
         assert_eq!(tx.actions.len(), 1);

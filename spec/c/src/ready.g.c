@@ -6,55 +6,44 @@
 
 static const ActionStep
     management_data_link_ready_t01_mdl_negotiate_request_actions[] = {
-        {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "XID_command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
+        {.verb = "Initiate Classes of Procedures Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Initiate Optional Functions Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Initiate N1 Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Initiate Window Negotiation",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Initiate Retry Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Initiate T1 Negotiation", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "AV := 0", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Start TM201", .kind = AX25SDL_KIND_PROCESSING},
-};
-
-static const ImplementationReference
-    management_data_link_ready_t01_mdl_negotiate_request_references[] = {
-        {.source = "spec_prose",
-         .cite = "§C5.3 ¶3",
-         .quote = "The station initiating the AX.25 connection will send an "
-                  "XID command after it receives the UA frame.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-        {.source = "spec_prose",
-         .cite = "§6.3.2 ¶1",
-         .quote = "Parameter negotiation occurs only before the connection is "
-                  "made. It is accomplished by sending the XID command frame "
-                  "and receiving the XID response frame.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
-        {.source = "spec_prose",
-         .cite = "§5.1",
-         .quote =
-             "MDL-NEGOTIATE Request. The Layer 3 entity uses this primitive to "
-             "request the Data-link State Machine to notify/negotiate.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
+        {.verb = "XID Command", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const ActionStep
-    management_data_link_ready_t02_xid_response_received_actions[] = {
-        {.verb = "MDL_ERROR_indicate_B", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+    management_data_link_ready_t02_xid_command_received_yes_actions[] = {
+        {.verb = "Classes of Procedures Negotiation Response",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Optional Functions Negotiation Response",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "N1 Negotiation Response", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Window Negotiation Response",
+         .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "Retry Negotiation Response", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "T1 Negotiation Response", .kind = AX25SDL_KIND_SUBROUTINE},
+        {.verb = "P := 1", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "XID Response", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
-static const ImplementationReference
-    management_data_link_ready_t02_xid_response_received_references[] = {
-        {.source = "spec_prose",
-         .cite = "§C5.3 Error Codes",
-         .quote = "B — Unexpected XID response.",
-         .path = "",
-         .function = "",
-         .line = 0,
-         .note = ""},
+static const ActionStep
+    management_data_link_ready_t02_xid_command_received_no_actions[] = {
+        {.verb = "MDL_ERROR_indicate_A", .kind = AX25SDL_KIND_SIGNAL_UPPER},
+};
+
+static const ActionStep
+    management_data_link_ready_t03_xid_response_received_actions[] = {
+        {.verb = "MDL_ERROR_indicate_B", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
 static const TransitionSpec management_data_link_ready_transitions[] = {
@@ -64,50 +53,55 @@ static const TransitionSpec management_data_link_ready_transitions[] = {
         .on = "MDL_NEGOTIATE_request",
         .guard = "",
         .actions = management_data_link_ready_t01_mdl_negotiate_request_actions,
-        .actions_len = 3,
+        .actions_len = 10,
         .next = "Negotiating",
-        .notes =
-            "verification_pending (prose-derived bootstrap; figc5.1 graphml "
-            "redraw pending — see backfill task). Derived from Appendix C5.3 "
-            "¶3 (\"The station initiating the AX.25 connection will send an "
-            "XID command after it receives the UA frame\") + C5.3 "
-            "Variables/Timers (RC, NM201, TM201). The ORDER of the three steps "
-            "(RC:=0, send XID, start TM201) and the XID command's P=1 bit are "
-            "NOT stated by the prose — error A (\"XID command without P=1\", "
-            "C5.3 Error Codes) implies the command carries P=1, but the exact "
-            "action ordering and the P-bit assignment box are figc5.1 detail "
-            "and unverified. The DL→MDL handoff that raises this input is the "
-            "data-link figc4.6 (AwaitingV22Connection) UA-received path, which "
-            "emits `MDL-NEGOTIATE Request` (internal_out) on a successful v2.2 "
-            "connect — see "
-            "spec-sdl/.../data-link/yaml/awaiting_v22_connection.sdl.yaml.",
-        .references =
-            management_data_link_ready_t01_mdl_negotiate_request_references,
-        .references_len = 3,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
     {
-        .id = "t02_xid_response_received",
+        .id = "t02_xid_command_received_yes",
+        .from = "Ready",
+        .on = "XID_command_received",
+        .guard = "P_eq_1",
+        .actions =
+            management_data_link_ready_t02_xid_command_received_yes_actions,
+        .actions_len = 8,
+        .next = "Ready",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t02_xid_command_received_no",
+        .from = "Ready",
+        .on = "XID_command_received",
+        .guard = "not P_eq_1",
+        .actions =
+            management_data_link_ready_t02_xid_command_received_no_actions,
+        .actions_len = 1,
+        .next = "Ready",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t03_xid_response_received",
         .from = "Ready",
         .on = "XID_response_received",
         .guard = "",
-        .actions = management_data_link_ready_t02_xid_response_received_actions,
+        .actions = management_data_link_ready_t03_xid_response_received_actions,
         .actions_len = 1,
         .next = "Ready",
-        .notes =
-            "verification_pending (prose-derived bootstrap; figc5.1 graphml "
-            "redraw pending — see backfill task). The EXISTENCE of error B "
-            "(\"Unexpected XID response\", §C5.3 Error Codes) is prose-clear, "
-            "and Ready is the defensible state for it (no XID command "
-            "outstanding). But the figc5.1 column for a received XID response "
-            "— whether it is drawn at all in Ready, what (if any) frame is "
-            "emitted, and the precise MDL-ERROR letter wiring — is unverified "
-            "figure detail. Encoded as the most defensible reading of the "
-            "error-code list, NOT from a figure.",
-        .references =
-            management_data_link_ready_t02_xid_response_received_references,
-        .references_len = 1,
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
         .loops = NULL,
         .loops_len = 0,
     },
@@ -116,10 +110,7 @@ static const TransitionSpec management_data_link_ready_transitions[] = {
 const StatePage management_data_link_ready = {
     .machine = "management_data_link",
     .state = "Ready",
-    .source = {.spec = "ax.25.2.2.4_Oct_25",
-               .figure = "figc5.1",
-               .url = "https://raw.githubusercontent.com/packethacking/"
-                      "ax25spec/main/doc/ax.25.2.2.4_Oct_25.md"},
+    .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc5.1", .url = ""},
     .transitions = management_data_link_ready_transitions,
-    .transitions_len = 2,
+    .transitions_len = 4,
 };

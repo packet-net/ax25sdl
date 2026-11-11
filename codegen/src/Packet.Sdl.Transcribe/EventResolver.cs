@@ -50,6 +50,14 @@ public static class EventResolver
         // frame receptions (RR_received, REJ_received, etc.) — canonical
         // event name follows that pattern. events.yaml needs an entry.
         [("I Frame", "Signal reception from lower layer")] = "I_received",
+
+        // Figure C2a.7 (Simplex Physical Receiver Start) draws one internal
+        // input labelled "T106 Expiry Or T108?". The "?" is the figure's own
+        // doubt about which timer it means (C2a.5 also draws "Start T106
+        // (T108?)", C2a.6 "(Start T108)", and no other page has a T108
+        // input), so the id names both rather than picking T106. on_label
+        // keeps the drawn text.
+        [("T106 Expiry Or T108?", "Internal Signal Reception")] = "T106_or_T108_expiry",
     };
 
     /// <summary>
@@ -77,6 +85,23 @@ public static class EventResolver
     /// <summary>An event id must be usable as an identifier in every backend and in a transition id.</summary>
     private static readonly System.Text.RegularExpressions.Regex EventIdShape = new("^[A-Za-z][A-Za-z0-9_]*$");
 
+    /// <summary>
+    /// The trigger label as one line, used for both the event id and
+    /// <c>on_label</c>. Line breaks and runs of spaces count as a single
+    /// space. In a primitive label, a break or space straight after a "-" or
+    /// "_" is joined up, because the figures wrap long names there: C2b.5
+    /// draws "PH-" / "EXPEDITED_" / "DATA" / "Request", which reads
+    /// "PH-EXPEDITED_DATA Request" whether it is typed with the breaks, with
+    /// spaces, or joined.
+    /// </summary>
+    public static string NormaliseTriggerLabel(string label)
+    {
+        var s = System.Text.RegularExpressions.Regex.Replace(label, @"\s+", " ").Trim();
+        if (PrimitivePrefix.IsMatch(s))
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?<=[-_]) ", "");
+        return s;
+    }
+
     public static string ResolveTriggerEvent(string label, string shapeClass)
     {
         var resolved = ResolveUnchecked(label, shapeClass);
@@ -89,9 +114,7 @@ public static class EventResolver
 
     private static string ResolveUnchecked(string label, string shapeClass)
     {
-        // A trigger label is one name however yEd wraps it, so line breaks
-        // and runs of spaces count as a single space.
-        var trimmed = System.Text.RegularExpressions.Regex.Replace(label, @"\s+", " ").Trim();
+        var trimmed = NormaliseTriggerLabel(label);
         if (ExplicitMap.TryGetValue((trimmed, shapeClass), out var explicitName))
             return explicitName;
 

@@ -10,16 +10,7 @@ describe("DataLinkAwaitingConnection", () => {
   });
 
   it("transitions are present", () => {
-    expect(DataLinkAwaitingConnection.transitions).toHaveLength(25);
-  });
-
-  it("t01_dl_disconnect_request", () => {
-    const t = DataLinkAwaitingConnection.transitions.find((x) => x.id === "t01_dl_disconnect_request");
-    expect(t, "transition t01_dl_disconnect_request not found").toBeDefined();
-    if (!t) return;
-    expect(t.on).toBe("DL_DISCONNECT_request");
-    expect(t.next).toBe("AwaitingConnection");
-    expect(t.actions).toHaveLength(0);
+    expect(DataLinkAwaitingConnection.transitions).toHaveLength(24);
   });
 
   it("t02_disc_received", () => {
@@ -223,9 +214,7 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.on).toBe("DL_DATA_request");
     expect(t.next).toBe("AwaitingConnection");
     expect(t.guard).toEqual([{ atom: "layer_3_initiated", negate: false }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("push_frame_on_queue");
-    expect(t.actions[0].kind).toBe("internal_out");
+    expect(t.actions).toHaveLength(0);
   });
 
   it("t09_dl_data_request_no", () => {
@@ -235,7 +224,9 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.on).toBe("DL_DATA_request");
     expect(t.next).toBe("AwaitingConnection");
     expect(t.guard).toEqual([{ atom: "layer_3_initiated", negate: true }]);
-    expect(t.actions).toHaveLength(0);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("push_frame_on_queue");
+    expect(t.actions[0].kind).toBe("internal_out");
   });
 
   it("t10_i_frame_pops_off_queue_yes", () => {
@@ -245,9 +236,7 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.on).toBe("I_frame_pops_off_queue");
     expect(t.next).toBe("AwaitingConnection");
     expect(t.guard).toEqual([{ atom: "layer_3_initiated", negate: false }]);
-    expect(t.actions).toHaveLength(1);
-    expect(t.actions[0].verb).toBe("push_frame_on_queue");
-    expect(t.actions[0].kind).toBe("internal_out");
+    expect(t.actions).toHaveLength(0);
   });
 
   it("t10_i_frame_pops_off_queue_no", () => {
@@ -257,7 +246,9 @@ describe("DataLinkAwaitingConnection", () => {
     expect(t.on).toBe("I_frame_pops_off_queue");
     expect(t.next).toBe("AwaitingConnection");
     expect(t.guard).toEqual([{ atom: "layer_3_initiated", negate: true }]);
-    expect(t.actions).toHaveLength(0);
+    expect(t.actions).toHaveLength(1);
+    expect(t.actions[0].verb).toBe("push_frame_on_queue");
+    expect(t.actions[0].kind).toBe("internal_out");
   });
 
   it("t11_all_other_primitives__from_upper_layer", () => {

@@ -13,17 +13,6 @@ export const DataLinkAwaitingConnection: StatePage = {
   source: { spec: "ax.25.2.2.4_Oct_25", figure: "figc4.2", url: "" },
   transitions: [
     {
-      id: "t01_dl_disconnect_request",
-      from: "AwaitingConnection",
-      on: "DL_DISCONNECT_request",
-      guard: [],
-      actions: [],
-      next: "AwaitingConnection",
-      notes: "",
-      references: [],
-      loops: [],
-    },
-    {
       id: "t02_disc_received",
       from: "AwaitingConnection",
       on: "DISC_received",
@@ -209,9 +198,7 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "DL_DATA_request",
       guard: [{ atom: "layer_3_initiated", negate: false }],
-      actions: [
-        { verb: "push_frame_on_queue", kind: "internal_out" },
-      ],
+      actions: [],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -222,7 +209,9 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "DL_DATA_request",
       guard: [{ atom: "layer_3_initiated", negate: true }],
-      actions: [],
+      actions: [
+        { verb: "push_frame_on_queue", kind: "internal_out" },
+      ],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -233,9 +222,7 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "I_frame_pops_off_queue",
       guard: [{ atom: "layer_3_initiated", negate: false }],
-      actions: [
-        { verb: "push_frame_on_queue", kind: "internal_out" },
-      ],
+      actions: [],
       next: "AwaitingConnection",
       notes: "",
       references: [],
@@ -246,7 +233,9 @@ export const DataLinkAwaitingConnection: StatePage = {
       from: "AwaitingConnection",
       on: "I_frame_pops_off_queue",
       guard: [{ atom: "layer_3_initiated", negate: true }],
-      actions: [],
+      actions: [
+        { verb: "push_frame_on_queue", kind: "internal_out" },
+      ],
       next: "AwaitingConnection",
       notes: "",
       references: [],

@@ -12,8 +12,8 @@ func TestManagementDataLinkReady_SourceFigure(t *testing.T) {
 }
 
 func TestManagementDataLinkReady_TransitionsArePresent(t *testing.T) {
-	if got := len(ManagementDataLinkReady.Transitions); got != 2 {
-		t.Errorf("len(Transitions) = %d, want 2", got)
+	if got := len(ManagementDataLinkReady.Transitions); got != 4 {
+		t.Errorf("len(Transitions) = %d, want 4", got)
 	}
 }
 
@@ -34,39 +34,185 @@ func TestManagementDataLinkReady_t01_mdl_negotiate_request(t *testing.T) {
 	if tx.Next != "Negotiating" {
 		t.Errorf("Next = %q, want Negotiating", tx.Next)
 	}
-	if got := len(tx.Actions); got != 3 {
-		t.Fatalf("len(Actions) = %d, want 3", got)
+	if got := len(tx.Actions); got != 10 {
+		t.Fatalf("len(Actions) = %d, want 10", got)
 	}
-	if tx.Actions[0].Verb != "RC := 0" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "RC := 0")
+	if tx.Actions[0].Verb != "Initiate Classes of Procedures Negotiation" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Initiate Classes of Procedures Negotiation")
 	}
-	if tx.Actions[0].Kind != Processing {
-		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	if tx.Actions[0].Kind != Subroutine {
+		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
 	}
-	if tx.Actions[1].Verb != "XID_command" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "XID_command")
+	if tx.Actions[1].Verb != "Initiate Optional Functions Negotiation" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Initiate Optional Functions Negotiation")
 	}
-	if tx.Actions[1].Kind != SignalLower {
-		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
+	if tx.Actions[1].Kind != Subroutine {
+		t.Errorf("Actions[1].Kind = %v, want Subroutine", tx.Actions[1].Kind)
 	}
-	if tx.Actions[2].Verb != "Start TM201" {
-		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "Start TM201")
+	if tx.Actions[2].Verb != "Initiate N1 Negotiation" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "Initiate N1 Negotiation")
 	}
-	if tx.Actions[2].Kind != Processing {
-		t.Errorf("Actions[2].Kind = %v, want Processing", tx.Actions[2].Kind)
+	if tx.Actions[2].Kind != Subroutine {
+		t.Errorf("Actions[2].Kind = %v, want Subroutine", tx.Actions[2].Kind)
+	}
+	if tx.Actions[3].Verb != "Initiate Window Negotiation" {
+		t.Errorf("Actions[3].Verb = %q, want %q", tx.Actions[3].Verb, "Initiate Window Negotiation")
+	}
+	if tx.Actions[3].Kind != Subroutine {
+		t.Errorf("Actions[3].Kind = %v, want Subroutine", tx.Actions[3].Kind)
+	}
+	if tx.Actions[4].Verb != "Initiate Retry Negotiation" {
+		t.Errorf("Actions[4].Verb = %q, want %q", tx.Actions[4].Verb, "Initiate Retry Negotiation")
+	}
+	if tx.Actions[4].Kind != Subroutine {
+		t.Errorf("Actions[4].Kind = %v, want Subroutine", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "Initiate T1 Negotiation" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Initiate T1 Negotiation")
+	}
+	if tx.Actions[5].Kind != Subroutine {
+		t.Errorf("Actions[5].Kind = %v, want Subroutine", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "AV := 0" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "AV := 0")
+	}
+	if tx.Actions[6].Kind != Processing {
+		t.Errorf("Actions[6].Kind = %v, want Processing", tx.Actions[6].Kind)
+	}
+	if tx.Actions[7].Verb != "P := 1" {
+		t.Errorf("Actions[7].Verb = %q, want %q", tx.Actions[7].Verb, "P := 1")
+	}
+	if tx.Actions[7].Kind != Processing {
+		t.Errorf("Actions[7].Kind = %v, want Processing", tx.Actions[7].Kind)
+	}
+	if tx.Actions[8].Verb != "Start TM201" {
+		t.Errorf("Actions[8].Verb = %q, want %q", tx.Actions[8].Verb, "Start TM201")
+	}
+	if tx.Actions[8].Kind != Processing {
+		t.Errorf("Actions[8].Kind = %v, want Processing", tx.Actions[8].Kind)
+	}
+	if tx.Actions[9].Verb != "XID Command" {
+		t.Errorf("Actions[9].Verb = %q, want %q", tx.Actions[9].Verb, "XID Command")
+	}
+	if tx.Actions[9].Kind != SignalLower {
+		t.Errorf("Actions[9].Kind = %v, want SignalLower", tx.Actions[9].Kind)
 	}
 }
 
-func TestManagementDataLinkReady_t02_xid_response_received(t *testing.T) {
+func TestManagementDataLinkReady_t02_xid_command_received_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range ManagementDataLinkReady.Transitions {
-		if ManagementDataLinkReady.Transitions[i].ID == "t02_xid_response_received" {
+		if ManagementDataLinkReady.Transitions[i].ID == "t02_xid_command_received_yes" {
 			tx = &ManagementDataLinkReady.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t02_xid_response_received not found")
+		t.Fatalf("transition t02_xid_command_received_yes not found")
+	}
+	if tx.On != "XID_command_received" {
+		t.Errorf("On = %q, want XID_command_received", tx.On)
+	}
+	if tx.Next != "Ready" {
+		t.Errorf("Next = %q, want Ready", tx.Next)
+	}
+	if tx.Guard != "P_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "P_eq_1")
+	}
+	if got := len(tx.Actions); got != 8 {
+		t.Fatalf("len(Actions) = %d, want 8", got)
+	}
+	if tx.Actions[0].Verb != "Classes of Procedures Negotiation Response" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Classes of Procedures Negotiation Response")
+	}
+	if tx.Actions[0].Kind != Subroutine {
+		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "Optional Functions Negotiation Response" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Optional Functions Negotiation Response")
+	}
+	if tx.Actions[1].Kind != Subroutine {
+		t.Errorf("Actions[1].Kind = %v, want Subroutine", tx.Actions[1].Kind)
+	}
+	if tx.Actions[2].Verb != "N1 Negotiation Response" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "N1 Negotiation Response")
+	}
+	if tx.Actions[2].Kind != Subroutine {
+		t.Errorf("Actions[2].Kind = %v, want Subroutine", tx.Actions[2].Kind)
+	}
+	if tx.Actions[3].Verb != "Window Negotiation Response" {
+		t.Errorf("Actions[3].Verb = %q, want %q", tx.Actions[3].Verb, "Window Negotiation Response")
+	}
+	if tx.Actions[3].Kind != Subroutine {
+		t.Errorf("Actions[3].Kind = %v, want Subroutine", tx.Actions[3].Kind)
+	}
+	if tx.Actions[4].Verb != "Retry Negotiation Response" {
+		t.Errorf("Actions[4].Verb = %q, want %q", tx.Actions[4].Verb, "Retry Negotiation Response")
+	}
+	if tx.Actions[4].Kind != Subroutine {
+		t.Errorf("Actions[4].Kind = %v, want Subroutine", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "T1 Negotiation Response" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "T1 Negotiation Response")
+	}
+	if tx.Actions[5].Kind != Subroutine {
+		t.Errorf("Actions[5].Kind = %v, want Subroutine", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "P := 1" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "P := 1")
+	}
+	if tx.Actions[6].Kind != Processing {
+		t.Errorf("Actions[6].Kind = %v, want Processing", tx.Actions[6].Kind)
+	}
+	if tx.Actions[7].Verb != "XID Response" {
+		t.Errorf("Actions[7].Verb = %q, want %q", tx.Actions[7].Verb, "XID Response")
+	}
+	if tx.Actions[7].Kind != SignalLower {
+		t.Errorf("Actions[7].Kind = %v, want SignalLower", tx.Actions[7].Kind)
+	}
+}
+
+func TestManagementDataLinkReady_t02_xid_command_received_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range ManagementDataLinkReady.Transitions {
+		if ManagementDataLinkReady.Transitions[i].ID == "t02_xid_command_received_no" {
+			tx = &ManagementDataLinkReady.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t02_xid_command_received_no not found")
+	}
+	if tx.On != "XID_command_received" {
+		t.Errorf("On = %q, want XID_command_received", tx.On)
+	}
+	if tx.Next != "Ready" {
+		t.Errorf("Next = %q, want Ready", tx.Next)
+	}
+	if tx.Guard != "not P_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not P_eq_1")
+	}
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "MDL_ERROR_indicate_A" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "MDL_ERROR_indicate_A")
+	}
+	if tx.Actions[0].Kind != SignalUpper {
+		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
+	}
+}
+
+func TestManagementDataLinkReady_t03_xid_response_received(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range ManagementDataLinkReady.Transitions {
+		if ManagementDataLinkReady.Transitions[i].ID == "t03_xid_response_received" {
+			tx = &ManagementDataLinkReady.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t03_xid_response_received not found")
 	}
 	if tx.On != "XID_response_received" {
 		t.Errorf("On = %q, want XID_response_received", tx.On)

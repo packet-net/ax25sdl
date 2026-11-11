@@ -19,17 +19,6 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
     ),
     transitions=(
         TransitionSpec(
-            id="t01_dl_disconnect_request",
-            from_="AwaitingConnection",
-            on="DL_DISCONNECT_request",
-            guard="",
-            actions=(),
-            next="AwaitingConnection",
-            notes="",
-            references=(),
-            loops=(),
-        ),
-        TransitionSpec(
             id="t02_disc_received",
             from_="AwaitingConnection",
             on="DISC_received",
@@ -215,9 +204,7 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
             from_="AwaitingConnection",
             on="DL_DATA_request",
             guard="layer_3_initiated",
-            actions=(
-                ActionStep(verb="push_frame_on_queue", kind=ActionKind.INTERNAL_OUT),
-            ),
+            actions=(),
             next="AwaitingConnection",
             notes="",
             references=(),
@@ -228,7 +215,9 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
             from_="AwaitingConnection",
             on="DL_DATA_request",
             guard="not layer_3_initiated",
-            actions=(),
+            actions=(
+                ActionStep(verb="push_frame_on_queue", kind=ActionKind.INTERNAL_OUT),
+            ),
             next="AwaitingConnection",
             notes="",
             references=(),
@@ -239,9 +228,7 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
             from_="AwaitingConnection",
             on="I_frame_pops_off_queue",
             guard="layer_3_initiated",
-            actions=(
-                ActionStep(verb="push_frame_on_queue", kind=ActionKind.INTERNAL_OUT),
-            ),
+            actions=(),
             next="AwaitingConnection",
             notes="",
             references=(),
@@ -252,7 +239,9 @@ DATA_LINK_AWAITING_CONNECTION = StatePage(
             from_="AwaitingConnection",
             on="I_frame_pops_off_queue",
             guard="not layer_3_initiated",
-            actions=(),
+            actions=(
+                ActionStep(verb="push_frame_on_queue", kind=ActionKind.INTERNAL_OUT),
+            ),
             next="AwaitingConnection",
             notes="",
             references=(),

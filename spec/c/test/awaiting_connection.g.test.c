@@ -25,24 +25,8 @@ static int test_source_figure(void) {
 }
 
 static int test_transitions_count(void) {
-  ASSERT(data_link_awaiting_connection.transitions_len == 25,
+  ASSERT(data_link_awaiting_connection.transitions_len == 24,
          "transitions count");
-  return 0;
-}
-
-static int test_t01_dl_disconnect_request(void) {
-  const TransitionSpec *t = NULL;
-  for (size_t i = 0; i < data_link_awaiting_connection.transitions_len; i++) {
-    if (strcmp(data_link_awaiting_connection.transitions[i].id,
-               "t01_dl_disconnect_request") == 0) {
-      t = &data_link_awaiting_connection.transitions[i];
-      break;
-    }
-  }
-  ASSERT(t != NULL, "t01_dl_disconnect_request not found");
-  ASSERT_STREQ(t->on, "DL_DISCONNECT_request", "on");
-  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
-  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -342,9 +326,7 @@ static int test_t09_dl_data_request_yes(void) {
   ASSERT_STREQ(t->on, "DL_DATA_request", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -361,7 +343,9 @@ static int test_t09_dl_data_request_no(void) {
   ASSERT_STREQ(t->on, "DL_DATA_request", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "not layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 0, "actions count");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
   return 0;
 }
 
@@ -378,9 +362,7 @@ static int test_t10_i_frame_pops_off_queue_yes(void) {
   ASSERT_STREQ(t->on, "I_frame_pops_off_queue", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
+  ASSERT(t->actions_len == 0, "actions count");
   return 0;
 }
 
@@ -397,7 +379,9 @@ static int test_t10_i_frame_pops_off_queue_no(void) {
   ASSERT_STREQ(t->on, "I_frame_pops_off_queue", "on");
   ASSERT_STREQ(t->next, "AwaitingConnection", "next");
   ASSERT_STREQ(t->guard, "not layer_3_initiated", "guard");
-  ASSERT(t->actions_len == 0, "actions count");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "push_frame_on_queue", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_INTERNAL_OUT, "actions[0].kind");
   return 0;
 }
 
@@ -558,7 +542,6 @@ int main(void) {
   int rc = 0;
   rc |= test_source_figure();
   rc |= test_transitions_count();
-  rc |= test_t01_dl_disconnect_request();
   rc |= test_t02_disc_received();
   rc |= test_t03_dm_received_yes();
   rc |= test_t03_dm_received_no();

@@ -32,7 +32,7 @@ public enum SeedKind
 {
     /// <summary>Both stations Connected with zeroed variables, T3 running, all data already queued.</summary>
     Connected,
-    /// <summary>Both stations Disconnected; A has issued DL_CONNECT_request and queued its data.</summary>
+    /// <summary>Both stations Disconnected; A has issued DL_CONNECT_request and then submitted its data (which figc4.2 drops while layer 3 initiated, ax25spec#161).</summary>
     Disconnected,
     /// <summary>
     /// A is in AwaitingV22Connection with its SABME P=1 already in flight

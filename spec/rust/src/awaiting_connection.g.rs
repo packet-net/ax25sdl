@@ -15,17 +15,6 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
     },
     transitions: &[
         TransitionSpec {
-            id: "t01_dl_disconnect_request",
-            from: "AwaitingConnection",
-            on: Ax25Event::DLDISCONNECTRequest,
-            guard: &[],
-            actions: &[],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t02_disc_received",
             from: "AwaitingConnection",
             on: Ax25Event::DISCReceived,
@@ -377,10 +366,7 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: false,
             }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::PushFrameOnQueue,
-                kind: ActionKind::InternalOut,
-            }],
+            actions: &[],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -394,7 +380,10 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: true,
             }],
-            actions: &[],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::PushFrameOnQueue,
+                kind: ActionKind::InternalOut,
+            }],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -408,10 +397,7 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: false,
             }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::PushFrameOnQueue,
-                kind: ActionKind::InternalOut,
-            }],
+            actions: &[],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -425,7 +411,10 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 atom: Ax25Guard::Layer3Initiated,
                 negate: true,
             }],
-            actions: &[],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::PushFrameOnQueue,
+                kind: ActionKind::InternalOut,
+            }],
             next: "AwaitingConnection",
             notes: "",
             references: &[],
@@ -578,19 +567,7 @@ mod tests {
 
     #[test]
     fn transitions_are_present() {
-        assert_eq!(DATA_LINK_AWAITING_CONNECTION.transitions.len(), 25);
-    }
-
-    #[test]
-    fn t01_dl_disconnect_request() {
-        let tx = DATA_LINK_AWAITING_CONNECTION
-            .transitions
-            .iter()
-            .find(|x| x.id == "t01_dl_disconnect_request")
-            .expect("transition t01_dl_disconnect_request not found");
-        assert_eq!(tx.on, Ax25Event::DLDISCONNECTRequest);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(DATA_LINK_AWAITING_CONNECTION.transitions.len(), 24);
     }
 
     #[test]
@@ -913,9 +890,7 @@ mod tests {
                 negate: false
             },]
         );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
-        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
+        assert_eq!(tx.actions.len(), 0);
     }
 
     #[test]
@@ -934,7 +909,9 @@ mod tests {
                 negate: true
             },]
         );
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
+        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
     }
 
     #[test]
@@ -953,9 +930,7 @@ mod tests {
                 negate: false
             },]
         );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
-        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
+        assert_eq!(tx.actions.len(), 0);
     }
 
     #[test]
@@ -974,7 +949,9 @@ mod tests {
                 negate: true
             },]
         );
-        assert_eq!(tx.actions.len(), 0);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::PushFrameOnQueue);
+        assert_eq!(tx.actions[0].kind, ActionKind::InternalOut);
     }
 
     #[test]

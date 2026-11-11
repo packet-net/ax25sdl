@@ -12,21 +12,101 @@ func TestManagementDataLinkNegotiating_SourceFigure(t *testing.T) {
 }
 
 func TestManagementDataLinkNegotiating_TransitionsArePresent(t *testing.T) {
-	if got := len(ManagementDataLinkNegotiating.Transitions); got != 5 {
-		t.Errorf("len(Transitions) = %d, want 5", got)
+	if got := len(ManagementDataLinkNegotiating.Transitions); got != 6 {
+		t.Errorf("len(Transitions) = %d, want 6", got)
 	}
 }
 
-func TestManagementDataLinkNegotiating_t01_xid_response_received_yes(t *testing.T) {
+func TestManagementDataLinkNegotiating_t02_tm201_expiry_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range ManagementDataLinkNegotiating.Transitions {
-		if ManagementDataLinkNegotiating.Transitions[i].ID == "t01_xid_response_received_yes" {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t02_tm201_expiry_yes" {
 			tx = &ManagementDataLinkNegotiating.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t01_xid_response_received_yes not found")
+		t.Fatalf("transition t02_tm201_expiry_yes not found")
+	}
+	if tx.On != "TM201_expiry" {
+		t.Errorf("On = %q, want TM201_expiry", tx.On)
+	}
+	if tx.Next != "Ready" {
+		t.Errorf("Next = %q, want Ready", tx.Next)
+	}
+	if tx.Guard != "AC_gt_NM201" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "AC_gt_NM201")
+	}
+	if got := len(tx.Actions); got != 2 {
+		t.Fatalf("len(Actions) = %d, want 2", got)
+	}
+	if tx.Actions[0].Verb != "RC := RC + 1" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "RC := RC + 1")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "MDL_ERROR_indicate_C" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "MDL_ERROR_indicate_C")
+	}
+	if tx.Actions[1].Kind != SignalUpper {
+		t.Errorf("Actions[1].Kind = %v, want SignalUpper", tx.Actions[1].Kind)
+	}
+}
+
+func TestManagementDataLinkNegotiating_t02_tm201_expiry_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range ManagementDataLinkNegotiating.Transitions {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t02_tm201_expiry_no" {
+			tx = &ManagementDataLinkNegotiating.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t02_tm201_expiry_no not found")
+	}
+	if tx.On != "TM201_expiry" {
+		t.Errorf("On = %q, want TM201_expiry", tx.On)
+	}
+	if tx.Next != "Ready" {
+		t.Errorf("Next = %q, want Ready", tx.Next)
+	}
+	if tx.Guard != "not AC_gt_NM201" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not AC_gt_NM201")
+	}
+	if got := len(tx.Actions); got != 3 {
+		t.Fatalf("len(Actions) = %d, want 3", got)
+	}
+	if tx.Actions[0].Verb != "RC := RC + 1" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "RC := RC + 1")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "Retransmit XID Command" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Retransmit XID Command")
+	}
+	if tx.Actions[1].Kind != SignalLower {
+		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
+	}
+	if tx.Actions[2].Verb != "Start TM201" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "Start TM201")
+	}
+	if tx.Actions[2].Kind != Processing {
+		t.Errorf("Actions[2].Kind = %v, want Processing", tx.Actions[2].Kind)
+	}
+}
+
+func TestManagementDataLinkNegotiating_t04_xid_response_received_yes(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range ManagementDataLinkNegotiating.Transitions {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t04_xid_response_received_yes" {
+			tx = &ManagementDataLinkNegotiating.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t04_xid_response_received_yes not found")
 	}
 	if tx.On != "XID_response_received" {
 		t.Errorf("On = %q, want XID_response_received", tx.On)
@@ -37,39 +117,69 @@ func TestManagementDataLinkNegotiating_t01_xid_response_received_yes(t *testing.
 	if tx.Guard != "F_eq_1" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "F_eq_1")
 	}
-	if got := len(tx.Actions); got != 3 {
-		t.Fatalf("len(Actions) = %d, want 3", got)
+	if got := len(tx.Actions); got != 8 {
+		t.Fatalf("len(Actions) = %d, want 8", got)
 	}
-	if tx.Actions[0].Verb != "Apply Negotiated Parameters" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Apply Negotiated Parameters")
+	if tx.Actions[0].Verb != "Complete Classes of Procedures Negotiation" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Complete Classes of Procedures Negotiation")
 	}
 	if tx.Actions[0].Kind != Subroutine {
 		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
 	}
-	if tx.Actions[1].Verb != "Stop TM201" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Stop TM201")
+	if tx.Actions[1].Verb != "Complete Optional Functions Negotiation" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Complete Optional Functions Negotiation")
 	}
-	if tx.Actions[1].Kind != Processing {
-		t.Errorf("Actions[1].Kind = %v, want Processing", tx.Actions[1].Kind)
+	if tx.Actions[1].Kind != Subroutine {
+		t.Errorf("Actions[1].Kind = %v, want Subroutine", tx.Actions[1].Kind)
 	}
-	if tx.Actions[2].Verb != "MDL_NEGOTIATE_confirm" {
-		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "MDL_NEGOTIATE_confirm")
+	if tx.Actions[2].Verb != "Complete N1 Negotiation" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "Complete N1 Negotiation")
 	}
-	if tx.Actions[2].Kind != SignalUpper {
-		t.Errorf("Actions[2].Kind = %v, want SignalUpper", tx.Actions[2].Kind)
+	if tx.Actions[2].Kind != Subroutine {
+		t.Errorf("Actions[2].Kind = %v, want Subroutine", tx.Actions[2].Kind)
+	}
+	if tx.Actions[3].Verb != "Complete Window Negotiation" {
+		t.Errorf("Actions[3].Verb = %q, want %q", tx.Actions[3].Verb, "Complete Window Negotiation")
+	}
+	if tx.Actions[3].Kind != Subroutine {
+		t.Errorf("Actions[3].Kind = %v, want Subroutine", tx.Actions[3].Kind)
+	}
+	if tx.Actions[4].Verb != "Complete Retry Negotiation" {
+		t.Errorf("Actions[4].Verb = %q, want %q", tx.Actions[4].Verb, "Complete Retry Negotiation")
+	}
+	if tx.Actions[4].Kind != Subroutine {
+		t.Errorf("Actions[4].Kind = %v, want Subroutine", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "Complete T1 Negotiation" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Complete T1 Negotiation")
+	}
+	if tx.Actions[5].Kind != Subroutine {
+		t.Errorf("Actions[5].Kind = %v, want Subroutine", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "Stop TM201" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "Stop TM201")
+	}
+	if tx.Actions[6].Kind != Processing {
+		t.Errorf("Actions[6].Kind = %v, want Processing", tx.Actions[6].Kind)
+	}
+	if tx.Actions[7].Verb != "MDL_NEGOTIATE_confirm" {
+		t.Errorf("Actions[7].Verb = %q, want %q", tx.Actions[7].Verb, "MDL_NEGOTIATE_confirm")
+	}
+	if tx.Actions[7].Kind != SignalUpper {
+		t.Errorf("Actions[7].Kind = %v, want SignalUpper", tx.Actions[7].Kind)
 	}
 }
 
-func TestManagementDataLinkNegotiating_t01_xid_response_received_no(t *testing.T) {
+func TestManagementDataLinkNegotiating_t04_xid_response_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range ManagementDataLinkNegotiating.Transitions {
-		if ManagementDataLinkNegotiating.Transitions[i].ID == "t01_xid_response_received_no" {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t04_xid_response_received_no" {
 			tx = &ManagementDataLinkNegotiating.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t01_xid_response_received_no not found")
+		t.Fatalf("transition t04_xid_response_received_no not found")
 	}
 	if tx.On != "XID_response_received" {
 		t.Errorf("On = %q, want XID_response_received", tx.On)
@@ -91,116 +201,70 @@ func TestManagementDataLinkNegotiating_t01_xid_response_received_no(t *testing.T
 	}
 }
 
-func TestManagementDataLinkNegotiating_t02_frmr_received(t *testing.T) {
+func TestManagementDataLinkNegotiating_t05_frmr_response_received_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range ManagementDataLinkNegotiating.Transitions {
-		if ManagementDataLinkNegotiating.Transitions[i].ID == "t02_frmr_received" {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t05_frmr_response_received_yes" {
 			tx = &ManagementDataLinkNegotiating.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t02_frmr_received not found")
+		t.Fatalf("transition t05_frmr_response_received_yes not found")
 	}
-	if tx.On != "FRMR_received" {
-		t.Errorf("On = %q, want FRMR_received", tx.On)
+	if tx.On != "FRMR_response_received" {
+		t.Errorf("On = %q, want FRMR_response_received", tx.On)
 	}
 	if tx.Next != "Ready" {
 		t.Errorf("Next = %q, want Ready", tx.Next)
 	}
+	if tx.Guard != "XID_rejected" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "XID_rejected")
+	}
 	if got := len(tx.Actions); got != 3 {
 		t.Fatalf("len(Actions) = %d, want 3", got)
 	}
-	if tx.Actions[0].Verb != "set_version_2_0" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "set_version_2_0")
+	if tx.Actions[0].Verb != "Set Segmentor Off" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Set Segmentor Off")
 	}
 	if tx.Actions[0].Kind != Processing {
 		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
 	}
-	if tx.Actions[1].Verb != "Stop TM201" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Stop TM201")
+	if tx.Actions[1].Verb != "Set Version 2.0 Defaults" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Set Version 2.0 Defaults")
 	}
 	if tx.Actions[1].Kind != Processing {
 		t.Errorf("Actions[1].Kind = %v, want Processing", tx.Actions[1].Kind)
 	}
-	if tx.Actions[2].Verb != "MDL_NEGOTIATE_confirm" {
-		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "MDL_NEGOTIATE_confirm")
+	if tx.Actions[2].Verb != "MDL_ERROR_indicate_E" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "MDL_ERROR_indicate_E")
 	}
 	if tx.Actions[2].Kind != SignalUpper {
 		t.Errorf("Actions[2].Kind = %v, want SignalUpper", tx.Actions[2].Kind)
 	}
 }
 
-func TestManagementDataLinkNegotiating_t03_tm201_expiry_yes(t *testing.T) {
+func TestManagementDataLinkNegotiating_t05_frmr_response_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range ManagementDataLinkNegotiating.Transitions {
-		if ManagementDataLinkNegotiating.Transitions[i].ID == "t03_tm201_expiry_yes" {
+		if ManagementDataLinkNegotiating.Transitions[i].ID == "t05_frmr_response_received_no" {
 			tx = &ManagementDataLinkNegotiating.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t03_tm201_expiry_yes not found")
+		t.Fatalf("transition t05_frmr_response_received_no not found")
 	}
-	if tx.On != "TM201_expiry" {
-		t.Errorf("On = %q, want TM201_expiry", tx.On)
+	if tx.On != "FRMR_response_received" {
+		t.Errorf("On = %q, want FRMR_response_received", tx.On)
 	}
 	if tx.Next != "Ready" {
 		t.Errorf("Next = %q, want Ready", tx.Next)
 	}
-	if tx.Guard != "RC_eq_NM201" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "RC_eq_NM201")
+	if tx.Guard != "not XID_rejected" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not XID_rejected")
 	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "MDL_ERROR_indicate_C" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "MDL_ERROR_indicate_C")
-	}
-	if tx.Actions[0].Kind != SignalUpper {
-		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
-	}
-}
-
-func TestManagementDataLinkNegotiating_t03_tm201_expiry_no(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range ManagementDataLinkNegotiating.Transitions {
-		if ManagementDataLinkNegotiating.Transitions[i].ID == "t03_tm201_expiry_no" {
-			tx = &ManagementDataLinkNegotiating.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t03_tm201_expiry_no not found")
-	}
-	if tx.On != "TM201_expiry" {
-		t.Errorf("On = %q, want TM201_expiry", tx.On)
-	}
-	if tx.Next != "Negotiating" {
-		t.Errorf("Next = %q, want Negotiating", tx.Next)
-	}
-	if tx.Guard != "not RC_eq_NM201" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not RC_eq_NM201")
-	}
-	if got := len(tx.Actions); got != 3 {
-		t.Fatalf("len(Actions) = %d, want 3", got)
-	}
-	if tx.Actions[0].Verb != "RC := RC + 1" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "RC := RC + 1")
-	}
-	if tx.Actions[0].Kind != Processing {
-		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
-	}
-	if tx.Actions[1].Verb != "XID_command" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "XID_command")
-	}
-	if tx.Actions[1].Kind != SignalLower {
-		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
-	}
-	if tx.Actions[2].Verb != "Start TM201" {
-		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "Start TM201")
-	}
-	if tx.Actions[2].Kind != Processing {
-		t.Errorf("Actions[2].Kind = %v, want Processing", tx.Actions[2].Kind)
+	if got := len(tx.Actions); got != 0 {
+		t.Fatalf("len(Actions) = %d, want 0", got)
 	}
 }

@@ -207,9 +207,15 @@ public static class SubroutinesWalker
 
     private static IEnumerable<PathStep> NodeToPathSteps(GraphmlNode node)
     {
-        if (node.ShapeClass == "Test or decision") yield break;
+        if (node.ShapeClass is "Test or decision" or "Subroutine start" or "Return from Subroutine") yield break;
         var kind = EventResolver.ShapeClassToActionKind(node.ShapeClass);
-        if (kind is null) yield break;
+        // Anything else that is not an action (a Save, a State, a signal
+        // reception) has no place inside a subroutine path. Dropping it
+        // would lose what the figure draws, so it is an error.
+        if (kind is null)
+            throw new InvalidDataException(
+                $"node {node.Id} ('{node.Label}', d5='{node.ShapeClass}') can't appear inside a subroutine path; " +
+                "only actions, decisions and a Return from Subroutine can.");
         // One action per line of the label, as on state pages (see
         // Walker.NodeToPathSteps).
         var lines = node.Label

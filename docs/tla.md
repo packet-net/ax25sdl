@@ -90,7 +90,8 @@ Every row of the explorer's calibration suite (`CalibrationTests.cs`), plus its 
 | d13-k7 | #13 | current | RejectCoherence at A, 13 steps | RejectCoherence at A, 13 steps (5.9 s) | yes |
 | d13-k4 | #13 control | current | clean, 1144 states | clean, 1144 states (29.1 s) | yes |
 | d44-48-cold | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (7.1 s) | yes |
-| d44-48-cold-mod8 | #44/#48 control | current | clean, 7 states | clean, 7 states (9.2 s) | yes |
+| d44-48-cold-mod8 | #44/#48 control | current | clean, 3 states | clean, 3 states (3.3 s) | yes |
+| d161-data-before-confirm | ax25spec#161 | current | Deadlock, 2 steps | Deadlock, 2 steps (2.5 s) | yes |
 | d43 | #43 | current | BusyTracksFlow at B, 3 steps | BusyTracksFlow at B, 3 steps (4.9 s) | yes |
 | d43-busy-off | #43 | current | FlowOffDelivery at B, 5 steps | FlowOffDelivery at B, 5 steps (4.5 s) | yes |
 | d43-both-off | #43 | current | clean, 42 states | clean, 42 states (11.1 s) | yes |

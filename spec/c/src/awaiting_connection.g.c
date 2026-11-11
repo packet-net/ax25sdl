@@ -85,12 +85,12 @@ static const ActionStep
 };
 
 static const ActionStep
-    data_link_awaiting_connection_t09_dl_data_request_yes_actions[] = {
+    data_link_awaiting_connection_t09_dl_data_request_no_actions[] = {
         {.verb = "push_frame_on_queue", .kind = AX25SDL_KIND_INTERNAL_OUT},
 };
 
 static const ActionStep
-    data_link_awaiting_connection_t10_i_frame_pops_off_queue_yes_actions[] = {
+    data_link_awaiting_connection_t10_i_frame_pops_off_queue_no_actions[] = {
         {.verb = "push_frame_on_queue", .kind = AX25SDL_KIND_INTERNAL_OUT},
 };
 
@@ -133,20 +133,6 @@ static const ActionStep
 };
 
 static const TransitionSpec data_link_awaiting_connection_transitions[] = {
-    {
-        .id = "t01_dl_disconnect_request",
-        .from = "AwaitingConnection",
-        .on = "DL_DISCONNECT_request",
-        .guard = "",
-        .actions = NULL,
-        .actions_len = 0,
-        .next = "AwaitingConnection",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
     {
         .id = "t02_disc_received",
         .from = "AwaitingConnection",
@@ -324,9 +310,8 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
         .from = "AwaitingConnection",
         .on = "DL_DATA_request",
         .guard = "layer_3_initiated",
-        .actions =
-            data_link_awaiting_connection_t09_dl_data_request_yes_actions,
-        .actions_len = 1,
+        .actions = NULL,
+        .actions_len = 0,
         .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
@@ -339,8 +324,8 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
         .from = "AwaitingConnection",
         .on = "DL_DATA_request",
         .guard = "not layer_3_initiated",
-        .actions = NULL,
-        .actions_len = 0,
+        .actions = data_link_awaiting_connection_t09_dl_data_request_no_actions,
+        .actions_len = 1,
         .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
@@ -353,9 +338,8 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
         .from = "AwaitingConnection",
         .on = "I_frame_pops_off_queue",
         .guard = "layer_3_initiated",
-        .actions =
-            data_link_awaiting_connection_t10_i_frame_pops_off_queue_yes_actions,
-        .actions_len = 1,
+        .actions = NULL,
+        .actions_len = 0,
         .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
@@ -368,8 +352,9 @@ static const TransitionSpec data_link_awaiting_connection_transitions[] = {
         .from = "AwaitingConnection",
         .on = "I_frame_pops_off_queue",
         .guard = "not layer_3_initiated",
-        .actions = NULL,
-        .actions_len = 0,
+        .actions =
+            data_link_awaiting_connection_t10_i_frame_pops_off_queue_no_actions,
+        .actions_len = 1,
         .next = "AwaitingConnection",
         .notes = "",
         .references = NULL,
@@ -499,5 +484,5 @@ const StatePage data_link_awaiting_connection = {
     .state = "AwaitingConnection",
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.2", .url = ""},
     .transitions = data_link_awaiting_connection_transitions,
-    .transitions_len = 25,
+    .transitions_len = 24,
 };

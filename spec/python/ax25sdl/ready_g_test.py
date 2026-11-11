@@ -10,7 +10,7 @@ def test_source_figure() -> None:
 
 
 def test_transitions_are_present() -> None:
-    assert len(MANAGEMENT_DATA_LINK_READY.transitions) == 2
+    assert len(MANAGEMENT_DATA_LINK_READY.transitions) == 4
 
 
 def test_t01_mdl_negotiate_request() -> None:
@@ -21,21 +21,77 @@ def test_t01_mdl_negotiate_request() -> None:
     assert t is not None, "transition t01_mdl_negotiate_request not found"
     assert t.on == "MDL_NEGOTIATE_request"
     assert t.next == "Negotiating"
-    assert len(t.actions) == 3
-    assert t.actions[0].verb == "RC := 0"
-    assert t.actions[0].kind == ActionKind.PROCESSING
-    assert t.actions[1].verb == "XID_command"
-    assert t.actions[1].kind == ActionKind.SIGNAL_LOWER
-    assert t.actions[2].verb == "Start TM201"
-    assert t.actions[2].kind == ActionKind.PROCESSING
+    assert len(t.actions) == 10
+    assert t.actions[0].verb == "Initiate Classes of Procedures Negotiation"
+    assert t.actions[0].kind == ActionKind.SUBROUTINE
+    assert t.actions[1].verb == "Initiate Optional Functions Negotiation"
+    assert t.actions[1].kind == ActionKind.SUBROUTINE
+    assert t.actions[2].verb == "Initiate N1 Negotiation"
+    assert t.actions[2].kind == ActionKind.SUBROUTINE
+    assert t.actions[3].verb == "Initiate Window Negotiation"
+    assert t.actions[3].kind == ActionKind.SUBROUTINE
+    assert t.actions[4].verb == "Initiate Retry Negotiation"
+    assert t.actions[4].kind == ActionKind.SUBROUTINE
+    assert t.actions[5].verb == "Initiate T1 Negotiation"
+    assert t.actions[5].kind == ActionKind.SUBROUTINE
+    assert t.actions[6].verb == "AV := 0"
+    assert t.actions[6].kind == ActionKind.PROCESSING
+    assert t.actions[7].verb == "P := 1"
+    assert t.actions[7].kind == ActionKind.PROCESSING
+    assert t.actions[8].verb == "Start TM201"
+    assert t.actions[8].kind == ActionKind.PROCESSING
+    assert t.actions[9].verb == "XID Command"
+    assert t.actions[9].kind == ActionKind.SIGNAL_LOWER
 
 
-def test_t02_xid_response_received() -> None:
+def test_t02_xid_command_received_yes() -> None:
     t = next(
-        (x for x in MANAGEMENT_DATA_LINK_READY.transitions if x.id == "t02_xid_response_received"),
+        (x for x in MANAGEMENT_DATA_LINK_READY.transitions if x.id == "t02_xid_command_received_yes"),
         None,
     )
-    assert t is not None, "transition t02_xid_response_received not found"
+    assert t is not None, "transition t02_xid_command_received_yes not found"
+    assert t.on == "XID_command_received"
+    assert t.next == "Ready"
+    assert t.guard == "P_eq_1"
+    assert len(t.actions) == 8
+    assert t.actions[0].verb == "Classes of Procedures Negotiation Response"
+    assert t.actions[0].kind == ActionKind.SUBROUTINE
+    assert t.actions[1].verb == "Optional Functions Negotiation Response"
+    assert t.actions[1].kind == ActionKind.SUBROUTINE
+    assert t.actions[2].verb == "N1 Negotiation Response"
+    assert t.actions[2].kind == ActionKind.SUBROUTINE
+    assert t.actions[3].verb == "Window Negotiation Response"
+    assert t.actions[3].kind == ActionKind.SUBROUTINE
+    assert t.actions[4].verb == "Retry Negotiation Response"
+    assert t.actions[4].kind == ActionKind.SUBROUTINE
+    assert t.actions[5].verb == "T1 Negotiation Response"
+    assert t.actions[5].kind == ActionKind.SUBROUTINE
+    assert t.actions[6].verb == "P := 1"
+    assert t.actions[6].kind == ActionKind.PROCESSING
+    assert t.actions[7].verb == "XID Response"
+    assert t.actions[7].kind == ActionKind.SIGNAL_LOWER
+
+
+def test_t02_xid_command_received_no() -> None:
+    t = next(
+        (x for x in MANAGEMENT_DATA_LINK_READY.transitions if x.id == "t02_xid_command_received_no"),
+        None,
+    )
+    assert t is not None, "transition t02_xid_command_received_no not found"
+    assert t.on == "XID_command_received"
+    assert t.next == "Ready"
+    assert t.guard == "not P_eq_1"
+    assert len(t.actions) == 1
+    assert t.actions[0].verb == "MDL_ERROR_indicate_A"
+    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
+
+
+def test_t03_xid_response_received() -> None:
+    t = next(
+        (x for x in MANAGEMENT_DATA_LINK_READY.transitions if x.id == "t03_xid_response_received"),
+        None,
+    )
+    assert t is not None, "transition t03_xid_response_received not found"
     assert t.on == "XID_response_received"
     assert t.next == "Ready"
     assert len(t.actions) == 1

@@ -24,7 +24,7 @@ static int test_source_figure(void) {
 }
 
 static int test_transitions_count(void) {
-  ASSERT(management_data_link_ready.transitions_len == 2, "transitions count");
+  ASSERT(management_data_link_ready.transitions_len == 4, "transitions count");
   return 0;
 }
 
@@ -40,26 +40,104 @@ static int test_t01_mdl_negotiate_request(void) {
   ASSERT(t != NULL, "t01_mdl_negotiate_request not found");
   ASSERT_STREQ(t->on, "MDL_NEGOTIATE_request", "on");
   ASSERT_STREQ(t->next, "Negotiating", "next");
-  ASSERT(t->actions_len == 3, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "RC := 0", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
-  ASSERT_STREQ(t->actions[1].verb, "XID_command", "actions[1].verb");
-  ASSERT(t->actions[1].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[1].kind");
-  ASSERT_STREQ(t->actions[2].verb, "Start TM201", "actions[2].verb");
-  ASSERT(t->actions[2].kind == AX25SDL_KIND_PROCESSING, "actions[2].kind");
+  ASSERT(t->actions_len == 10, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "Initiate Classes of Procedures Negotiation",
+               "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "Initiate Optional Functions Negotiation",
+               "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SUBROUTINE, "actions[1].kind");
+  ASSERT_STREQ(t->actions[2].verb, "Initiate N1 Negotiation",
+               "actions[2].verb");
+  ASSERT(t->actions[2].kind == AX25SDL_KIND_SUBROUTINE, "actions[2].kind");
+  ASSERT_STREQ(t->actions[3].verb, "Initiate Window Negotiation",
+               "actions[3].verb");
+  ASSERT(t->actions[3].kind == AX25SDL_KIND_SUBROUTINE, "actions[3].kind");
+  ASSERT_STREQ(t->actions[4].verb, "Initiate Retry Negotiation",
+               "actions[4].verb");
+  ASSERT(t->actions[4].kind == AX25SDL_KIND_SUBROUTINE, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "Initiate T1 Negotiation",
+               "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_SUBROUTINE, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "AV := 0", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_PROCESSING, "actions[6].kind");
+  ASSERT_STREQ(t->actions[7].verb, "P := 1", "actions[7].verb");
+  ASSERT(t->actions[7].kind == AX25SDL_KIND_PROCESSING, "actions[7].kind");
+  ASSERT_STREQ(t->actions[8].verb, "Start TM201", "actions[8].verb");
+  ASSERT(t->actions[8].kind == AX25SDL_KIND_PROCESSING, "actions[8].kind");
+  ASSERT_STREQ(t->actions[9].verb, "XID Command", "actions[9].verb");
+  ASSERT(t->actions[9].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[9].kind");
   return 0;
 }
 
-static int test_t02_xid_response_received(void) {
+static int test_t02_xid_command_received_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < management_data_link_ready.transitions_len; i++) {
     if (strcmp(management_data_link_ready.transitions[i].id,
-               "t02_xid_response_received") == 0) {
+               "t02_xid_command_received_yes") == 0) {
       t = &management_data_link_ready.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t02_xid_response_received not found");
+  ASSERT(t != NULL, "t02_xid_command_received_yes not found");
+  ASSERT_STREQ(t->on, "XID_command_received", "on");
+  ASSERT_STREQ(t->next, "Ready", "next");
+  ASSERT_STREQ(t->guard, "P_eq_1", "guard");
+  ASSERT(t->actions_len == 8, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "Classes of Procedures Negotiation Response",
+               "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SUBROUTINE, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "Optional Functions Negotiation Response",
+               "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SUBROUTINE, "actions[1].kind");
+  ASSERT_STREQ(t->actions[2].verb, "N1 Negotiation Response",
+               "actions[2].verb");
+  ASSERT(t->actions[2].kind == AX25SDL_KIND_SUBROUTINE, "actions[2].kind");
+  ASSERT_STREQ(t->actions[3].verb, "Window Negotiation Response",
+               "actions[3].verb");
+  ASSERT(t->actions[3].kind == AX25SDL_KIND_SUBROUTINE, "actions[3].kind");
+  ASSERT_STREQ(t->actions[4].verb, "Retry Negotiation Response",
+               "actions[4].verb");
+  ASSERT(t->actions[4].kind == AX25SDL_KIND_SUBROUTINE, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "T1 Negotiation Response",
+               "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_SUBROUTINE, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "P := 1", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_PROCESSING, "actions[6].kind");
+  ASSERT_STREQ(t->actions[7].verb, "XID Response", "actions[7].verb");
+  ASSERT(t->actions[7].kind == AX25SDL_KIND_SIGNAL_LOWER, "actions[7].kind");
+  return 0;
+}
+
+static int test_t02_xid_command_received_no(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < management_data_link_ready.transitions_len; i++) {
+    if (strcmp(management_data_link_ready.transitions[i].id,
+               "t02_xid_command_received_no") == 0) {
+      t = &management_data_link_ready.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t02_xid_command_received_no not found");
+  ASSERT_STREQ(t->on, "XID_command_received", "on");
+  ASSERT_STREQ(t->next, "Ready", "next");
+  ASSERT_STREQ(t->guard, "not P_eq_1", "guard");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "MDL_ERROR_indicate_A", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
+  return 0;
+}
+
+static int test_t03_xid_response_received(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < management_data_link_ready.transitions_len; i++) {
+    if (strcmp(management_data_link_ready.transitions[i].id,
+               "t03_xid_response_received") == 0) {
+      t = &management_data_link_ready.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t03_xid_response_received not found");
   ASSERT_STREQ(t->on, "XID_response_received", "on");
   ASSERT_STREQ(t->next, "Ready", "next");
   ASSERT(t->actions_len == 1, "actions count");
@@ -73,6 +151,8 @@ int main(void) {
   rc |= test_source_figure();
   rc |= test_transitions_count();
   rc |= test_t01_mdl_negotiate_request();
-  rc |= test_t02_xid_response_received();
+  rc |= test_t02_xid_command_received_yes();
+  rc |= test_t02_xid_command_received_no();
+  rc |= test_t03_xid_response_received();
   return rc;
 }

@@ -192,11 +192,11 @@ public class RustEmitterTests
         var verb = r.ReadRust("ax25_action_verb.g.rs");
         verb.Should().Contain("pub enum Ax25ActionVerb {");
         // send_disc → SendDisc (same fold as the C# emitter).
-        verb.Should().Contain("SendDisc,");
+        verb.Should().MatchRegex(@"SendDisc = \d+,");
 
         var evt = r.ReadRust("ax25_event.g.rs");
         evt.Should().Contain("pub enum Ax25Event {");
-        evt.Should().Contain("DLDISCONNECTRequest,");
+        evt.Should().MatchRegex(@"DLDISCONNECTRequest = \d+,");
 
         // lib.rs wires the three enum modules in + re-exports them.
         var lib = r.ReadRust("lib.rs");
@@ -267,7 +267,7 @@ public class RustEmitterTests
 
         var guardEnum = r.ReadRust("ax25_guard.g.rs");
         guardEnum.Should().Contain("pub enum Ax25Guard {");
-        guardEnum.Should().Contain("PeerReceiverBusy,");
+        guardEnum.Should().MatchRegex(@"PeerReceiverBusy = \d+,");
 
         // rustfmt may wrap a GuardTerm across lines depending on the
         // surrounding indent, so assert on whitespace-collapsed source —
