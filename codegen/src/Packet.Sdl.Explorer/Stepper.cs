@@ -702,7 +702,7 @@ public sealed class Stepper
                 if (station == Station.B && s.StubPeer is not null)
                     return InjectStub(s, frame, $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, number);
                 return Inject(s, station, FrameInput(s.Machine(station), frame, station),
-                    $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, clearOwed: false, number);
+                    $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, clearOwed: false, number, frame.Type);
             }
             case MoveKind.Duplicate:
             {
@@ -710,7 +710,7 @@ public sealed class Stepper
                 var action = $"receives {frame.Render()} from {peer} (channel fault: DUPLICATE, a copy stays at the head; budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})";
                 if (station == Station.B && s.StubPeer is not null)
                     return InjectStub(s, frame, action, incoming, s.Budget - 1, number);
-                return Inject(s, station, FrameInput(s.Machine(station), frame, station), action, incoming, s.Budget - 1, clearOwed: false, number);
+                return Inject(s, station, FrameInput(s.Machine(station), frame, station), action, incoming, s.Budget - 1, clearOwed: false, number, frame.Type);
             }
             case MoveKind.FlowOff:
                 return Inject(s, station, new EventInput("DL_FLOW_OFF_request"), "DL_FLOW_OFF_request (layer 3 turns flow off)", incoming, s.Budget, clearOwed: false, number);
@@ -922,7 +922,7 @@ public sealed class Stepper
     /// the frame (reported as a MachineError).
     /// </summary>
     private StepOutcome Inject(SystemState s, Station station, EventInput? input, string action,
-        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number)
+        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null)
     {
         var peer = SystemState.Peer(station);
         var pre = s.Machine(station);
@@ -1040,9 +1040,11 @@ public sealed class Stepper
         }
 
         // A UI frame's handling (UnitData): delivered or refused as UI Check
-        // says, and a poll answered as section 4.3.3.6 says.
-        if (violation is null && result is not null && input!.Event == "UI_received" && _o.UnitData != FlowControlAt.None && On(Invariants.UnitData))
-            violation = UnitDataCheck(station, pre, input, _o.UiForm == UiForm.Oversize, result.Effects);
+        // says, and a poll answered as section 4.3.3.6 says. Keyed on the
+        // frame being UI, not on the event it is dispatched as, so a page
+        // that lost its UI arm (the frame falls to a catch-all) is caught.
+        if (violation is null && result is not null && frameType == "UI" && _o.UnitData != FlowControlAt.None && On(Invariants.UnitData))
+            violation = UnitDataCheck(station, pre, input!, _o.UiForm == UiForm.Oversize, result.Effects);
 
         // Layer-3 flow control bookkeeping and the busy-condition check
         // (§6.4.10: entering the busy condition is what DL-FLOW-OFF is for,

@@ -42,7 +42,7 @@ public sealed record FrameEffect(string Frame, bool Command, bool Pf, int? Nr, i
 
 /// <summary>A primitive handed to the upper layer (DL-* indication/confirm, DL-ERROR Indication (X), …). Verbatim canonical verb.</summary>
 /// <param name="Primitive">The canonical verb.</param>
-/// <param name="Detail">For <c>DL_DATA_indication</c>, the delivered payload label; null otherwise.</param>
+/// <param name="Detail">For <c>DL_DATA_indication</c>, the delivered payload label; for <c>DL_UNIT_DATA_indication</c>, the received UI frame's label; null otherwise.</param>
 public sealed record UpperEffect(string Primitive, string? Detail = null) : Effect
 {
     public override string Render() => Detail is null ? $"dl {Primitive}" : $"dl {Primitive} [{Detail}]";

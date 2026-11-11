@@ -1680,7 +1680,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [InlineData(UiForm.Poll, Stepper.UiPollId, "t10_ui_received_yes")]
     public void UI_In_Awaiting_V22_Connection_Is_Answered_The_Wrong_Way_Round(UiForm form, string send, string receive)
     {
-        // Unfiled: figc4.6's UI column draws "P == 1?" with Yes going
+        // ax25spec#170: figc4.6's UI column draws "P == 1?" with Yes going
         // straight to the next state and No to DM (F = 1), the reverse of
         // figc4.2 and of the July 1998 edition. A UI with P = 0 draws a DM; a
         // UI poll draws nothing.
@@ -1730,7 +1730,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void UI_Poll_To_A_Busy_Station_Is_Answered_With_RR()
     {
-        // Unfiled: Enquiry_Response's head decision (added in the 2017
+        // ax25spec#171: Enquiry_Response's head decision (added in the 2017
         // redraw) sends a UI poll, whose frame is neither RR, RNR nor I, down
         // the No branch, which sends RR without testing own receiver busy;
         // the July 1998 edition tested it first. 4.3.3.6 says RR "or RNR, if
@@ -1804,6 +1804,20 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.UnitData);
         result.Violation.Station.Should().Be(Station.B);
         result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Seeded_A_UI_Falling_To_A_Catch_All_Is_Caught()
+    {
+        // The seeded fixture deletes Timer Recovery's UI arms, so B's UI
+        // reaching A there falls to the lower-layer catch-all and is never
+        // delivered. The check keys on the frame, not on the event.
+        var result = Run(Ui(FlowControlAt.Both) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, TablesDir = Fixtures.UiArmDeletedDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[^1].Transition.Should().Be("t25_all_other_primitives__from_lower_layer");
+        result.CounterexampleLength.Should().Be(5);
     }
 
     [Fact]

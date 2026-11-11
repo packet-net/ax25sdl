@@ -104,7 +104,8 @@ UpperEvent(m, p) ==
 FrameInput(m, f, into) ==
     [ev |-> FrameEvent(m, f), pf |-> IF f.pf THEN 1 ELSE 0, cmd |-> IF f.cmd THEN 1 ELSE 0,
      nr |-> f.nr, ns |-> f.ns, data |-> f.data,
-     able |-> ~(PeerDeclinesSabme /\ into = "B" /\ f.type = "SABME"), info |-> ~(UiForm = "long" /\ f.type = "UI")]
+     able |-> ~(PeerDeclinesSabme /\ into = "B" /\ f.type = "SABME"), info |-> ~(UiForm = "long" /\ f.type = "UI"),
+     ftype |-> f.type]
 
 \* The link multiplexer's confirm (pinned semantic 2); a page without the arm
 \* takes it through its lower-layer catch-all.
@@ -263,7 +264,9 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         t3loop == IF ok THEN m.st = "TimerRecovery" /\ (S.t3loop[s] \/ e.ev = "T3_expiry") ELSE S.t3loop[s]
         flowOffNow == ok /\ e.ev = "DL_FLOW_OFF_request"
         flowOnNow == ok /\ e.ev = "DL_FLOW_ON_request"
-        uiv == IF ok /\ e.ev = "UI_received" /\ UnitDataAt # {} /\ "UnitData" \in StepChecks
+        \* Keyed on the frame being UI (ftype), not on the event it is
+        \* dispatched as, so a page that lost its UI arm is caught.
+        uiv == IF ok /\ e.ftype = "UI" /\ UnitDataAt # {} /\ "UnitData" \in StepChecks
                THEN UnitDataCheck(s, pre, e, c.fx) ELSE NoViol
         v2 == IF r.v # NoViol THEN r.v
               ELSE IF uiv # NoViol THEN uiv

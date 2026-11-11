@@ -51,6 +51,9 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which UI Check delivers a UI response.</summary>
     public static string UiResponseDeliveredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-response-delivered");
 
+    /// <summary>The TlaCheck seeded fixture in which Timer Recovery has no UI arm.</summary>
+    public static string UiArmDeletedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-arm-deleted");
+
     /// <summary>The TlaCheck seeded fixture in which Connected has no T3 expiry arm.</summary>
     public static string T3DeadDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead");
 

@@ -52,7 +52,9 @@ LmFx(p) == [kind |-> "lm", frame |-> NoFrm, prim |-> p, detail |-> ""]
 
 \* One injected stimulus (EventInput). pf and cmd are 1, 0 or None (the
 \* stimulus is not a frame); able and info are the two environment atoms.
-Event(ev) == [ev |-> ev, pf |-> None, cmd |-> None, nr |-> None, ns |-> None, data |-> "", able |-> TRUE, info |-> TRUE]
+\* ftype is the received frame's type, "" when the stimulus is not a frame
+\* (the harness's UI check keys on it).
+Event(ev) == [ev |-> ev, pf |-> None, cmd |-> None, nr |-> None, ns |-> None, data |-> "", able |-> TRUE, info |-> TRUE, ftype |-> ""]
 
 \* Finite maps from a sequence number to a payload label, kept as sets of
 \* pairs so that equal maps are equal values whatever built them.

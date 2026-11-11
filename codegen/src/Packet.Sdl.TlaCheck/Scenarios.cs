@@ -39,6 +39,8 @@ public enum TableSetKind
     UiPollUnanswered,
     /// <summary>A seeded-defect fixture (fixtures/tables-ui-response-delivered): UI Check delivers a UI response.</summary>
     UiResponseDelivered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-arm-deleted): Timer Recovery has no UI arm, so a UI falls to its lower-layer catch-all.</summary>
+    UiArmDeleted,
     /// <summary>A seeded-defect fixture (fixtures/tables-t3-dead): Connected has no T3 expiry arm.</summary>
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
@@ -509,15 +511,15 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll,
         }, "Deadlock, 8");
-        Add("ui-v22", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22", "ax25spec#170", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B,
         }, "UnitData at A, 2");
-        Add("ui-v22-poll", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22-poll", "ax25spec#170", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, UiForm = UiForm.Poll,
         }, "UnitData at A, 2");
-        Add("ui-v22-check-off", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22-check-off", "ax25spec#170", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, Invariants = Default & ~Invariants.UnitData,
         }, "Deadlock, 5");
@@ -527,7 +529,7 @@ public static class Scenarios
         {
             FramesAb = 1, FramesBa = 1, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll, Budget = 1, Faults = FaultKinds.Drop,
         }, "clean");
-        Add("ui-poll-busy", "unfiled (H7: Enquiry Response skips the busy test), ax25spec#154 reading", TableSetKind.Current, o => o with
+        Add("ui-poll-busy", "ax25spec#171 (ax25spec#154 reading)", TableSetKind.Current, o => o with
         {
             FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll, LocalBusy = FlowControlAt.B,
         }, "BusyIndication at B, 3");
@@ -545,6 +547,10 @@ public static class Scenarios
         {
             FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Response,
         }, "UnitData at B, 2");
+        Add("seeded-ui-arm-deleted", "seeded (UI handled on a catch-all)", TableSetKind.UiArmDeleted, o => o with
+        {
+            FramesAb = 1, UnitData = FlowControlAt.Both, Budget = 1, Faults = FaultKinds.Drop,
+        }, "UnitData at A, 5");
 
         return list;
     }
