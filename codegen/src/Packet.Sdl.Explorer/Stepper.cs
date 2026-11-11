@@ -39,6 +39,8 @@ public enum MoveKind
     T3Expiry,
     /// <summary>The station's layer 3 sends its UI datagram (<see cref="ExplorerOptions.UnitData"/>), in the form <see cref="ExplorerOptions.UiForm"/> names.</summary>
     UnitData,
+    /// <summary>The station puts its injected frame on the air (<see cref="ExplorerOptions.Inject"/>).</summary>
+    Inject,
     /// <summary>Channel fault: the head frame arrives with an unknown control field (<see cref="FrameErrors.ControlField"/>).</summary>
     CorruptControl,
     /// <summary>Channel fault: the head frame arrives with an information field it may not carry (<see cref="FrameErrors.InfoNotPermitted"/>).</summary>
@@ -54,7 +56,7 @@ public enum MoveKind
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
 public readonly record struct Move(MoveKind Kind, Station Station)
 {
-    public bool IsFault => Kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder || IsCorrupt;
+    public bool IsFault => Kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder or MoveKind.Inject || IsCorrupt;
 
     /// <summary>A frame-error fault (<see cref="ExplorerOptions.FrameErrors"/>).</summary>
     public bool IsCorrupt => Kind is MoveKind.CorruptControl or MoveKind.CorruptInfo or MoveKind.CorruptLength or MoveKind.CorruptN1 or MoveKind.CorruptIResponse;
@@ -145,6 +147,10 @@ public sealed class Stepper
             throw new ArgumentException("a UI form needs a station that sends UI (--unit-data)", nameof(options));
         if (_o.FrameErrors != FrameErrors.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("frame errors are for the table-driven peer only (the v2.0 stub has no frame-error inputs)", nameof(options));
+        if (_o.Inject != FlowControlAt.None && (_o.Peer != PeerKind.Tables || _o.InjectedFrame == InjectedFrame.None))
+            throw new ArgumentException("an injected frame needs the table-driven peer and a form (--inject-frame)", nameof(options));
+        if (_o.InjectedFrame != InjectedFrame.None && _o.Inject == FlowControlAt.None)
+            throw new ArgumentException("an injected frame form needs a station that injects it (--inject)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -534,6 +540,10 @@ public sealed class Stepper
             // Layer 3 sends its UI datagram once, in any state.
             if (SendsUnitData(station) && !s.UiSent(station))
                 moves.Add(new Move(MoveKind.UnitData, station));
+
+            // The harness puts the station's injected frame on the air, once.
+            if (InjectReady(s, station))
+                moves.Add(new Move(MoveKind.Inject, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -606,6 +616,68 @@ public sealed class Stepper
         FrameErrors.Length => ("u_or_s_frame_length_error", "DL-ERROR Indication (N)"),
         _ => ("I_received", "DL-ERROR Indication (O)"),
     };
+
+    private bool Injects(Station station) => _o.Inject switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
+    /// <summary>
+    /// The injected frame's gate: a REJ poll only while the receiver is in
+    /// TimerRecovery (figc4.5's REJ command columns; figc4.4's REJ arms do not
+    /// test the command bit), an SREJ command (P = 0 or 1) while it is in
+    /// Connected or TimerRecovery, each from a sender in one of those and naming a frame
+    /// outstanding at the receiver (the sender's V(r) inside the receiver's
+    /// [V(a), V(s))), so it is a coherent reject; a UA with F = 0 only while
+    /// the receiver waits on a connect or release page; an FRMR only while
+    /// the receiver is in Connected or TimerRecovery.
+    /// </summary>
+    private bool InjectReady(SystemState s, Station station)
+    {
+        if (!Injects(station) || s.Injected(station)) return false;
+        var m = s.Machine(station);
+        var r = s.Machine(SystemState.Peer(station));
+        return _o.InjectedFrame switch
+        {
+            InjectedFrame.RejPoll or InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => IsDataState(m.State)
+                && (_o.InjectedFrame == InjectedFrame.RejPoll ? r.State == "TimerRecovery" : IsDataState(r.State))
+                && Distance(r.Va, m.Vr, r.Modulo) < Distance(r.Va, r.Vs, r.Modulo),
+            InjectedFrame.UaF0 => r.State is "AwaitingConnection" or "AwaitingV22Connection" or "AwaitingRelease",
+            InjectedFrame.Frmr => IsDataState(r.State),
+            _ => false,
+        };
+    }
+
+    /// <summary>Transition ids the harness reports for the injected frames (not table rows).</summary>
+    public static string InjectId(InjectedFrame form) => form switch
+    {
+        InjectedFrame.RejPoll => "pinned:inject_rej_poll",
+        InjectedFrame.SrejCommand => "pinned:inject_srej_command",
+        InjectedFrame.SrejPoll => "pinned:inject_srej_poll",
+        InjectedFrame.UaF0 => "pinned:inject_ua_f0",
+        _ => "pinned:inject_frmr",
+    };
+
+    /// <summary>The station puts its injected frame on the air (<see cref="ExplorerOptions.Inject"/>).</summary>
+    private StepOutcome InjectFrame(SystemState s, Station station, int number)
+    {
+        var m = s.Machine(station);
+        var frame = _o.InjectedFrame switch
+        {
+            InjectedFrame.RejPoll => new Frame("REJ", Command: true, Pf: true, Nr: m.Vr, Ns: null, Data: null),
+            InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => new Frame("SREJ", Command: true, Pf: _o.InjectedFrame == InjectedFrame.SrejPoll, Nr: m.Vr, Ns: null, Data: null),
+            InjectedFrame.UaF0 => new Frame("UA", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
+            _ => new Frame("FRMR", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
+        };
+        var outgoing = new List<Frame>(s.Outgoing(station)) { frame };
+        var next = station == Station.A ? s with { ToB = outgoing, InjectedA = true } : s with { ToA = outgoing, InjectedB = true };
+        var record = new StepRecord(number, station.ToString(), $"{frame.Render()} put on the air by the harness (another implementation)",
+            InjectId(_o.InjectedFrame), new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+        return new StepOutcome(next, record, null);
+    }
 
     private bool SubmitReady(SystemState s, Station station) =>
         _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
@@ -914,6 +986,8 @@ public sealed class Stepper
                 return LocalBusy(s, station, move.Kind == MoveKind.BusyOn, number);
             case MoveKind.UnitData:
                 return SendUnitData(s, station, incoming, number);
+            case MoveKind.Inject:
+                return InjectFrame(s, station, number);
             default:
                 throw new ArgumentOutOfRangeException(nameof(move));
         }

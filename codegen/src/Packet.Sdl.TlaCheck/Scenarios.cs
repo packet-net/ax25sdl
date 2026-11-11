@@ -588,6 +588,21 @@ public static class Scenarios
         {
             FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.A, Budget = 2, Faults = FaultKinds.Drop,
         }, "Deadlock, 14");
+        // Coverage batch 6, part 2: injected frames (Inject, InjectedFrame).
+        ExplorerOptions Inj(ExplorerOptions o, FlowControlAt at, InjectedFrame f) => o with { Inject = at, InjectedFrame = f, Budget = 0 };
+        Add("inj-rej-busy-tr", "ax25spec#171", TableSetKind.Current, o => Inj(o, FlowControlAt.A, InjectedFrame.RejPoll) with
+        {
+            FramesAb = 0, FramesBa = 1, LocalBusy = FlowControlAt.B, Budget = 1, Faults = FaultKinds.Drop,
+        }, "BusyIndication at B, 6");
+        Add("inj-rej-tr", "REJ poll control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.RejPoll) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-srej-tr", "ax25spec#164 (accepted)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejCommand) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-srejp-tr", "ax25spec#164 (accepted)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejPoll) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-ua-cold", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { Seed = SeedKind.Disconnected, FramesAb = 0 }, "clean");
+        Add("inj-ua-v22", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0 }, "clean");
+        Add("inj-ua-release", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { FramesAb = 0, Release = ReleaseBy.A }, "clean");
+        Add("inj-frmr-srej", "FRMR control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 0, Srej = true }, "clean");
+        Add("inj-frmr-t3", "FRMR control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 0, T3 = true }, "clean");
+        Add("inj-frmr-a1", "ax25spec#50", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 1 }, "Deadlock, 4");
         Add("seeded-fe-unreported", "seeded (frame error reported)", TableSetKind.FrameErrorUnreported, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "FrameError at B, 2");
         Add("seeded-fe-arms-deleted", "seeded (frame error on a catch-all)", TableSetKind.FrameErrorArmsDeleted, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "FrameError at A, 3");
         Add("seeded-reset-unconfirmed", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "Deadlock, 4");

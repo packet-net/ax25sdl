@@ -38,6 +38,8 @@ CONSTANTS
     UnitDataAt,        \* stations whose layer 3 sends one UI datagram, once, in any state, subset of {"A", "B"}
     UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
     FrameErrors,       \* corrupted forms a frame may arrive in, subset of {"control", "info", "length", "n1", "iresp"}
+    InjectAt,          \* stations that put one injected frame on the air, once, subset of {"A", "B"}
+    InjectForm,        \* its form: "rej-poll", "srej-command", "srej-poll", "ua-f0", "frmr" (or "none")
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -386,7 +388,7 @@ S0 ==
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE], hb |-> [s \in Stations |-> FALSE],
      uis |-> [s \in Stations |-> FALSE], uid |-> [s \in Stations |-> FALSE],
-     rs |-> [s \in Stations |-> 0], told |-> [s \in Stations |-> 0],
+     rs |-> [s \in Stations |-> 0], told |-> [s \in Stations |-> 0], inj |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -573,6 +575,42 @@ SendUnitData(S, s) ==
               tid |-> IF poll THEN "pinned:ui_poll" ELSE "pinned:ui_response",
               arms |-> {}]
 
+
+\* The injected frame's gate (Stepper.InjectReady): a REJ poll only while the
+\* receiver is in TimerRecovery, an SREJ command (P = 0 or 1) while it is in
+\* Connected or TimerRecovery, each from a sender in one of those and naming a
+\* frame outstanding at the receiver; a UA with F = 0 while the receiver
+\* waits on a connect or release page; an FRMR while the receiver is in
+\* Connected or TimerRecovery.
+InjectReady(S, s) ==
+    /\ s \in InjectAt /\ Table(s) /\ ~S.inj[s]
+    /\ LET m == S.m[s]
+           r == S.m[Other(s)]
+       IN  CASE InjectForm \in {"rej-poll", "srej-command", "srej-poll"} ->
+                    /\ m.st \in DataStates
+                    /\ IF InjectForm = "rej-poll" THEN r.st = "TimerRecovery" ELSE r.st \in DataStates
+                    /\ (m.vr - r.va) % r.mod < (r.vs - r.va) % r.mod
+             [] InjectForm = "ua-f0" -> r.st \in {"AwaitingConnection", "AwaitingV22Connection", "AwaitingRelease"}
+             [] InjectForm = "frmr" -> r.st \in DataStates
+             [] OTHER -> FALSE
+
+\* The harness puts the station's injected frame on the air
+\* (Stepper.InjectFrame), as from another implementation.
+InjectFrame(S, s) ==
+    LET m == S.m[s]
+        f == CASE InjectForm = "rej-poll" -> Frm("REJ", TRUE, TRUE, m.vr, None, "")
+               [] InjectForm = "srej-command" -> Frm("SREJ", TRUE, FALSE, m.vr, None, "")
+               [] InjectForm = "srej-poll" -> Frm("SREJ", TRUE, TRUE, m.vr, None, "")
+               [] InjectForm = "ua-f0" -> Frm("UA", FALSE, FALSE, None, None, "")
+               [] OTHER -> Frm("FRMR", FALSE, FALSE, None, None, "")
+    IN  [sys |-> [S EXCEPT !.ch[Other(s)] = Append(@, f), !.inj[s] = TRUE],
+         viol |-> NoViol,
+         tid |-> CASE InjectForm = "rej-poll" -> "pinned:inject_rej_poll"
+                   [] InjectForm = "srej-command" -> "pinned:inject_srej_command"
+                   [] InjectForm = "srej-poll" -> "pinned:inject_srej_poll"
+                   [] InjectForm = "ua-f0" -> "pinned:inject_ua_f0"
+                   [] OTHER -> "pinned:inject_frmr",
+         arms |-> {}]
 
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
 \* flight, owed, ready to pop or waiting to be submitted anywhere. A pending
@@ -761,6 +799,12 @@ UnitData(s) ==
     /\ CanUnitData(s)
     /\ Take(SendUnitData(sys, s), "unit-data", s, NoFrm)
 
+\* The harness's injected frame (InjectAt). Like a channel fault it is not a
+\* progress move for the liveness checks.
+InjectMove(s) ==
+    /\ viol = NoViol /\ InjectReady(sys, s)
+    /\ Take(InjectFrame(sys, s), "inject", s, NoFrm)
+
 (***************************************************************************)
 (* Quiescence                                                              *)
 (***************************************************************************)
@@ -801,10 +845,10 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 Next ==
     \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A")
        \/ Corrupt("A", "control") \/ Corrupt("A", "info") \/ Corrupt("A", "length") \/ Corrupt("A", "n1") \/ Corrupt("A", "iresp")
-       \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A") \/ UnitData("A")
+       \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A") \/ UnitData("A") \/ InjectMove("A")
     \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B")
        \/ Corrupt("B", "control") \/ Corrupt("B", "info") \/ Corrupt("B", "length") \/ Corrupt("B", "n1") \/ Corrupt("B", "iresp")
-       \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B") \/ UnitData("B")
+       \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B") \/ UnitData("B") \/ InjectMove("B")
     \/ T1("A") \/ T1("B")
     \/ T3("A") \/ T3("B")
     \/ Rest

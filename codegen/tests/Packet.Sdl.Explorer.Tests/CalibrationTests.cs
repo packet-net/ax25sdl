@@ -2059,4 +2059,99 @@ public class CalibrationTests(ITestOutputHelper output)
         var a = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { FrameErrors = FrameErrors.ControlField });
         a.Should().Throw<ArgumentException>();
     }
+    // ─── Coverage batch 6, part 2: injected frames ──────────────────────
+
+    private static ExplorerOptions Inj(FlowControlAt at, InjectedFrame f) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, Inject = at, InjectedFrame = f, FramesAb = 0, Budget = 0,
+    };
+
+    [Fact]
+    public void A_REJ_Poll_To_A_Busy_Station_In_Timer_Recovery_Is_Answered_With_RR()
+    {
+        // inj-rej-busy-tr, ax25spec#171's strongest caller: B's b0 is lost,
+        // B polls from Timer Recovery and enters its busy condition; A's REJ
+        // command P=1 takes figc4.5 t23_rej_received_no_yes_yes_no, whose
+        // Enquiry Response (F = 1) sends a REJ caller down the No branch of
+        // its 2017 head decision to RR Response, past the busy test.
+        var result = Run(Inj(FlowControlAt.A, InjectedFrame.RejPoll) with
+        {
+            FramesBa = 1, LocalBusy = FlowControlAt.B, Budget = 1, Faults = FaultKinds.Drop,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace.Should().Contain(r => r.Transition == Stepper.InjectId(InjectedFrame.RejPoll));
+        result.Trace[^1].Transition.Should().Be("t23_rej_received_no_yes_yes_no");
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Theory]
+    [InlineData(InjectedFrame.RejPoll, 67, "TimerRecovery/t23_rej_received_no_yes_yes_no")]
+    [InlineData(InjectedFrame.SrejCommand, 83, "TimerRecovery/t24_srej_received_no_yes_no_no")]
+    [InlineData(InjectedFrame.SrejPoll, 101, "TimerRecovery/t24_srej_received_no_yes_yes_no")]
+    public void Reject_Commands_In_Timer_Recovery_Are_Accepted(InjectedFrame form, int states, string arm)
+    {
+        // inj-rej-tr, inj-srej-tr, inj-srejp-tr: a REJ poll, and an SREJ
+        // command (ax25spec#164: SREJ is a response only, but figc4.5 acts on
+        // the command: it retransmits the frame named), each naming A's
+        // outstanding a0 while A polls after a lost frame.
+        var result = Run(Inj(FlowControlAt.B, form) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Theory]
+    [InlineData(SeedKind.Disconnected, ReleaseBy.None, 13, "AwaitingConnection/t04_ua_received_no")]
+    [InlineData(SeedKind.AwaitingV22Connection, ReleaseBy.None, 13, "AwaitingV22Connection/t12_ua_received_no")]
+    [InlineData(SeedKind.Connected, ReleaseBy.A, 11, "AwaitingRelease/t03_ua_received_no")]
+    public void A_UA_With_F_0_While_Waiting_Is_Reported_And_Ignored(SeedKind seed, ReleaseBy release, int states, string arm)
+    {
+        // inj-ua-cold, inj-ua-v22, inj-ua-release: DL-ERROR (D), and the
+        // station keeps waiting for the UA with F = 1.
+        var result = Run(Inj(FlowControlAt.B, InjectedFrame.UaF0) with { Seed = seed, Release = release });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Theory]
+    [InlineData(true, false, 5, "Connected/t16_frmr_received_yes")]
+    [InlineData(false, true, 25, "TimerRecovery/t15_frmr_received")]
+    public void An_FRMR_In_The_Data_Phase_Resets_The_Link(bool srej, bool t3, int states, string arm)
+    {
+        // inj-frmr-srej, inj-frmr-t3: with nothing queued the reset loses
+        // nothing and the link comes back up.
+        var result = Run(Inj(FlowControlAt.B, InjectedFrame.Frmr) with { Srej = srej, T3 = t3 });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void An_FRMR_Discards_The_Queue_Unannounced()
+    {
+        // inj-frmr-a1, ax25spec#50 (the comment there names FRMR): figc4.4
+        // t16 re-establishes with Layer 3 Initiated cleared; A's queued a0 is
+        // discarded by Establish_Data_Link and, with V(s) = V(a), the UA
+        // brings no DL-CONNECT Confirm. A's layer 3 hears only DL-ERROR (K).
+        var result = Run(Inj(FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t16_frmr_received_no");
+        result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_no_yes");
+        result.CounterexampleLength.Should().Be(4);
+    }
+
+    [Fact]
+    public void Injected_Frames_Need_A_Form_And_The_Table_Driven_Peer()
+    {
+        var a = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Inject = FlowControlAt.A });
+        a.Should().Throw<ArgumentException>();
+        var b = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, InjectedFrame = InjectedFrame.Frmr });
+        b.Should().Throw<ArgumentException>();
+        var c = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Inject = FlowControlAt.A, InjectedFrame = InjectedFrame.UaF0 });
+        c.Should().Throw<ArgumentException>();
+    }
 }

@@ -43,6 +43,10 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --ui-form plain|poll|response|long   with --unit-data: the datagram's form on the air (default plain, a UI command
                          P=0 through DL_UNIT_DATA_request; poll and response are put on the air by the harness; long
                          goes through the table and fails the receiver's N1 check)
+  --inject A|B|both      that station (or either) puts one injected frame on the air, as from another implementation
+  --inject-frame FORM    with --inject: rej-poll (receiver in TimerRecovery), srej-command (receiver in Connected or
+                         TimerRecovery; srej-poll the same with P=1), each naming a frame outstanding at the receiver, ua-f0 (receiver on a connect or release page) or frmr (receiver in
+                         Connected or TimerRecovery)
   --frame-errors LIST    comma list of corrupted forms a frame may arrive in, as a channel fault under the budget:
                          control, info, length, n1, i-response; the receiver reports each with its DL-ERROR, a
                          reset is honest only on a corrupted frame, and data an honest reset loses is reset-loss
@@ -75,6 +79,8 @@ var longBusy = false;
 var unitData = FlowControlAt.None;
 var uiForm = UiForm.Plain;
 var frameErrors = FrameErrors.None;
+var inject = FlowControlAt.None;
+var injectedFrame = InjectedFrame.None;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
@@ -136,6 +142,26 @@ try
                     "response" => UiForm.Response,
                     "long" => UiForm.Oversize,
                     var v => throw new ArgumentException($"unknown UI form `{v}` (plain, poll, response, long)"),
+                };
+                break;
+            case "--inject":
+                inject = Next(args, ref i) switch
+                {
+                    "A" => FlowControlAt.A,
+                    "B" => FlowControlAt.B,
+                    "both" => FlowControlAt.Both,
+                    var v => throw new ArgumentException($"unknown inject station `{v}` (A, B, both)"),
+                };
+                break;
+            case "--inject-frame":
+                injectedFrame = Next(args, ref i) switch
+                {
+                    "rej-poll" => InjectedFrame.RejPoll,
+                    "srej-command" => InjectedFrame.SrejCommand,
+                    "srej-poll" => InjectedFrame.SrejPoll,
+                    "ua-f0" => InjectedFrame.UaF0,
+                    "frmr" => InjectedFrame.Frmr,
+                    var v => throw new ArgumentException($"unknown injected frame `{v}` (rej-poll, srej-command, srej-poll, ua-f0, frmr)"),
                 };
                 break;
             case "--frame-errors":
@@ -272,6 +298,8 @@ try
         UnitData = unitData,
         UiForm = uiForm,
         FrameErrors = frameErrors,
+        Inject = inject,
+        InjectedFrame = injectedFrame,
         Release = release,
         ReleaseEarly = releaseEarly,
         Reconnect = reconnect,

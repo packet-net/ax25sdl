@@ -206,6 +206,25 @@ public enum FrameErrors
     IResponse = 16,
 }
 
+/// <summary>
+/// A frame the harness puts on the air as from another implementation
+/// (<see cref="ExplorerOptions.InjectedFrame"/>): forms no table sends.
+/// </summary>
+public enum InjectedFrame
+{
+    None,
+    /// <summary>A REJ command with P = 1 and N(r) = the sender's V(r), naming a frame outstanding at the receiver, while the receiver is in TimerRecovery.</summary>
+    RejPoll,
+    /// <summary>An SREJ command (P = 0) with N(r) = the sender's V(r), naming a frame outstanding at the receiver (ax25spec#164: SREJ is a response only).</summary>
+    SrejCommand,
+    /// <summary>The same SREJ command with P = 1.</summary>
+    SrejPoll,
+    /// <summary>A UA response with F = 0, while the receiver waits on a connect or release page.</summary>
+    UaF0,
+    /// <summary>An FRMR response (F = 0), while the receiver is in Connected or TimerRecovery.</summary>
+    Frmr,
+}
+
 /// <summary>The form of a UI datagram on the air (<see cref="ExplorerOptions.UiForm"/>).</summary>
 public enum UiForm
 {
@@ -414,6 +433,25 @@ public sealed record ExplorerOptions
     /// stations only. Off by default.
     /// </summary>
     public FrameErrors FrameErrors { get; init; } = FrameErrors.None;
+
+    /// <summary>
+    /// The stations that put one injected frame on the air, once, in the form
+    /// <see cref="InjectedFrame"/> names, as from another implementation
+    /// (the pattern of the UI poll and response): a REJ command with P = 1
+    /// while the receiver is in TimerRecovery, or an SREJ command while it is
+    /// in Connected or TimerRecovery, each naming a frame outstanding at the
+    /// receiver, from a sender in Connected or TimerRecovery; a UA with F = 0 while the
+    /// receiver waits in AwaitingConnection, AwaitingV22Connection or
+    /// AwaitingRelease; an FRMR while the receiver is in Connected or
+    /// TimerRecovery. No table row runs at the sender (the step log reports
+    /// <c>pinned:inject_*</c>). Not work in flight and, like a channel fault,
+    /// not a move the liveness checks may use. Table-driven peer only. Off by
+    /// default.
+    /// </summary>
+    public FlowControlAt Inject { get; init; } = FlowControlAt.None;
+
+    /// <summary>With <see cref="Inject"/>, the injected frame's form.</summary>
+    public InjectedFrame InjectedFrame { get; init; } = InjectedFrame.None;
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase

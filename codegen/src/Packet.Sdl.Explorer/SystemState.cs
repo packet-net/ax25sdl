@@ -147,6 +147,11 @@ public sealed record SystemState
 
     public int ToldB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.Inject"/>, whether the station has put its injected frame on the air.</summary>
+    public bool InjectedA { get; init; }
+
+    public bool InjectedB { get; init; }
+
     public V20Peer? StubPeer { get; init; }
 
     public DataLinkMachine Machine(Station s) => s == Station.A ? A : B;
@@ -182,6 +187,8 @@ public sealed record SystemState
     public bool UiSent(Station s) => s == Station.A ? UiSentA : UiSentB;
 
     public bool UiDone(Station s) => s == Station.A ? UiDoneA : UiDoneB;
+
+    public bool Injected(Station s) => s == Station.A ? InjectedA : InjectedB;
 
     public int Reset(Station s) => s == Station.A ? ResetA : ResetB;
 
@@ -227,7 +234,8 @@ public sealed record SystemState
           .Append("|t").Append(T3LoopA ? '1' : '0').Append(T3LoopB ? '1' : '0')
           .Append(HeardBusyA ? '1' : '0').Append(HeardBusyB ? '1' : '0')
           .Append("|v").Append(UiSentA ? '1' : '0').Append(UiSentB ? '1' : '0').Append(UiDoneA ? '1' : '0').Append(UiDoneB ? '1' : '0')
-          .Append("|e").Append(Inv(ResetA)).Append(Inv(ResetB)).Append(Inv(ToldA)).Append(Inv(ToldB));
+          .Append("|e").Append(Inv(ResetA)).Append(Inv(ResetB)).Append(Inv(ToldA)).Append(Inv(ToldB))
+          .Append("|i").Append(InjectedA ? '1' : '0').Append(InjectedB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

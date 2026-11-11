@@ -142,6 +142,13 @@ public sealed class Tlc
         if (On(Invariants.BusyIndication)) stepChecks.Add("BusyIndication");
         if (On(Invariants.UnitData)) stepChecks.Add("UnitData");
         if (On(Invariants.FrameError)) stepChecks.Add("FrameError");
+        var injectAt = o.Inject switch
+        {
+            FlowControlAt.A => new[] { "A" },
+            FlowControlAt.B => new[] { "B" },
+            FlowControlAt.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var frameErrors = new List<string>();
         if (o.FrameErrors.HasFlag(FrameErrors.ControlField)) frameErrors.Add("control");
         if (o.FrameErrors.HasFlag(FrameErrors.InfoNotPermitted)) frameErrors.Add("info");
@@ -194,6 +201,16 @@ public sealed class Tlc
             _ => "\"plain\"",
         });
         C("FrameErrors", Set(frameErrors));
+        C("InjectAt", Set(injectAt));
+        C("InjectForm", o.InjectedFrame switch
+        {
+            InjectedFrame.RejPoll => "\"rej-poll\"",
+            InjectedFrame.SrejCommand => "\"srej-command\"",
+            InjectedFrame.SrejPoll => "\"srej-poll\"",
+            InjectedFrame.UaF0 => "\"ua-f0\"",
+            InjectedFrame.Frmr => "\"frmr\"",
+            _ => "\"none\"",
+        });
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
         C("StepChecks", Set(stepChecks));
