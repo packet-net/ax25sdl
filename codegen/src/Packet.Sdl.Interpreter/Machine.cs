@@ -296,8 +296,10 @@ public sealed class DataLinkMachine
         // Pinned delegated semantics (docs/explorer.md): a re-queued old
         // frame popping in an information-transfer state is re-emitted with
         // its original N(s) rather than run through the table's fresh-frame
-        // pop path, which would renumber it from V(s).
-        if (_poppedEntry is { OldNs: not null } && State is "Connected" or "TimerRecovery")
+        // pop path, which would renumber it from V(s). While the peer is busy
+        // it takes the table's peer-busy pop arm instead, which pushes it back
+        // (§6.4.9: a station that receives RNR stops sending I frames).
+        if (_poppedEntry is { OldNs: not null } && State is "Connected" or "TimerRecovery" && !PeerReceiverBusy)
             return RetransmitOldFrame(_poppedEntry);
 
         var page = _tables.States[State];
@@ -341,8 +343,10 @@ public sealed class DataLinkMachine
     /// ax25_link.c resend_for_srej / the retransmission loop; prose §6.4.7
     /// and §6.4.8 "retransmits the I frames"). So: the retained copy goes
     /// out with its original N(s), the current V(r) as N(r) and P=0; V(s) is
-    /// untouched; the peer-busy and window-full pop checks do not apply (the
-    /// frame is already inside the window); the frame carries an
+    /// untouched; the window-full pop check does not apply (the frame is
+    /// already inside the window), but the peer-busy one does: while the peer
+    /// is busy the entry takes the table's pop arm, which pushes it back
+    /// (coverage batch 4; nothing reached it before); the frame carries an
     /// acknowledgement, so Acknowledge Pending clears and, mirroring the
     /// fresh-frame pop, T1 starts (stopping T3) if it is not already running.
     /// </summary>

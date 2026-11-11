@@ -102,6 +102,11 @@ public sealed record SystemState
 
     public bool HeardGiveUpB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.T3"/>: station A's current Timer Recovery loop was entered by a T3 expiry (a keepalive poll, no loss behind it), so its give-up threshold is N2, not N2 + 1. Cleared when the station leaves Timer Recovery.</summary>
+    public bool T3LoopA { get; init; }
+
+    public bool T3LoopB { get; init; }
+
     /// <summary>With <see cref="ExplorerOptions.LocalBusy"/>: station A has entered its local busy condition (once per scenario).</summary>
     public bool BusyUsedA { get; init; }
 
@@ -135,6 +140,8 @@ public sealed record SystemState
     public bool HeardGiveUp(Station s) => s == Station.A ? HeardGiveUpA : HeardGiveUpB;
 
     public bool BusyUsed(Station s) => s == Station.A ? BusyUsedA : BusyUsedB;
+
+    public bool T3Loop(Station s) => s == Station.A ? T3LoopA : T3LoopB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -172,7 +179,8 @@ public sealed record SystemState
           .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0')
           .Append("|c").Append(ReconnectedA ? '1' : '0').Append(ReconnectedB ? '1' : '0').Append(ReconnectPendingA ? '1' : '0').Append(ReconnectPendingB ? '1' : '0')
           .Append("|u").Append(Inv(ReportA)).Append(Inv(ReportB))
-          .Append("|y").Append(BusyUsedA ? '1' : '0').Append(BusyUsedB ? '1' : '0');
+          .Append("|y").Append(BusyUsedA ? '1' : '0').Append(BusyUsedB ? '1' : '0')
+          .Append("|t").Append(T3LoopA ? '1' : '0').Append(T3LoopB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

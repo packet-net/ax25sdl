@@ -122,6 +122,8 @@ public sealed class Stepper
             throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
         if (_o.LocalBusy != FlowControlAt.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
+        if (_o.LongBusy && _o.LocalBusy == FlowControlAt.None)
+            throw new ArgumentException("a long busy period needs a busy station (--local-busy)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -330,10 +332,13 @@ public sealed class Stepper
     /// it gives up honestly there. Establish_Data_Link starts RC at 1, so the
     /// connect loops give up after N2 transmissions; DL-DISCONNECT starts RC
     /// at 0, and Connected's T1 expiry sets it to 1 only after a first loss,
-    /// so AwaitingRelease and TimerRecovery give up after N2 + 1.
+    /// so AwaitingRelease and TimerRecovery give up after N2 + 1. With
+    /// <see cref="ExplorerOptions.T3"/>, a Timer Recovery loop entered by a T3
+    /// expiry (figc4.4 t13: RC := 1, then the poll) gives up after N2 polls
+    /// with no loss before it, so its threshold is N2.
     /// </summary>
-    private int GiveUpThreshold(string page) =>
-        page is "AwaitingConnection" or "AwaitingV22Connection" ? _o.N2 : _o.N2 + 1;
+    private int GiveUpThreshold(string page, bool t3Loop) =>
+        page is "AwaitingConnection" or "AwaitingV22Connection" || (page == "TimerRecovery" && t3Loop) ? _o.N2 : _o.N2 + 1;
 
     /// <summary>One-line summary of a station for the counterexample log (the stub's own summary when it plays B).</summary>
     private static string SummaryOf(SystemState s, Station station) =>
@@ -455,7 +460,7 @@ public sealed class Stepper
         {
             foreach (var station in new[] { Station.A, Station.B })
             {
-                if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry"))
+                if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry") && !BusyHoldsT1(s, station))
                     moves.Add(new Move(MoveKind.T1Expiry, station));
             }
             // T3 (the idle keepalive) fires under the same rule and only while
@@ -494,6 +499,23 @@ public sealed class Stepper
         FlowControlAt.B => station == Station.B,
         _ => false,
     };
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.LocalBusy"/> and not
+    /// <see cref="ExplorerOptions.LongBusy"/>: a busy period is short, so it
+    /// leaves the peer at least one retry for the poll that finds it cleared.
+    /// Every T1 expiry in Timer Recovery costs a retry (figc4.5 t21 counts RC
+    /// up, and an RNR answer does not reset it), so while the station is busy
+    /// its peer's T1 does not fire in Timer Recovery once RC has reached
+    /// N2 - 1.
+    /// </summary>
+    private bool BusyHoldsT1(SystemState s, Station station)
+    {
+        if (_o.LocalBusy == FlowControlAt.None || _o.LongBusy) return false;
+        var peer = SystemState.Peer(station);
+        var m = s.Machine(station);
+        return LocalBusies(peer) && s.Machine(peer).OwnReceiverBusy && m.State == "TimerRecovery" && m.Rc >= _o.N2 - 1;
+    }
 
     private bool BusyOnReady(SystemState s, Station station) =>
         LocalBusies(station) && !s.BusyUsed(station) && IsDataState(s.Machine(station).State) && !s.Machine(station).OwnReceiverBusy;
@@ -937,8 +959,13 @@ public sealed class Stepper
         {
             if (connectReported || acked > s.Acked(station)) losses = 0;
             if (input!.Event == "T1_expiry" && m.State == "Disconnected")
-                gaveUp = Math.Max(gaveUp, losses >= GiveUpThreshold(pre.State) ? Honest : Unjustified);
+                gaveUp = Math.Max(gaveUp, losses >= GiveUpThreshold(pre.State, s.T3Loop(station)) ? Honest : Unjustified);
         }
+        // A Timer Recovery loop entered by T3 lasts until the station leaves
+        // Timer Recovery.
+        var t3Loop = result is not null
+            ? m.State == "TimerRecovery" && (s.T3Loop(station) || input!.Event == "T3_expiry")
+            : s.T3Loop(station);
 
         if (violation is null && On(Invariants.DefinedState) && !KnownStates.Contains(m.State))
             violation = new Violation(Invariants.DefinedState, station, $"station {station} is in undefined state `{m.State}`");
@@ -979,6 +1006,8 @@ public sealed class Stepper
             LossesB = station == Station.B ? losses : s.LossesB,
             GaveUpA = station == Station.A ? gaveUp : s.GaveUpA,
             GaveUpB = station == Station.B ? gaveUp : s.GaveUpB,
+            T3LoopA = station == Station.A ? t3Loop : s.T3LoopA,
+            T3LoopB = station == Station.B ? t3Loop : s.T3LoopB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,

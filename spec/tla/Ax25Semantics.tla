@@ -516,8 +516,9 @@ Prepare(m, e) ==
 
 \* Pinned semantic 1: a re-queued old frame popping in an information-
 \* transfer state is re-emitted with its original N(s), not renumbered by
-\* the table's fresh-frame path.
-RetransmitsOldFrame(c) == c.hasPop /\ c.pop.old # None /\ c.st \in {"Connected", "TimerRecovery"}
+\* the table's fresh-frame path. While the peer is busy it takes the table's
+\* peer-busy pop arm, which pushes it back (coverage batch 4).
+RetransmitsOldFrame(c) == c.hasPop /\ c.pop.old # None /\ c.st \in {"Connected", "TimerRecovery"} /\ ~c.peer
 
 \* Keep only the retained frames still outstanding: N(s) in [V(a), V(s)).
 Prune(c) == [c EXCEPT !.ret = {pr \in @ : Dist(c, c.va, pr[1]) < Dist(c, c.va, c.vs)}]

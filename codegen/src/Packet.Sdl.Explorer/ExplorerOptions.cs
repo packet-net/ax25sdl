@@ -263,6 +263,18 @@ public sealed record ExplorerOptions
     public FlowControlAt LocalBusy { get; init; } = FlowControlAt.None;
 
     /// <summary>
+    /// With <see cref="LocalBusy"/>, the busy condition may outlast the peer's
+    /// retries. By default it does not: it leaves the peer at least one retry
+    /// for the poll that finds it cleared, so while a station is busy its
+    /// peer's T1 does not fire in Timer Recovery once RC has reached N2 - 1
+    /// (each RNR-answered poll costs a retry: figc4.5 counts RC up on T1 and
+    /// an RNR answer does not reset it). With this
+    /// on, that hold is lifted and a long busy period can end the link
+    /// (figc4.5 t21 with peer busy, DL-ERROR U or I). Off by default.
+    /// </summary>
+    public bool LongBusy { get; init; }
+
+    /// <summary>
     /// Model T3 expiry: a T3_expiry move at a station whose T3 is running and
     /// whose T1 is not, under the quiescent-timeout rule T1 uses (nothing in
     /// flight, owed, ready to pop or waiting to be submitted anywhere), on a
