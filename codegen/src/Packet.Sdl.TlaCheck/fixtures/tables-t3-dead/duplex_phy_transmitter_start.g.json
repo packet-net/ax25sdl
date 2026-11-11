@@ -1,0 +1,56 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "duplex_phy",
+  "state": "TransmitterStart",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2b.4",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_t105_expiry_yes",
+      "from": "TransmitterStart",
+      "on": "T105_expiry",
+      "guard": "interrupted",
+      "actions": [],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t01_t105_expiry_no",
+      "from": "TransmitterStart",
+      "on": "T105_expiry",
+      "guard": "not interrupted",
+      "actions": [
+        {
+          "verb": "PH_SEIZE_confirm",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_all_other_primitives__from_upper_layer",
+      "from": "TransmitterStart",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

@@ -32,6 +32,12 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          has given up honestly, and a settled honest give-up with everything delivered is quiescent
                          (one that lost data is a give-up-loss violation; an unjustified give-up never rests)
   --flow-control A|B|both   let that station's layer 3 issue DL_FLOW_OFF_request then DL_FLOW_ON_request
+  --local-busy A|B|both  that station enters a local busy condition once on an established link (own receiver busy,
+                         RNR, as the #43-fixed DL-FLOW-OFF arm draws it) and may leave it (RR) while it holds
+  --long-busy            with --local-busy: the busy period may outlast the peer's N2 retries (by default the peer's
+                         T1 holds back the expiry that would exhaust N2 while the station is busy)
+  --t3                   model T3 expiry (idle keepalive, T1 not running); at rest a Connected station keeps T1 or
+                         T3 running, and with --accept-give-up a station left up after its peer gave up never settles
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
   --disable LIST         comma list of invariants to switch off: defined-state, sequence, delivery,
@@ -54,6 +60,9 @@ var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
 var peer = PeerKind.Tables;
 var flowControl = FlowControlAt.None;
+var localBusy = FlowControlAt.None;
+var t3 = false;
+var longBusy = false;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
@@ -87,6 +96,18 @@ try
                     var v => throw new ArgumentException($"unknown flow-control station `{v}` (A, B, both, none)"),
                 };
                 break;
+            case "--local-busy":
+                localBusy = Next(args, ref i) switch
+                {
+                    "A" or "a" => FlowControlAt.A,
+                    "B" or "b" => FlowControlAt.B,
+                    "both" => FlowControlAt.Both,
+                    "none" => FlowControlAt.None,
+                    var v => throw new ArgumentException($"unknown local-busy station `{v}` (A, B, both, none)"),
+                };
+                break;
+            case "--t3": t3 = true; break;
+            case "--long-busy": longBusy = true; break;
             case "--release":
                 release = Next(args, ref i) switch
                 {
@@ -168,6 +189,8 @@ try
                         "deadlock" => Invariants.Deadlock,
                         "flow-off-delivery" => Invariants.FlowOffDelivery,
                         "busy-tracks-flow" => Invariants.BusyTracksFlow,
+                        "peer-busy-hold" => Invariants.PeerBusyHold,
+                        "busy-indication" => Invariants.BusyIndication,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }
@@ -195,6 +218,9 @@ try
         DataAfterConfirm = dataAfterConfirm,
         Peer = peer,
         FlowControl = flowControl,
+        LocalBusy = localBusy,
+        T3 = t3,
+        LongBusy = longBusy,
         Release = release,
         ReleaseEarly = releaseEarly,
         Reconnect = reconnect,

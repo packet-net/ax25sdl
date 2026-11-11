@@ -31,6 +31,12 @@ public enum MoveKind
     Release,
     /// <summary>DL_CONNECT_request from the station's layer 3 on a live or waiting link (<see cref="ExplorerOptions.Reconnect"/>).</summary>
     Reconnect,
+    /// <summary>The station enters its local busy condition (<see cref="ExplorerOptions.LocalBusy"/>): own receiver busy, RNR response.</summary>
+    BusyOn,
+    /// <summary>The station leaves its local busy condition: own receiver busy cleared, RR command.</summary>
+    BusyOff,
+    /// <summary>T3_expiry at the station (<see cref="ExplorerOptions.T3"/>; quiescent-timeout rule, T1 not running).</summary>
+    T3Expiry,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -114,6 +120,10 @@ public sealed class Stepper
             throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
         if (_o.Reconnect != ReconnectBy.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
+        if (_o.LocalBusy != FlowControlAt.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
+        if (_o.LongBusy && _o.LocalBusy == FlowControlAt.None)
+            throw new ArgumentException("a long busy period needs a busy station (--local-busy)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -239,8 +249,8 @@ public sealed class Stepper
         // variables or timers).
         var bAtRest = s.StubPeer is not null
             ? s.StubPeer.Connected
-            : QuiescentState(s.B.State) && s.B.QueueEntries.Count == 0 && s.B.Vs == s.B.Va && !s.SeizeOwedB;
-        return QuiescentState(s.A.State) && bAtRest
+            : QuiescentState(s.B.State) && s.B.QueueEntries.Count == 0 && s.B.Vs == s.B.Va && !s.SeizeOwedB && KeepsAlive(s.B);
+        return QuiescentState(s.A.State) && bAtRest && KeepsAlive(s.A)
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && s.A.QueueEntries.Count == 0
             && s.A.Vs == s.A.Va
@@ -266,6 +276,15 @@ public sealed class Stepper
         };
         return Match(s.ReportA, s.A.State) && (s.StubPeer is not null || Match(s.ReportB, s.B.State));
     }
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.T3"/>, the keepalive rule: a station at
+    /// rest in Connected has T1 or T3 running, so an idle link still polls its
+    /// peer (§4.4.5.2: T3 runs whenever T1 does not on an established link).
+    /// Without T3 modelled the timer is not observed and every station passes.
+    /// </summary>
+    private bool KeepsAlive(DataLinkMachine m) =>
+        !_o.T3 || m.State != "Connected" || m.T1 == TimerStatus.Running || m.T3 == TimerStatus.Running;
 
     private const int Honest = 1;
     private const int Unjustified = 2;
@@ -299,8 +318,10 @@ public sealed class Stepper
         if (!ReportsMatch(s)) return false;
         // A station still up counts only if nothing its peer sent after giving
         // up reached it: one that received the DM and stayed up is not settled.
+        // With T3 modelled none still up is: its T3 polls and finds the peer
+        // gone, so the give-up has settled only once both are Disconnected.
         bool Settled(DataLinkMachine m, bool heard) =>
-            m.State == "Disconnected" || (!heard && QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
+            m.State == "Disconnected" || (!_o.T3 && !heard && QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
         return Settled(s.A, s.HeardGiveUpA) && (s.StubPeer is not null || Settled(s.B, s.HeardGiveUpB))
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && !s.SeizeOwedA && !s.SeizeOwedB;
@@ -311,10 +332,13 @@ public sealed class Stepper
     /// it gives up honestly there. Establish_Data_Link starts RC at 1, so the
     /// connect loops give up after N2 transmissions; DL-DISCONNECT starts RC
     /// at 0, and Connected's T1 expiry sets it to 1 only after a first loss,
-    /// so AwaitingRelease and TimerRecovery give up after N2 + 1.
+    /// so AwaitingRelease and TimerRecovery give up after N2 + 1. With
+    /// <see cref="ExplorerOptions.T3"/>, a Timer Recovery loop entered by a T3
+    /// expiry (figc4.4 t13: RC := 1, then the poll) gives up after N2 polls
+    /// with no loss before it, so its threshold is N2.
     /// </summary>
-    private int GiveUpThreshold(string page) =>
-        page is "AwaitingConnection" or "AwaitingV22Connection" ? _o.N2 : _o.N2 + 1;
+    private int GiveUpThreshold(string page, bool t3Loop) =>
+        page is "AwaitingConnection" or "AwaitingV22Connection" || (page == "TimerRecovery" && t3Loop) ? _o.N2 : _o.N2 + 1;
 
     /// <summary>One-line summary of a station for the counterexample log (the stub's own summary when it plays B).</summary>
     private static string SummaryOf(SystemState s, Station station) =>
@@ -416,6 +440,13 @@ public sealed class Stepper
             // Layer 3 resets a live or waiting link, under the same gate.
             if (ReconnectReady(s, station))
                 moves.Add(new Move(MoveKind.Reconnect, station));
+
+            // The local busy condition: entered once on an established link,
+            // left whenever it still holds.
+            if (BusyOnReady(s, station))
+                moves.Add(new Move(MoveKind.BusyOn, station));
+            if (BusyOffReady(s, station))
+                moves.Add(new Move(MoveKind.BusyOff, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -429,8 +460,22 @@ public sealed class Stepper
         {
             foreach (var station in new[] { Station.A, Station.B })
             {
-                if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry"))
+                if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry") && !BusyHoldsT1(s, station))
                     moves.Add(new Move(MoveKind.T1Expiry, station));
+            }
+            // T3 (the idle keepalive) fires under the same rule and only while
+            // no T1 runs at either station: the figures stop T3 whenever they
+            // start T1, and T3 is longer than T1 (§6.7.1.3), so a running T1,
+            // here or at the peer, expires first.
+            if (_o.T3 && s.A.T1 != TimerStatus.Running && (s.StubPeer is not null || s.B.T1 != TimerStatus.Running))
+            {
+                foreach (var station in new[] { Station.A, Station.B })
+                {
+                    if (station == Station.B && s.StubPeer is not null) continue;
+                    var m = s.Machine(station);
+                    if (m.T3 == TimerStatus.Running && Handles(m, "T3_expiry"))
+                        moves.Add(new Move(MoveKind.T3Expiry, station));
+                }
             }
         }
 
@@ -448,6 +493,37 @@ public sealed class Stepper
     private bool ReconnectReady(SystemState s, Station station) =>
         Reconnects(station) && !s.Reconnected(station) && IsLinkState(s.Machine(station).State)
         && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
+
+    private bool LocalBusies(Station station) => _o.LocalBusy switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.LocalBusy"/> and not
+    /// <see cref="ExplorerOptions.LongBusy"/>: a busy period is short, so it
+    /// leaves the peer at least one retry for the poll that finds it cleared.
+    /// Every T1 expiry in Timer Recovery costs a retry (figc4.5 t21 counts RC
+    /// up, and an RNR answer does not reset it), so while the station is busy
+    /// its peer's T1 does not fire in Timer Recovery once RC has reached
+    /// N2 - 1.
+    /// </summary>
+    private bool BusyHoldsT1(SystemState s, Station station)
+    {
+        if (_o.LocalBusy == FlowControlAt.None || _o.LongBusy) return false;
+        var peer = SystemState.Peer(station);
+        var m = s.Machine(station);
+        return LocalBusies(peer) && s.Machine(peer).OwnReceiverBusy && m.State == "TimerRecovery" && m.Rc >= _o.N2 - 1;
+    }
+
+    private bool BusyOnReady(SystemState s, Station station) =>
+        LocalBusies(station) && !s.BusyUsed(station) && IsDataState(s.Machine(station).State) && !s.Machine(station).OwnReceiverBusy;
+
+    private bool BusyOffReady(SystemState s, Station station) =>
+        LocalBusies(station) && s.BusyUsed(station) && IsDataState(s.Machine(station).State) && s.Machine(station).OwnReceiverBusy;
 
     private bool DropAllowed(Frame head, Station into)
     {
@@ -527,6 +603,26 @@ public sealed class Stepper
     {
         ArgumentNullException.ThrowIfNull(s);
         var outcome = ApplyMove(s, move, number);
+        // The peer-busy hold: an RNR reaching a table-driven station raises
+        // it, and a frame that clears the busy condition or resets or ends the
+        // link lowers it; an I frame sent while it is up is a violation.
+        if (move.Kind is MoveKind.Deliver or MoveKind.Duplicate && !(move.Station == Station.B && s.StubPeer is not null))
+        {
+            var heard = HeardBusyAfter(s.HeardBusy(move.Station), s.Incoming(move.Station)[0].Type);
+            outcome = outcome with
+            {
+                Next = move.Station == Station.A ? outcome.Next with { HeardBusyA = heard } : outcome.Next with { HeardBusyB = heard },
+            };
+        }
+        else if (move.Kind == MoveKind.Pop && outcome.Violation is null && On(Invariants.PeerBusyHold) && s.HeardBusy(move.Station)
+                 && outcome.Record.Effects.Any(e => e.StartsWith("frame I ", StringComparison.Ordinal)))
+        {
+            outcome = outcome with
+            {
+                Violation = new Violation(Invariants.PeerBusyHold, move.Station,
+                    $"station {move.Station} sent an I frame although its peer's RNR has not been cleared (section 6.4.9: a station that receives RNR stops transmitting I frames until the busy condition is cleared)"),
+            };
+        }
         // The give-up rule: a frame reaching a station after its peer gave up
         // was sent at or after the give-up (T1 only fires with both channels
         // empty), so the station has heard it.
@@ -539,6 +635,14 @@ public sealed class Stepper
         }
         return outcome;
     }
+
+    /// <summary>The peer-busy hold after receiving a frame of this type: RNR raises it; RR, REJ, SREJ and the frames that reset or end the link lower it; anything else leaves it.</summary>
+    private static bool HeardBusyAfter(bool heard, string type) => type switch
+    {
+        "RNR" => true,
+        "RR" or "REJ" or "SREJ" or "SABM" or "SABME" or "UA" or "DM" or "DISC" or "FRMR" => false,
+        _ => heard,
+    };
 
     private StepOutcome ApplyMove(SystemState s, Move move, int number)
     {
@@ -628,9 +732,57 @@ public sealed class Stepper
             }
             case MoveKind.T1Expiry:
                 return Inject(s, station, new EventInput("T1_expiry"), "T1 expiry (quiescent timeout: nothing in flight)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.T3Expiry:
+                return Inject(s, station, new EventInput("T3_expiry"), "T3 expiry (idle keepalive: nothing in flight, T1 not running)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.BusyOn:
+            case MoveKind.BusyOff:
+                return LocalBusy(s, station, move.Kind == MoveKind.BusyOn, number);
             default:
                 throw new ArgumentOutOfRangeException(nameof(move));
         }
+    }
+
+    /// <summary>Transition ids the harness reports for the local busy condition (not table rows).</summary>
+    public const string BusyEnterId = "pinned:local_busy_enter";
+
+    public const string BusyLeaveId = "pinned:local_busy_leave";
+
+    /// <summary>
+    /// Enter or leave the local busy condition (<see cref="ExplorerOptions.LocalBusy"/>):
+    /// the action stacks the figures draw for DL-FLOW-OFF and DL-FLOW-ON
+    /// Request with #43 and H3 fixed. Entering: Set Own Receiver Busy,
+    /// N(r) := V(r), RNR response F = 0, Clear Acknowledge Pending. Leaving:
+    /// Clear Own Receiver Busy, N(r) := V(r), RR command P = 0, Clear
+    /// Acknowledge Pending, and when T1 is not running Stop T3, Start T1. No
+    /// table row runs, so no per-step check can fire here.
+    /// </summary>
+    private static StepOutcome LocalBusy(SystemState s, Station station, bool enter, int number)
+    {
+        var m = s.Machine(station).Clone();
+        m.SetVariable("own_receiver_busy", enter ? "true" : "false");
+        m.SetVariable("ack_pending", "false");
+        Frame frame;
+        if (enter)
+        {
+            frame = new Frame("RNR", Command: false, Pf: false, Nr: m.Vr, Ns: null, Data: null);
+        }
+        else
+        {
+            frame = new Frame("RR", Command: true, Pf: false, Nr: m.Vr, Ns: null, Data: null);
+            if (m.T1 != TimerStatus.Running)
+            {
+                m.SetTimer("t3", TimerStatus.Stopped);
+                m.SetTimer("t1", TimerStatus.Running);
+            }
+        }
+        var outgoing = new List<Frame>(s.Outgoing(station)) { frame };
+        var next = station == Station.A
+            ? s with { A = m, ToB = outgoing, BusyUsedA = s.BusyUsedA || enter }
+            : s with { B = m, ToA = outgoing, BusyUsedB = s.BusyUsedB || enter };
+        var record = new StepRecord(number, station.ToString(),
+            enter ? "local busy condition entered (own receiver busy, RNR)" : "local busy condition cleared (RR)",
+            enter ? BusyEnterId : BusyLeaveId, new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+        return new StepOutcome(next, record, null);
     }
 
     private EventInput? FrameInput(DataLinkMachine m, Frame frame, Station into)
@@ -744,6 +896,8 @@ public sealed class Stepper
                         outgoing.Add(frame);
                         if (violation is null && frame.IsReject && On(Invariants.RejectCoherence))
                             violation = EmitterRejectCheck(station, m, frame);
+                        if (violation is null && _o.LocalBusy != FlowControlAt.None && On(Invariants.BusyIndication))
+                            violation = BusyIndicationCheck(station, m, frame);
                         break;
                     }
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
@@ -752,6 +906,14 @@ public sealed class Stepper
                         {
                             violation = new Violation(Invariants.FlowOffDelivery, station,
                                 $"station {station} delivered `{ue.Detail}` upward while its layer 3 has flow off (DL_FLOW_OFF_request issued and not yet lifted): the busy condition did not hold the data back");
+                        }
+                        // With the local busy condition modelled, a station
+                        // whose own receiver was busy when the event arrived
+                        // delivers nothing either (§6.4.10).
+                        if (violation is null && On(Invariants.FlowOffDelivery) && _o.LocalBusy != FlowControlAt.None && pre.OwnReceiverBusy)
+                        {
+                            violation = new Violation(Invariants.FlowOffDelivery, station,
+                                $"station {station} delivered `{ue.Detail}` upward while its own receiver is busy (local busy condition): the busy condition did not hold the data back");
                         }
                         var submitted = Submitted(peer);
                         var expected = delivered < submitted.Length ? submitted[delivered] : null;
@@ -829,8 +991,13 @@ public sealed class Stepper
         {
             if (connectReported || acked > s.Acked(station)) losses = 0;
             if (input!.Event == "T1_expiry" && m.State == "Disconnected")
-                gaveUp = Math.Max(gaveUp, losses >= GiveUpThreshold(pre.State) ? Honest : Unjustified);
+                gaveUp = Math.Max(gaveUp, losses >= GiveUpThreshold(pre.State, s.T3Loop(station)) ? Honest : Unjustified);
         }
+        // A Timer Recovery loop entered by T3 lasts until the station leaves
+        // Timer Recovery.
+        var t3Loop = result is not null
+            ? m.State == "TimerRecovery" && (s.T3Loop(station) || input!.Event == "T3_expiry")
+            : s.T3Loop(station);
 
         if (violation is null && On(Invariants.DefinedState) && !KnownStates.Contains(m.State))
             violation = new Violation(Invariants.DefinedState, station, $"station {station} is in undefined state `{m.State}`");
@@ -871,6 +1038,8 @@ public sealed class Stepper
             LossesB = station == Station.B ? losses : s.LossesB,
             GaveUpA = station == Station.A ? gaveUp : s.GaveUpA,
             GaveUpB = station == Station.B ? gaveUp : s.GaveUpB,
+            T3LoopA = station == Station.A ? t3Loop : s.T3LoopA,
+            T3LoopB = station == Station.B ? t3Loop : s.T3LoopB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
@@ -906,6 +1075,13 @@ public sealed class Stepper
                 $"station {station}: SREJ exception count {Inv(m.SrejectException)} exceeds the window k={Inv(m.K)}: more selective rejects outstanding than there can be gaps (state {m.State})");
         return null;
     }
+
+    /// <summary>A station whose own receiver is busy sends RNR, not RR, REJ or SREJ (§6.4.10).</summary>
+    private static Violation? BusyIndicationCheck(Station station, DataLinkMachine m, Frame frame) =>
+        m.OwnReceiverBusy && frame.Type is "RR" or "REJ" or "SREJ"
+            ? new Violation(Invariants.BusyIndication, station,
+                $"station {station} sent {frame.Render()} while its own receiver is busy: a busy station indicates it with RNR (section 6.4.10)")
+            : null;
 
     /// <summary>Emitter side: a REJ/SREJ with N(r)=x must name V(r) or a not-yet-held frame inside the receive window.</summary>
     private static Violation? EmitterRejectCheck(Station station, DataLinkMachine m, Frame frame)

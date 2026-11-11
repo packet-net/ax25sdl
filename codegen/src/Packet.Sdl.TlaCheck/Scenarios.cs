@@ -23,6 +23,16 @@ public enum TableSetKind
     ReconnectSwallowed,
     /// <summary>A seeded-defect fixture (fixtures/tables-confirm-as-disconnect): AwaitingConnection reports a completed connect as DL-DISCONNECT Indication.</summary>
     ConfirmAsDisconnect,
+    /// <summary>A seeded-defect fixture (fixtures/tables-rnr-ignored): an RNR in Connected does not set peer receiver busy.</summary>
+    RnrIgnored,
+    /// <summary>A seeded-defect fixture (fixtures/tables-busy-delivers): Connected's own-busy test on I frames reads peer receiver busy.</summary>
+    BusyDelivers,
+    /// <summary>A seeded-defect fixture (fixtures/tables-busy-says-rr): a busy station answers a poll with RR.</summary>
+    BusySaysRr,
+    /// <summary>A seeded-defect fixture (fixtures/tables-t3-dead): Connected has no T3 expiry arm.</summary>
+    T3Dead,
+    /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
+    NoKeepalive,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -398,6 +408,70 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A,
         }, "Deadlock, 3");
+
+        // Coverage batch 4: the peer-busy family. A local busy condition
+        // (ExplorerOptions.LocalBusy) is entered once with what the #43-fixed
+        // DL-FLOW-OFF arm draws (own receiver busy, RNR with V(r)) and left
+        // with what DL-FLOW-ON draws (RR); by default it is short (the peer's
+        // T1 holds back once RC reaches N2 - 1).
+        Add("busy-b", "peer-busy control", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "clean");
+        Add("busy-a-ba2", "peer-busy control", TableSetKind.Current, o => o with { FramesAb = 1, FramesBa = 2, LocalBusy = FlowControlAt.A }, "clean");
+        Add("busy-both-trq", "peer-busy control (behind #91)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.Both, TimerRecoveryIsQuiescent = true,
+        }, "clean");
+        Add("busy-b-b1", "#91 (after a busy period)", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B, Budget = 1 }, "Deadlock, 21");
+        Add("busy-b-long", "unfiled (RNR answers count RC)", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B, LongBusy = true }, "Deadlock, 18");
+        Add("busy-b-ro", "ax25spec#95 (H4), H2", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, LocalBusy = FlowControlAt.B, Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+            Invariants = Default & ~Invariants.RejectCoherence,
+        }, "MachineError at A, 16");
+        // H3: once own receiver busy is set, the table's own DL-FLOW-OFF busy
+        // arm emits RNR with no N(r) staged (both #43 checks off, so the
+        // search gets past #43 to it).
+        Add("h3-busy-flow-off", "#43 (H3)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, LocalBusy = FlowControlAt.B, FlowControl = FlowControlAt.B,
+            Invariants = Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery),
+        }, "MachineError at B, 4");
+        Add("d43-tr", "#43 (the Timer Recovery arms)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, FlowControl = FlowControlAt.B,
+            Invariants = Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery),
+        }, "clean");
+        Add("seeded-rnr-ignored", "seeded (peer-busy hold)", TableSetKind.RnrIgnored, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "PeerBusyHold at A, 3");
+        Add("seeded-busy-delivers", "seeded (busy delivery)", TableSetKind.BusyDelivers, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "FlowOffDelivery at B, 3");
+        Add("seeded-busy-says-rr", "seeded (busy indication)", TableSetKind.BusySaysRr, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "BusyIndication at B, 4");
+
+        // Coverage batch 4: T3 (ExplorerOptions.T3). The keepalive fires only
+        // when nothing is in flight and no T1 runs at either station.
+        Add("t3-idle", "T3 control", TableSetKind.Current, o => o with { FramesAb = 0, T3 = true }, "clean");
+        Add("t3-data", "T3 control", TableSetKind.Current, o => o with { FramesAb = 2, FramesBa = 1, Budget = 1, T3 = true }, "clean");
+        Add("t3-gu", "T3 give-up control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, N2 = 2, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true, T3 = true,
+        }, "clean");
+        Add("t3-gu-release", "T3 give-up control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true, T3 = true,
+        }, "clean");
+        Add("t3-h1-k1", "#91", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true,
+        }, "Quiescence");
+        Add("t3-reconnect-cold", "ax25spec#167 (fault-free with T3)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A, T3 = true,
+        }, "Quiescence");
+        Add("seeded-t3-dead", "seeded (give-up settles with T3)", TableSetKind.T3Dead, o => o with
+        {
+            FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true, T3 = true,
+        }, "Deadlock, 4");
+        Add("seeded-no-keepalive", "seeded (keepalive at rest)", TableSetKind.NoKeepalive, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, T3 = true,
+        }, "Deadlock, 2");
 
         return list;
     }

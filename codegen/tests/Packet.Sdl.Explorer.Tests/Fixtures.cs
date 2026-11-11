@@ -27,6 +27,21 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which Awaiting Connection reports a completed connect as DL-DISCONNECT Indication.</summary>
     public static string ConfirmAsDisconnectDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-confirm-as-disconnect");
 
+    /// <summary>The TlaCheck seeded fixture in which an RNR in Connected does not set peer receiver busy.</summary>
+    public static string RnrIgnoredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rnr-ignored");
+
+    /// <summary>The TlaCheck seeded fixture in which Connected's own-busy test on I frames reads peer receiver busy.</summary>
+    public static string BusyDeliversDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-busy-delivers");
+
+    /// <summary>The TlaCheck seeded fixture in which a busy station answers a poll with RR (Enquiry_Response's busy path).</summary>
+    public static string BusySaysRrDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-busy-says-rr");
+
+    /// <summary>The TlaCheck seeded fixture in which Connected has no T3 expiry arm.</summary>
+    public static string T3DeadDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead");
+
+    /// <summary>The TlaCheck seeded fixture in which neither end of a cold connect starts T3.</summary>
+    public static string NoKeepaliveDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-no-keepalive");
+
     public static string ReconnectSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed");
 
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);

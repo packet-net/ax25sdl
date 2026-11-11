@@ -129,9 +129,25 @@ public enum Invariants
     /// rest). Data lost in a give-up is reported as such, never accepted.
     /// </summary>
     GiveUpLoss = 2048,
+    /// <summary>
+    /// A station that has received RNR from its peer sends no I frame until it
+    /// receives RR, REJ, SREJ or a frame that resets or ends the link (§6.4.9:
+    /// it "stops transmitting I frames until the busy condition is cleared").
+    /// Checked on the frames sent, not on the station's peer-busy flag, so a
+    /// figure that ignores RNR is caught. Only RNR raises it, and on today's
+    /// tables only <see cref="ExplorerOptions.LocalBusy"/> produces one.
+    /// </summary>
+    PeerBusyHold = 4096,
+    /// <summary>
+    /// A station whose own receiver is busy indicates it: every supervisory
+    /// frame it sends is RNR, never RR, REJ or SREJ (§6.4.10). Only checked with
+    /// <see cref="ExplorerOptions.LocalBusy"/>, the only way own receiver busy
+    /// is ever set on today's tables.
+    /// </summary>
+    BusyIndication = 8192,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>
@@ -244,6 +260,48 @@ public sealed record ExplorerOptions
     /// justification. Off by default.
     /// </summary>
     public bool AcceptGiveUp { get; init; }
+
+    /// <summary>
+    /// A local busy condition (§6.4.10, "Whenever a TNC enters a busy
+    /// condition, it indicates this by sending an RNR response at the next
+    /// opportunity"), injected by the harness at the stations named here, once
+    /// each, on an established link (Connected or TimerRecovery). Entering it
+    /// does what the figures draw for DL-FLOW-OFF Request once #43 and H3 are
+    /// fixed (ax25spec PR #109): Set Own Receiver Busy, N(r) := V(r), RNR
+    /// response F = 0, Clear Acknowledge Pending. Leaving it, which is enabled
+    /// whenever the condition still holds, does what the figures draw for
+    /// DL-FLOW-ON Request with H3's N(r) box: Clear Own Receiver Busy,
+    /// N(r) := V(r), RR command P = 0, Clear Acknowledge Pending, and when T1
+    /// is not running Stop T3 and Start T1. On today's tables nothing else sets
+    /// own receiver busy (#43), so this is how the peer-busy and own-busy arms
+    /// are reached. Table-driven stations only. Off by default.
+    /// </summary>
+    public FlowControlAt LocalBusy { get; init; } = FlowControlAt.None;
+
+    /// <summary>
+    /// With <see cref="LocalBusy"/>, the busy condition may outlast the peer's
+    /// retries. By default it does not: it leaves the peer at least one retry
+    /// for the poll that finds it cleared, so while a station is busy its
+    /// peer's T1 does not fire in Timer Recovery once RC has reached N2 - 1
+    /// (each RNR-answered poll costs a retry: figc4.5 counts RC up on T1 and
+    /// an RNR answer does not reset it). With this
+    /// on, that hold is lifted and a long busy period can end the link
+    /// (figc4.5 t21 with peer busy, DL-ERROR U or I). Off by default.
+    /// </summary>
+    public bool LongBusy { get; init; }
+
+    /// <summary>
+    /// Model T3 expiry: a T3_expiry move at a station whose T3 is running,
+    /// while no T1 runs at either station (T3 is longer than T1, §6.7.1.3, so
+    /// a running T1 expires first), under the quiescent-timeout rule T1 uses (nothing in
+    /// flight, owed, ready to pop or waiting to be submitted anywhere), on a
+    /// page with a T3 arm (figc4.4 only; figc4.5 has none, #91). Two rules come
+    /// with it: at rest a Connected station keeps its keepalive (T1 or T3
+    /// running), and with <see cref="AcceptGiveUp"/> a station left up after
+    /// its peer gave up is never settled (its T3 will find the peer gone). Off
+    /// by default.
+    /// </summary>
+    public bool T3 { get; init; }
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase
