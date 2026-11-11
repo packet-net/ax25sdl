@@ -23,6 +23,7 @@ CONSTANTS
     InteriorDropsOnly, \* a drop may only hit an I frame that is not the last its sender submitted
     Seed,              \* "connected", "disconnected" or "awaiting-v22"
     Mod128A,           \* disconnected seed: A starts at modulo 128, so it sends SABME
+    DataAfterConfirm,  \* disconnected seed: layer 3 submits its data only once its link is up
     PeerDeclinesSabme, \* table-driven B refuses SABME (able_to_establish false) but accepts SABM
     Peer,              \* what plays B: "tables", "v20-frmr" or "v20-dm"
     FlowAt,            \* stations whose layer 3 issues DL_FLOW_OFF / DL_FLOW_ON, subset of {"A", "B"}
@@ -115,7 +116,8 @@ EmitterReject(s, m, f) ==
 
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
-\* order and flow-off), a seize request to the owed flag.
+\* order and flow-off), a seize request to the owed flag, and (with
+\* DataAfterConfirm) a connect confirm or indication to the link-up flag.
 RECURSIVE Route(_, _, _, _, _, _)
 Route(s, m, fx, acc, flowOff, i) ==
     IF i > Len(fx) THEN acc
@@ -138,6 +140,7 @@ Route(s, m, fx, acc, flowOff, i) ==
                                                     \o (IF expected = "" THEN "everything was already delivered: duplicate or spurious delivery"
                                                         ELSE "'" \o expected \o "' is next: out-of-order, duplicate or gapped delivery"))
                                           ELSE vf]
+                ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"} /\ DataAfterConfirm THEN [acc EXCEPT !.up = TRUE]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
@@ -160,7 +163,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         v1 == IF ran /\ c.err # "" THEN Viol("MachineError", s, "interpreter error at station " \o s \o ": " \o c.err) ELSE v0
         m == IF ran THEN Persist(c) ELSE pre
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
-                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], v |-> v1],
+                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], v |-> v1],
                    S.off[s], 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -174,7 +177,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
                    THEN Viol("BusyTracksFlow", s, "station " \o s \o " took " \o c.tid \o " on DL_FLOW_ON_request but its own-receiver-busy condition is still set")
               ELSE NoViol
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
-                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked,
+                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
          viol |-> v2,
@@ -231,6 +234,7 @@ S0 ==
      owed |-> [s \in Stations |-> FALSE], budget |-> 0,
      deliv |-> [s \in Stations |-> 0], acked |-> [s \in Stations |-> 0],
      off |-> [s \in Stations |-> FALSE], rounds |-> [s \in Stations |-> 0],
+     up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -241,12 +245,14 @@ S1 ==
       [] OTHER -> S0
 
 \* All data is submitted up front: one DL_DATA_request per label, A first.
+\* With DataAfterConfirm nothing is: layer 3 submits by SubmitData moves.
 RECURSIVE Submit(_, _, _)
 Submit(S, s, i) ==
     IF i > Len(Submitted(s)) THEN S
     ELSE Submit(Seeded(Inject(S, s, [Event("DL_DATA_request") EXCEPT !.data = Submitted(s)[i]], S.ch[s], S.budget, FALSE)), s, i + 1)
 
-SeedState == [Submit(Submit(S1, "A", 1), "B", 1) EXCEPT !.budget = Budget, !.acked = [s \in Stations |-> 0]]
+SeedState == [IF DataAfterConfirm THEN S1 ELSE Submit(Submit(S1, "A", 1), "B", 1)
+              EXCEPT !.budget = Budget, !.acked = [s \in Stations |-> 0]]
 
 (***************************************************************************)
 (* Moves (Stepper.EnabledMoves / Apply)                                    *)
@@ -274,12 +280,16 @@ PopChanges(S, s) ==
         /\ LET c == Dispatch(m, Event("I_frame_pops_off_queue"))
            IN  c.err # "" \/ (\E i \in 1..Len(c.fx) : c.fx[i].kind = "frame") \/ Persist(c) # m
 
+\* Layer 3 holds data and its link is up (DataAfterConfirm).
+SubmitReady(S, s) == DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < Len(Submitted(s))
+
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
-\* flight, owed or ready to pop anywhere.
+\* flight, owed, ready to pop or waiting to be submitted anywhere.
 Quiet(S) ==
     /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
     /\ ~S.owed["A"] /\ ~S.owed["B"]
     /\ ~PopChanges(S, "A") /\ ~PopChanges(S, "B")
+    /\ ~SubmitReady(S, "A") /\ ~SubmitReady(S, "B")
 
 DropAllowed(f, into) ==
     \/ ~InteriorDropsOnly
@@ -296,6 +306,7 @@ CanFlowOff(s) ==
     /\ viol = NoViol /\ Table(s) /\ s \in FlowAt /\ ~sys.off[s]
     /\ sys.rounds[s] < FlowRounds /\ sys.deliv[s] >= FlowOffAfter
     /\ Handles(sys.m[s].st, "DL_FLOW_OFF_request")
+CanSubmit(s) == viol = NoViol /\ SubmitReady(sys, s)
 CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
 
 Deliver(s) ==
@@ -339,6 +350,12 @@ FlowOff(s) ==
     /\ CanFlowOff(s)
     /\ Take(Inject(sys, s, Event("DL_FLOW_OFF_request"), sys.ch[s], sys.budget, FALSE), "flow-off", s, NoFrm)
 
+\* Layer 3 submits its next frame (DataAfterConfirm).
+SubmitData(s) ==
+    /\ CanSubmit(s)
+    /\ LET r == Inject(sys, s, [Event("DL_DATA_request") EXCEPT !.data = Submitted(s)[sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
+       IN  Take([r EXCEPT !.sys.offered[s] = @ + 1], "submit", s, NoFrm)
+
 T1(s) ==
     /\ CanT1(s)
     /\ Take(Inject(sys, s, Event("T1_expiry"), sys.ch[s], sys.budget, FALSE), "T1-expiry", s, NoFrm)
@@ -373,8 +390,8 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B")
     \/ T1("A") \/ T1("B")
     \/ Rest
 
@@ -435,9 +452,9 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* The argument needs every progress move to be a real (non-stuttering) step,
 \* or a move that changes nothing could be "taken" without TLC seeing it and
 \* the fairness would be discharged falsely. The tick in last guarantees it.
-ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off"}
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit"}
 
-CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s)
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s)
 
 CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s)
 TookProgress == last'.move \in ProgressKinds

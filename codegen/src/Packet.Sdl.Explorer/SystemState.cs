@@ -57,6 +57,16 @@ public sealed record SystemState
 
     public int FlowRoundsB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.DataAfterConfirm"/>: station A has reported the link up to its layer 3 (DL_CONNECT_confirm or DL_CONNECT_indication).</summary>
+    public bool LinkUpA { get; init; }
+
+    public bool LinkUpB { get; init; }
+
+    /// <summary>With <see cref="ExplorerOptions.DataAfterConfirm"/>: frames A's layer 3 has submitted so far.</summary>
+    public int OfferedA { get; init; }
+
+    public int OfferedB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -65,6 +75,10 @@ public sealed record SystemState
     public bool FlowOff(Station s) => s == Station.A ? FlowOffA : FlowOffB;
 
     public int FlowRounds(Station s) => s == Station.A ? FlowRoundsA : FlowRoundsB;
+
+    public bool LinkUp(Station s) => s == Station.A ? LinkUpA : LinkUpB;
+
+    public int Offered(Station s) => s == Station.A ? OfferedA : OfferedB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -95,7 +109,8 @@ public sealed record SystemState
           .Append("|b").Append(Inv(Budget))
           .Append("|d").Append(Inv(DeliveredAtA)).Append(',').Append(Inv(DeliveredAtB))
           .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB))
-          .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB));
+          .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
+          .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB));
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

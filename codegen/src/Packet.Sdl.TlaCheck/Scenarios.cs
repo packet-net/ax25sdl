@@ -90,12 +90,31 @@ public static class Scenarios
             Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 0, Budget = 0,
         }, "clean");
 
-        // ax25spec#161: figc4.2 read as figc4.6 labels it drops data offered
-        // before DL-CONNECT Confirm, with no error.
+        // ax25spec#161: figc4.2 discards data offered before DL-CONNECT
+        // Confirm, as the 1998 edition of the figure (Figure C4.3) labels its
+        // "Layer 3 Initiated?" decision, with no indication to layer 3.
         Add("d161-data-before-confirm", "ax25spec#161", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
         }, "Deadlock, 2");
+
+        // Cold connect, then data: each layer 3 submits only once its link is
+        // up (DL_CONNECT_confirm at A, DL_CONNECT_indication at B), so #161
+        // does not apply. The v2.2 connect comes up through figc4.2 (#44), and
+        // B, accepting SABME, sets the version 2.2 flag but never modulo 128
+        // (#54): invisible until A's V(s) passes 7, then B's N(r) wraps and A
+        // takes it as an N(r) error, re-establishes and loses its queue.
+        ExplorerOptions Cold(ExplorerOptions o, bool mod128) => o with { Seed = SeedKind.Disconnected, Modulo128A = mod128, DataAfterConfirm = true, Budget = 0 };
+        Add("cold-v20-data", "#102 control", TableSetKind.Current, o => Cold(o, false) with
+        {
+            FramesAb = 2, FramesBa = 1, Invariants = Default | Invariants.SelectiveProgress,
+        }, "clean");
+        Add("cold-v22-data", "#44 route", TableSetKind.Current, o => Cold(o, true) with
+        {
+            FramesAb = 2, FramesBa = 1, Invariants = Default | Invariants.SelectiveProgress,
+        }, "clean");
+        Add("d54-cold-v22-wrap", "#54", TableSetKind.Current, o => Cold(o, true) with { FramesAb = 9, K = 1 }, "Deadlock, 45");
+        Add("d54-cold-v20-wrap", "#54 control", TableSetKind.Current, o => Cold(o, false) with { FramesAb = 9, K = 1 }, "clean");
 
         // #43: DL-FLOW-OFF on the wrong branch.
         ExplorerOptions S43(ExplorerOptions o) => o with { FramesAb = 2, FramesBa = 0, K = 4, Budget = 0, FlowControl = FlowControlAt.B };

@@ -32,7 +32,7 @@ public enum SeedKind
 {
     /// <summary>Both stations Connected with zeroed variables, T3 running, all data already queued.</summary>
     Connected,
-    /// <summary>Both stations Disconnected; A has issued DL_CONNECT_request and then submitted its data (which figc4.2 drops while layer 3 initiated, ax25spec#161).</summary>
+    /// <summary>Both stations Disconnected; A has issued DL_CONNECT_request and then submitted its data (which figc4.2 discards while layer 3 initiated, as the 1998 edition of the figure labels it, with no indication: ax25spec#161).</summary>
     Disconnected,
     /// <summary>
     /// A is in AwaitingV22Connection with its SABME P=1 already in flight
@@ -142,6 +142,17 @@ public sealed record ExplorerOptions
 
     /// <summary>Disconnected seed only: station A is seeded at modulo 128, so its DL_CONNECT_request sends SABME.</summary>
     public bool Modulo128A { get; init; }
+
+    /// <summary>
+    /// Disconnected seed only: each station's layer 3 holds its data until
+    /// its data link has reported the link up (DL_CONNECT_confirm at A,
+    /// DL_CONNECT_indication at B), as a well-behaved layer 3 would, then
+    /// submits it one DL_DATA_request per move. Off by default: the seed
+    /// submits A's data straight after DL_CONNECT_request, where figc4.2
+    /// discards it while layer 3 initiated, with no indication (ax25spec#161). With this on, B may
+    /// submit data too.
+    /// </summary>
+    public bool DataAfterConfirm { get; init; }
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase
