@@ -227,7 +227,8 @@ SelectGuard(c, e, gs) ==
 (***************************************************************************)
 
 SignalUpper(c, e, verb) ==
-    [c EXCEPT !.fx = Append(@, UpperFx(verb, IF verb = "DL_DATA_indication" THEN c.dd ELSE ""))]
+    [c EXCEPT !.fx = Append(@, UpperFx(verb, IF verb = "DL_DATA_indication" THEN c.dd
+                                             ELSE IF verb = "DL_UNIT_DATA_indication" THEN e.data ELSE ""))]
 
 EmitU(c, type, cmd, pf) == [c EXCEPT !.fx = Append(@, FrameFx(Frm(type, cmd, pf, None, None, "")))]
 
@@ -251,7 +252,8 @@ SignalLower(c, e, verb) ==
       [] verb = "SABME" -> EmitU(c, "SABME", TRUE, c.pP = 1)
       [] verb = "SABME (P = 1)" -> EmitU(c, "SABME", TRUE, TRUE)
       [] verb = "DISC (P = 1)" -> EmitU(c, "DISC", TRUE, TRUE)
-      [] verb = "UI Command" -> EmitU(c, "UI", TRUE, c.pP = 1)
+      \* The UI frame carries the DL-UNIT-DATA Request's payload label.
+      [] verb = "UI Command" -> [c EXCEPT !.fx = Append(@, FrameFx(Frm("UI", TRUE, c.pP = 1, None, None, e.data)))]
       [] verb = "XID_command" -> EmitU(c, "XID", TRUE, c.pP = 1)
       \* A fresh I frame: staged N(s) and N(r), the popped payload; the copy
       \* is retained for any later retransmission (pinned semantic 1).

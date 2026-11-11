@@ -35,6 +35,8 @@ CONSTANTS
     BusyAt,            \* stations that enter a local busy condition once (own receiver busy, RNR), subset of {"A", "B"}
     LongBusy,          \* with BusyAt: the busy period may outlast the peer's retries (no T1 hold)
     T3Moves,           \* model T3 expiry (idle keepalive), the keepalive rest rule and the stricter give-up settle
+    UnitDataAt,        \* stations whose layer 3 sends one UI datagram, once, in any state, subset of {"A", "B"}
+    UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -95,10 +97,11 @@ UpperEvent(m, p) ==
     IF Handles(m.st, p) \/ ~Handles(m.st, "all_other_primitives__from_upper_layer") THEN p
     ELSE "all_other_primitives__from_upper_layer"
 
+\* Only a long UI datagram fails the N1 check (UiForm "long").
 FrameInput(m, f, into) ==
     [ev |-> FrameEvent(m, f), pf |-> IF f.pf THEN 1 ELSE 0, cmd |-> IF f.cmd THEN 1 ELSE 0,
      nr |-> f.nr, ns |-> f.ns, data |-> f.data,
-     able |-> ~(PeerDeclinesSabme /\ into = "B" /\ f.type = "SABME"), info |-> TRUE]
+     able |-> ~(PeerDeclinesSabme /\ into = "B" /\ f.type = "SABME"), info |-> ~(UiForm = "long" /\ f.type = "UI")]
 
 \* The link multiplexer's confirm (pinned semantic 2); a page without the arm
 \* takes it through its lower-layer catch-all.
@@ -137,6 +140,31 @@ BusyIndication(s, m, f) ==
     IF m.own /\ f.type \in {"RR", "REJ", "SREJ"}
     THEN Viol("BusyIndication", s, "station " \o s \o " sent " \o FrameText(f) \o " while its own receiver is busy")
     ELSE NoViol
+
+\* A received UI frame's handling (Stepper.UnitDataCheck). Delivery, as UI
+\* Check draws it: a command that passes the N1 check is delivered upward
+\* once with its label; a response is not delivered and draws DL-ERROR (Q);
+\* a command that fails the N1 check is not delivered and draws DL-ERROR (K).
+\* The answer, as section 4.3.3.6 says (the tables' reading of
+\* ax25spec#154): a command with P = 1 gets exactly one response with F = 1,
+\* DM outside the information transfer state and RR or RNR in it; a command
+\* with P = 0 gets none. A response's answer is not judged.
+UnitDataCheck(s, pre, e, fx) ==
+    LET cmd == e.cmd = 1
+        poll == cmd /\ e.pf = 1
+        inds == {i \in 1..Len(fx) : fx[i].kind = "dl" /\ fx[i].prim = "DL_UNIT_DATA_indication"}
+        errs == {fx[i].prim : i \in {j \in 1..Len(fx) : fx[j].kind = "dl"}}
+        frs == SelectSeq(fx, LAMBDA x : x.kind = "frame")
+        deliv == IF cmd /\ e.info
+                 THEN Cardinality(inds) = 1 /\ \A i \in inds : fx[i].detail = e.data
+                 ELSE inds = {} /\ (IF cmd THEN "DL-ERROR Indication (K)" ELSE "DL-ERROR Indication (Q)") \in errs
+        ans == IF ~cmd THEN TRUE
+               ELSE IF ~poll THEN Len(frs) = 0
+               ELSE /\ Len(frs) = 1 /\ ~frs[1].frame.cmd /\ frs[1].frame.pf
+                    /\ IF pre.st \in DataStates THEN frs[1].frame.type \in {"RR", "RNR"} ELSE frs[1].frame.type = "DM"
+    IN  IF ~deliv THEN Viol("UnitData", s, "station " \o s \o " in " \o pre.st \o " mishandled the UI frame [" \o e.data \o "]: delivery or refusal is not what UI Check draws")
+        ELSE IF ~ans THEN Viol("UnitData", s, "station " \o s \o " in " \o pre.st \o " answered the UI frame [" \o e.data \o "] other than as section 4.3.3.6 says")
+        ELSE NoViol
 
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
@@ -230,7 +258,10 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         t3loop == IF ok THEN m.st = "TimerRecovery" /\ (S.t3loop[s] \/ e.ev = "T3_expiry") ELSE S.t3loop[s]
         flowOffNow == ok /\ e.ev = "DL_FLOW_OFF_request"
         flowOnNow == ok /\ e.ev = "DL_FLOW_ON_request"
+        uiv == IF ok /\ e.ev = "UI_received" /\ UnitDataAt # {} /\ "UnitData" \in StepChecks
+               THEN UnitDataCheck(s, pre, e, c.fx) ELSE NoViol
         v2 == IF r.v # NoViol THEN r.v
+              ELSE IF uiv # NoViol THEN uiv
               ELSE IF flowOffNow /\ "BusyTracksFlow" \in StepChecks /\ ~m.own
                    THEN Viol("BusyTracksFlow", s, "station " \o s \o " took " \o c.tid \o " on DL_FLOW_OFF_request but its own-receiver-busy condition is still clear")
               ELSE IF flowOnNow /\ "BusyTracksFlow" \in StepChecks /\ m.own
@@ -300,6 +331,7 @@ S0 ==
      loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE], hb |-> [s \in Stations |-> FALSE],
+     uis |-> [s \in Stations |-> FALSE], uid |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -411,10 +443,12 @@ BusyOffReady(S, s) == s \in BusyAt /\ Table(s) /\ S.busy[s] /\ S.m[s].st \in Dat
 
 \* A short busy period leaves the peer one retry for the poll that finds it
 \* cleared: while the station is busy its peer's T1 does not fire in Timer
-\* Recovery once RC has reached N2 - 1 (Stepper.BusyHoldsT1).
+\* Recovery once RC has reached N2 - 1 (Stepper.BusyHoldsT1), and only while
+\* the busy station is in a data state (own receiver busy can outlive them,
+\* and then the busy period can never end).
 BusyHoldsT1(S, s) ==
     /\ BusyAt # {} /\ ~LongBusy
-    /\ Other(s) \in BusyAt /\ S.m[Other(s)].own
+    /\ Other(s) \in BusyAt /\ S.m[Other(s)].own /\ S.m[Other(s)].st \in DataStates
     /\ S.m[s].st = "TimerRecovery" /\ S.m[s].rc >= N2 - 1
 
 \* Entering the condition does what the figures draw for DL-FLOW-OFF Request
@@ -433,6 +467,29 @@ LocalBusy(S, s, enter) ==
          viol |-> NoViol,
          tid |-> IF enter THEN "pinned:local_busy_enter" ELSE "pinned:local_busy_leave",
          arms |-> {}]
+
+\* The station's layer 3 still has its UI datagram to send (UnitDataAt).
+UnitDataReady(S, s) == s \in UnitDataAt /\ Table(s) /\ ~S.uis[s]
+
+\* The datagram's label (Stepper.UiLabel).
+UiLabel(s) == IF s = "A" THEN "ua0" ELSE "ub0"
+
+\* Layer 3 sends its UI datagram: a plain or long one through the page's
+\* DL_UNIT_DATA_request arm, a poll (UI command, P = 1) or a response (UI
+\* response, F = 0) put on the air by the harness (Stepper.SendUnitData).
+SendUnitData(S, s) ==
+    IF UiForm \in {"plain", "long"}
+    THEN LET r == Inject(S, s, [Event(UpperEvent(S.m[s], "DL_UNIT_DATA_request")) EXCEPT !.data = UiLabel(s)], S.ch[s], S.budget, FALSE)
+         IN  [r EXCEPT !.sys.uis[s] = TRUE]
+    ELSE LET poll == UiForm = "poll"
+         IN  [sys |-> [S EXCEPT !.ch[Other(s)] = Append(@, Frm("UI", poll, poll, None, None, UiLabel(s))), !.uis[s] = TRUE],
+              viol |-> NoViol,
+              tid |-> IF poll THEN "pinned:ui_poll" ELSE "pinned:ui_response",
+              arms |-> {}]
+
+\* At rest every UI datagram was sent and then reached its peer or was
+\* dropped (Stepper.UnitDataAccounted).
+UiAccounted(S) == \A s \in UnitDataAt : S.uis[s] /\ S.uid[s]
 
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
 \* flight, owed, ready to pop or waiting to be submitted anywhere. A pending
@@ -471,6 +528,7 @@ CanT3(s) ==
     /\ sys.m[s].t3 = "running" /\ Handles(sys.m[s].st, "T3_expiry")
 CanBusyOn(s) == viol = NoViol /\ BusyOnReady(sys, s)
 CanBusyOff(s) == viol = NoViol /\ BusyOffReady(sys, s)
+CanUnitData(s) == viol = NoViol /\ UnitDataReady(sys, s)
 
 \* The give-up rule: a frame reaching s after its peer gave up was sent at or
 \* after the give-up (T1 only fires with both channels empty), so s heard it.
@@ -485,26 +543,32 @@ HeardBusyAfter(h, t) ==
     ELSE h
 HeardBusy(r, s, f) == IF Table(s) THEN [r EXCEPT !.sys.hb[s] = HeardBusyAfter(sys.hb[s], f.type)] ELSE r
 
+\* A UI datagram is accounted for once it reaches its peer; the only UI
+\* frames are datagrams.
+UiDone(r, s, f) == IF UnitDataAt # {} /\ f.type = "UI" THEN [r EXCEPT !.sys.uid[Other(s)] = TRUE] ELSE r
+
 Deliver(s) ==
     /\ CanDeliver(s)
     /\ LET f == Head(sys.ch[s])
-       IN  Take(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
-                      ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), s), s, f), "deliver", s, f)
+       IN  Take(UiDone(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
+                      ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), s), s, f), s, f), "deliver", s, f)
 
 Drop(s) ==
     /\ viol = NoViol
     /\ sys.ch[s] # <<>> /\ sys.budget > 0 /\ "drop" \in Faults
     /\ DropAllowed(Head(sys.ch[s]), s)
-    \* The give-up rule counts every drop as a loss for both stations.
+    \* The give-up rule counts every drop as a loss for both stations; a
+    \* dropped UI datagram is accounted for (honestly lost).
     /\ TakeChannel([sys EXCEPT !.ch[s] = Tail(@), !.budget = @ - 1,
-                               !.loss = IF AcceptGiveUp THEN [x \in Stations |-> @[x] + 1] ELSE @], "drop", s, Head(sys.ch[s]))
+                               !.loss = IF AcceptGiveUp THEN [x \in Stations |-> @[x] + 1] ELSE @,
+                               !.uid[Other(s)] = @ \/ (UnitDataAt # {} /\ Head(sys.ch[s]).type = "UI")], "drop", s, Head(sys.ch[s]))
 
 Dup(s) ==
     /\ viol = NoViol
     /\ sys.ch[s] # <<>> /\ sys.budget > 0 /\ "dup" \in Faults
     /\ LET f == Head(sys.ch[s])
-       IN  Take(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
-                      ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), s), s, f), "duplicate", s, f)
+       IN  Take(UiDone(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
+                      ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), s), s, f), s, f), "duplicate", s, f)
 
 Reorder(s) ==
     /\ viol = NoViol
@@ -574,6 +638,11 @@ BusyOff(s) ==
     /\ CanBusyOff(s)
     /\ Take(LocalBusy(sys, s, FALSE), "busy-off", s, NoFrm)
 
+\* Layer 3 sends its UI datagram (UnitDataAt).
+UnitData(s) ==
+    /\ CanUnitData(s)
+    /\ Take(SendUnitData(sys, s), "unit-data", s, NoFrm)
+
 (***************************************************************************)
 (* Quiescence                                                              *)
 (***************************************************************************)
@@ -600,6 +669,7 @@ PlainQuiescent ==
 Quiescent ==
     /\ ~sys.pend["A"] /\ ~sys.pend["B"]
     /\ ReportsMatch(sys)
+    /\ UiAccounted(sys)
     /\ \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
        \/ /\ ~(AcceptGiveUp /\ (sys.gave["A"] = 2 \/ sys.gave["B"] = 2))
           /\ PlainQuiescent
@@ -617,8 +687,8 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A") \/ UnitData("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B") \/ UnitData("B")
     \/ T1("A") \/ T1("B")
     \/ T3("A") \/ T3("B")
     \/ Rest
@@ -680,9 +750,9 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* The argument needs every progress move to be a real (non-stuttering) step,
 \* or a move that changes nothing could be "taken" without TLC seeing it and
 \* the fairness would be discharged falsely. The tick in last guarantees it.
-ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release", "reconnect", "busy-on", "busy-off"}
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release", "reconnect", "busy-on", "busy-off", "unit-data"}
 
-CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s) \/ CanReconnect(s) \/ CanBusyOn(s) \/ CanBusyOff(s)
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s) \/ CanReconnect(s) \/ CanBusyOn(s) \/ CanBusyOff(s) \/ CanUnitData(s)
 
 \* The timers: T1, and T3 with T3Moves.
 CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s) \/ CanT3(s)
@@ -713,6 +783,7 @@ OneShotFair ==
         /\ (<>[]CanReconnect(s) => []<><<Took("reconnect", s)>>_vars)
         /\ (<>[]CanBusyOff(s) => []<><<Took("busy-off", s)>>_vars)
         /\ (<>[]CanSubmit(s) => []<><<Took("submit", s)>>_vars)
+        /\ (<>[]CanUnitData(s) => []<><<Took("unit-data", s)>>_vars)
 QuiescenceLiveL3 == ((<>[]CanProgressOrT1 => []<><<TookProgressOrT1>>_vars) /\ OneShotFair) => []<>Quiescent
 TimerFreeLiveL3 == ((<>[]CanProgress => []<><<TookProgress>>_vars) /\ OneShotFair) => []<>Quiescent
 

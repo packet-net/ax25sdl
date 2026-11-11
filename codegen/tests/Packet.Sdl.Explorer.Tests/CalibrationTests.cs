@@ -1384,7 +1384,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Busy_B_Outlasting_N2_Polls_Tears_The_Link_Down()
     {
-        // Unfiled (docs/explorer.md, H5): with frames outstanding, each poll
+        // ax25spec#168 (docs/explorer.md, H5): with frames outstanding, each poll
         // answered by RNR F=1 takes figc4.5 t19_rnr_received_yes_yes_no, which
         // restarts T1 without resetting RC (and re-queues the outstanding frame
         // again), so after N2 RNR answers the link goes down with DL-ERROR I.
@@ -1478,7 +1478,8 @@ public class CalibrationTests(ITestOutputHelper output)
     public void Seeded_A_Busy_Station_That_Answers_RR_Is_Caught()
     {
         // The seeded fixture answers a poll with RR on Enquiry_Response's busy
-        // path (one of ax25spec#94's calibration mutations): busy B claims to
+        // path (the answer side; #94's gate names Transmit_Enquiry, see
+        // Seeded_A_Busy_Station_That_Polls_With_RR_Is_Caught): busy B claims to
         // be ready. busy-b on the real tables is clean.
         var result = Run(Busy(FlowControlAt.B, 2, 0) with { TablesDir = Fixtures.BusySaysRrDir });
         result.Outcome.Should().Be(Outcome.Violation);
@@ -1486,6 +1487,30 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation.Station.Should().Be(Station.B);
         result.Trace[^1].Transition.Should().Be("t21_rr_received_yes");
         result.CounterexampleLength.Should().Be(4);
+    }
+
+    [Fact]
+    public void Busy_A_Polls_With_RNR_When_Its_Frame_Is_Lost()
+    {
+        // A goes busy with a0 out, a0 is lost, and A's T1 expires while it is
+        // busy: Transmit_Enquiry's busy path polls with RNR command P=1.
+        var result = Run(Busy(FlowControlAt.A, 1, 0) with { Budget = 1, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(222);
+    }
+
+    [Fact]
+    public void Seeded_A_Busy_Station_That_Polls_With_RR_Is_Caught()
+    {
+        // ax25spec#94's gate mutation: the seeded fixture sends RR Command on
+        // Transmit_Enquiry's busy path, so busy A's T1 poll claims it is ready.
+        // busy-a-enq on the real tables is clean.
+        var result = Run(Busy(FlowControlAt.A, 1, 0) with { Budget = 1, Faults = FaultKinds.Drop, TablesDir = Fixtures.EnquirySaysRrDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[^1].Transition.Should().Be("t12_t1_expiry");
+        result.CounterexampleLength.Should().Be(5);
     }
 
     [Fact]
