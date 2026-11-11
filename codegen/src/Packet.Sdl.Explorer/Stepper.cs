@@ -896,6 +896,8 @@ public sealed class Stepper
                         outgoing.Add(frame);
                         if (violation is null && frame.IsReject && On(Invariants.RejectCoherence))
                             violation = EmitterRejectCheck(station, m, frame);
+                        if (violation is null && _o.LocalBusy != FlowControlAt.None && On(Invariants.BusyIndication))
+                            violation = BusyIndicationCheck(station, m, frame);
                         break;
                     }
                     case UpperEffect { Primitive: "DL_DATA_indication" } ue:
@@ -1073,6 +1075,13 @@ public sealed class Stepper
                 $"station {station}: SREJ exception count {Inv(m.SrejectException)} exceeds the window k={Inv(m.K)}: more selective rejects outstanding than there can be gaps (state {m.State})");
         return null;
     }
+
+    /// <summary>A station whose own receiver is busy sends RNR, not RR, REJ or SREJ (§6.4.10).</summary>
+    private static Violation? BusyIndicationCheck(Station station, DataLinkMachine m, Frame frame) =>
+        m.OwnReceiverBusy && frame.Type is "RR" or "REJ" or "SREJ"
+            ? new Violation(Invariants.BusyIndication, station,
+                $"station {station} sent {frame.Render()} while its own receiver is busy: a busy station indicates it with RNR (§6.4.10)")
+            : null;
 
     /// <summary>Emitter side: a REJ/SREJ with N(r)=x must name V(r) or a not-yet-held frame inside the receive window.</summary>
     private static Violation? EmitterRejectCheck(Station station, DataLinkMachine m, Frame frame)

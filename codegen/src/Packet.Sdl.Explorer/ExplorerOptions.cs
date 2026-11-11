@@ -138,9 +138,16 @@ public enum Invariants
     /// tables only <see cref="ExplorerOptions.LocalBusy"/> produces one.
     /// </summary>
     PeerBusyHold = 4096,
+    /// <summary>
+    /// A station whose own receiver is busy indicates it: every supervisory
+    /// frame it sends is RNR, never RR, REJ or SREJ (§6.4.10). Only checked with
+    /// <see cref="ExplorerOptions.LocalBusy"/>, the only way own receiver busy
+    /// is ever set on today's tables.
+    /// </summary>
+    BusyIndication = 8192,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>

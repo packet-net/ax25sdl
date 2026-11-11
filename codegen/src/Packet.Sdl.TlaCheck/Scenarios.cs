@@ -27,6 +27,8 @@ public enum TableSetKind
     RnrIgnored,
     /// <summary>A seeded-defect fixture (fixtures/tables-busy-delivers): Connected's own-busy test on I frames reads peer receiver busy.</summary>
     BusyDelivers,
+    /// <summary>A seeded-defect fixture (fixtures/tables-busy-says-rr): a busy station answers a poll with RR.</summary>
+    BusySaysRr,
     /// <summary>A seeded-defect fixture (fixtures/tables-t3-dead): Connected has no T3 expiry arm.</summary>
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
@@ -440,6 +442,7 @@ public static class Scenarios
         }, "clean");
         Add("seeded-rnr-ignored", "seeded (peer-busy hold)", TableSetKind.RnrIgnored, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "PeerBusyHold at A, 3");
         Add("seeded-busy-delivers", "seeded (busy delivery)", TableSetKind.BusyDelivers, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "FlowOffDelivery at B, 3");
+        Add("seeded-busy-says-rr", "seeded (busy indication)", TableSetKind.BusySaysRr, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "BusyIndication at B, 4");
 
         // Coverage batch 4: T3 (ExplorerOptions.T3). The keepalive fires only
         // when nothing is in flight and no T1 runs at either station.

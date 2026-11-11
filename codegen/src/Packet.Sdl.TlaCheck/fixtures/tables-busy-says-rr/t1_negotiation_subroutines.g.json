@@ -1,0 +1,130 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "management_data_link",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.8",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Initiate_T1_Negotiation",
+      "paths": [
+        {
+          "id": "t01_initiate_t1_negotiation_yes",
+          "guard": "T1_negotiation_requested",
+          "actions": [
+            {
+              "verb": "Add Receive T1 Parameter field to XID Command",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_initiate_t1_negotiation_no",
+          "guard": "not T1_negotiation_requested",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "T1_Negotiation_Response",
+      "paths": [
+        {
+          "id": "t01_t1_negotiation_response_yes_yes",
+          "guard": "T1_parameter_field_present and transmit_T1_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Transmit T1 From XID Command",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive T1 Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_t1_negotiation_response_yes_no",
+          "guard": "T1_parameter_field_present and not transmit_T1_acceptable",
+          "actions": [
+            {
+              "verb": "Set Transmit T1 to Default",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive T1 Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_t1_negotiation_response_no",
+          "guard": "not T1_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Complete_T1_Negotiation",
+      "paths": [
+        {
+          "id": "t01_complete_t1_negotiation_yes_yes",
+          "guard": "T1_parameter_field_present and transmit_T1_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Receive T1 from XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_complete_t1_negotiation_yes_no",
+          "guard": "T1_parameter_field_present and not transmit_T1_acceptable",
+          "actions": [
+            {
+              "verb": "Set Receive T1 to Default",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_complete_t1_negotiation_no",
+          "guard": "not T1_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

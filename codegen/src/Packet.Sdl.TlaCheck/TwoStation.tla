@@ -131,6 +131,13 @@ EmitterReject(s, m, f) ==
         ELSE Viol("RejectCoherence", s, "reject coherence (emitter): station " \o s \o " sent " \o FrameText(f) \o " with V(r)=" \o N(m.vr)
                   \o (IF held THEN ", but it already holds I(ns=" \o N(x) \o ")" ELSE ", but N(r) is outside its receive window"))
 
+\* A station whose own receiver is busy sends RNR, not RR, REJ or SREJ
+\* (Stepper.BusyIndicationCheck).
+BusyIndication(s, m, f) ==
+    IF m.own /\ f.type \in {"RR", "REJ", "SREJ"}
+    THEN Viol("BusyIndication", s, "station " \o s \o " sent " \o FrameText(f) \o " while its own receiver is busy")
+    ELSE NoViol
+
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
 \* order and flow-off), a seize request to the owed flag, a connect confirm
@@ -146,9 +153,11 @@ Route(s, m, fx, acc, flowOff, i) ==
              sub == Submitted(Other(s))
              nxt ==
                 IF fe.kind = "frame" THEN
-                    [acc EXCEPT !.out = Append(@, fe.frame),
-                                !.v = IF @ = NoViol /\ fe.frame.type \in {"REJ", "SREJ"} /\ "RejectCoherence" \in StepChecks
-                                      THEN EmitterReject(s, m, fe.frame) ELSE @]
+                    LET vr == IF acc.v = NoViol /\ fe.frame.type \in {"REJ", "SREJ"} /\ "RejectCoherence" \in StepChecks
+                              THEN EmitterReject(s, m, fe.frame) ELSE acc.v
+                    IN  [acc EXCEPT !.out = Append(@, fe.frame),
+                                    !.v = IF vr = NoViol /\ BusyAt # {} /\ "BusyIndication" \in StepChecks
+                                          THEN BusyIndication(s, m, fe.frame) ELSE vr]
                 ELSE IF fe.kind = "dl" /\ fe.prim = "DL_DATA_indication" THEN
                     LET vf == IF acc.v = NoViol /\ "FlowOffDelivery" \in StepChecks /\ flowOff
                               THEN Viol("FlowOffDelivery", s, "station " \o s \o " delivered '" \o fe.detail \o "' upward while its layer 3 has flow off")

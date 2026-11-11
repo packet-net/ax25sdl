@@ -1,0 +1,69 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "simplex_phy",
+  "state": "ReceiverStart",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2a.7",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_ph_expedited_data_request",
+      "from": "ReceiverStart",
+      "on": "PH_EXPEDITED_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add Frame to Priority Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_all_other_primitives__from_upper_layer",
+      "from": "ReceiverStart",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "ReceiverStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_t106_or_t108_expiry",
+      "from": "ReceiverStart",
+      "on": "T106_or_T108_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Start T100",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T101",
+          "kind": "processing"
+        },
+        {
+          "verb": "PH-QUIET Indication",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "TransmitterSuppression",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

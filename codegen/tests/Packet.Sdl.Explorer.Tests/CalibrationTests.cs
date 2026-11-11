@@ -1475,6 +1475,20 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Seeded_A_Busy_Station_That_Answers_RR_Is_Caught()
+    {
+        // The seeded fixture answers a poll with RR on Enquiry_Response's busy
+        // path (one of ax25spec#94's calibration mutations): busy B claims to
+        // be ready. busy-b on the real tables is clean.
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with { TablesDir = Fixtures.BusySaysRrDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t21_rr_received_yes");
+        result.CounterexampleLength.Should().Be(4);
+    }
+
+    [Fact]
     public void Long_Busy_Needs_A_Busy_Station_And_Busy_Needs_The_Table_Driven_Peer()
     {
         var a = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, LongBusy = true });

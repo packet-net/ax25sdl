@@ -33,6 +33,9 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which Connected's own-busy test on I frames reads peer receiver busy.</summary>
     public static string BusyDeliversDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-busy-delivers");
 
+    /// <summary>The TlaCheck seeded fixture in which a busy station answers a poll with RR (Enquiry_Response's busy path).</summary>
+    public static string BusySaysRrDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-busy-says-rr");
+
     /// <summary>The TlaCheck seeded fixture in which Connected has no T3 expiry arm.</summary>
     public static string T3DeadDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead");
 
