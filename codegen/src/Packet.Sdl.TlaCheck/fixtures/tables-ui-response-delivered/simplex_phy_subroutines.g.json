@@ -1,0 +1,80 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "simplex_phy",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2a.s",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Start_Transmitter",
+      "paths": [
+        {
+          "id": "t01_start_transmitter",
+          "guard": "",
+          "actions": [
+            {
+              "verb": "Suspend Priority and Normal Queue Processing",
+              "kind": "processing"
+            },
+            {
+              "verb": "Stop All Timer Except T100.",
+              "kind": "processing"
+            },
+            {
+              "verb": "Start T103.",
+              "kind": "processing"
+            },
+            {
+              "verb": "PH-BUSY Indication",
+              "kind": "signal_upper"
+            },
+            {
+              "verb": "HW-TON Request",
+              "kind": "signal_lower"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Acquisition",
+      "paths": [
+        {
+          "id": "t01_acquisition",
+          "guard": "",
+          "actions": [
+            {
+              "verb": "Set Repeater Up",
+              "kind": "processing"
+            },
+            {
+              "verb": "Stop All Timers",
+              "kind": "processing"
+            },
+            {
+              "verb": "Suspend Priority and Normal Queue Processing",
+              "kind": "processing"
+            },
+            {
+              "verb": "PH-BUSY Indication",
+              "kind": "signal_upper"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

@@ -1042,7 +1042,7 @@ public sealed class Stepper
         // A UI frame's handling (UnitData): delivered or refused as UI Check
         // says, and a poll answered as section 4.3.3.6 says.
         if (violation is null && result is not null && input!.Event == "UI_received" && _o.UnitData != FlowControlAt.None && On(Invariants.UnitData))
-            violation = UnitDataCheck(station, pre, input, result.Effects);
+            violation = UnitDataCheck(station, pre, input, _o.UiForm == UiForm.Oversize, result.Effects);
 
         // Layer-3 flow control bookkeeping and the busy-condition check
         // (§6.4.10: entering the busy condition is what DL-FLOW-OFF is for,
@@ -1171,14 +1171,17 @@ public sealed class Stepper
     /// command with P = 1 is answered by exactly one frame, a response with
     /// F = 1, DM outside the information transfer state and RR or RNR in it;
     /// a command with P = 0 by none. What a station sends on a UI response is
-    /// not judged.
+    /// not judged. Whether the information field is too long is the
+    /// scenario's (<see cref="UiForm.Oversize"/>), not read back from the
+    /// atom the harness supplied, so a harness that failed to supply it is
+    /// caught too; and the label it must carry is the peer's datagram's, not
+    /// read back from the frame, so a frame that lost its label is caught.
     /// </summary>
-    private static Violation? UnitDataCheck(Station station, DataLinkMachine pre, EventInput input, IReadOnlyList<Effect> effects)
+    private static Violation? UnitDataCheck(Station station, DataLinkMachine pre, EventInput input, bool longInfo, IReadOnlyList<Effect> effects)
     {
         var command = input.Command ?? true;
         var poll = command && input.Pf == true;
-        var longInfo = input.Atoms is not null && input.Atoms.TryGetValue("info_field_length_le_N1_and_content_is_octet_aligned", out var ok) && !ok;
-        var label = input.Data;
+        var label = UiLabel(SystemState.Peer(station));
         var indications = effects.OfType<UpperEffect>().Where(e => e.Primitive == "DL_UNIT_DATA_indication").ToList();
         var errors = effects.OfType<UpperEffect>().Where(e => e.Primitive.StartsWith("DL-ERROR", StringComparison.Ordinal)).Select(e => e.Primitive).ToList();
         var frames = effects.OfType<FrameEffect>().ToList();

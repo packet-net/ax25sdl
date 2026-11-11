@@ -39,6 +39,18 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which a busy station's own T1 poll is RR (Transmit_Enquiry's busy path).</summary>
     public static string EnquirySaysRrDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-enquiry-says-rr");
 
+    /// <summary>The TlaCheck seeded fixture in which Connected swallows a UI command with P = 0.</summary>
+    public static string UiSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-swallowed");
+
+    /// <summary>The TlaCheck seeded fixture in which DL-UNIT-DATA Request in Connected sends nothing.</summary>
+    public static string UiUnsentDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-unsent");
+
+    /// <summary>The TlaCheck seeded fixture in which Connected does not answer a UI poll.</summary>
+    public static string UiPollUnansweredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-poll-unanswered");
+
+    /// <summary>The TlaCheck seeded fixture in which UI Check delivers a UI response.</summary>
+    public static string UiResponseDeliveredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-response-delivered");
+
     /// <summary>The TlaCheck seeded fixture in which Connected has no T3 expiry arm.</summary>
     public static string T3DeadDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead");
 

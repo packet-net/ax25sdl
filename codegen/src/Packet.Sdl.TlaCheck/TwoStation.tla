@@ -60,6 +60,9 @@ Submitted(s) ==
     IF s = "A" THEN [i \in 1..FramesAB |-> "a" \o ToString(i - 1)]
     ELSE [i \in 1..FramesBA |-> "b" \o ToString(i - 1)]
 
+\* The label of each station's UI datagram (Stepper.UiLabel).
+UiLabel(s) == IF s = "A" THEN "ua0" ELSE "ub0"
+
 StubB == Peer # "tables"
 DataStates == {"Connected", "TimerRecovery"}
 \* A live or waiting link: established, or being set up.
@@ -155,8 +158,10 @@ UnitDataCheck(s, pre, e, fx) ==
         inds == {i \in 1..Len(fx) : fx[i].kind = "dl" /\ fx[i].prim = "DL_UNIT_DATA_indication"}
         errs == {fx[i].prim : i \in {j \in 1..Len(fx) : fx[j].kind = "dl"}}
         frs == SelectSeq(fx, LAMBDA x : x.kind = "frame")
-        deliv == IF cmd /\ e.info
-                 THEN Cardinality(inds) = 1 /\ \A i \in inds : fx[i].detail = e.data
+        \* Too long is the scenario's (UiForm), not read back from e.info.
+        deliv == IF cmd /\ UiForm # "long"
+                 \* The label is the peer's datagram's, not read back from the frame.
+                 THEN Cardinality(inds) = 1 /\ \A i \in inds : fx[i].detail = UiLabel(Other(s))
                  ELSE inds = {} /\ (IF cmd THEN "DL-ERROR Indication (K)" ELSE "DL-ERROR Indication (Q)") \in errs
         ans == IF ~cmd THEN TRUE
                ELSE IF ~poll THEN Len(frs) = 0
@@ -470,9 +475,6 @@ LocalBusy(S, s, enter) ==
 
 \* The station's layer 3 still has its UI datagram to send (UnitDataAt).
 UnitDataReady(S, s) == s \in UnitDataAt /\ Table(s) /\ ~S.uis[s]
-
-\* The datagram's label (Stepper.UiLabel).
-UiLabel(s) == IF s = "A" THEN "ua0" ELSE "ub0"
 
 \* Layer 3 sends its UI datagram: a plain or long one through the page's
 \* DL_UNIT_DATA_request arm, a poll (UI command, P = 1) or a response (UI

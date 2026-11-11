@@ -31,6 +31,14 @@ public enum TableSetKind
     BusySaysRr,
     /// <summary>A seeded-defect fixture (fixtures/tables-enquiry-says-rr): a busy station's T1 poll is RR, not RNR (Transmit_Enquiry).</summary>
     EnquirySaysRr,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-swallowed): Connected swallows a UI command with P = 0.</summary>
+    UiSwallowed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-unsent): DL-UNIT-DATA Request in Connected sends nothing.</summary>
+    UiUnsent,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-poll-unanswered): Connected does not answer a UI poll.</summary>
+    UiPollUnanswered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-response-delivered): UI Check delivers a UI response.</summary>
+    UiResponseDelivered,
     /// <summary>A seeded-defect fixture (fixtures/tables-t3-dead): Connected has no T3 expiry arm.</summary>
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
@@ -530,6 +538,13 @@ public static class Scenarios
         {
             FramesAb = 1, UnitData = FlowControlAt.Both, Release = ReleaseBy.A, UiForm = UiForm.Poll,
         }, "clean");
+        Add("seeded-ui-swallowed", "seeded (UI delivered)", TableSetKind.UiSwallowed, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both }, "UnitData at B, 2");
+        Add("seeded-ui-unsent", "seeded (UI accounted at rest)", TableSetKind.UiUnsent, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both }, "Deadlock, 6");
+        Add("seeded-ui-poll-unanswered", "seeded (UI poll answered)", TableSetKind.UiPollUnanswered, o => o with { FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll }, "UnitData at B, 2");
+        Add("seeded-ui-response-delivered", "seeded (UI response refused)", TableSetKind.UiResponseDelivered, o => o with
+        {
+            FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Response,
+        }, "UnitData at B, 2");
 
         return list;
     }
