@@ -1,0 +1,95 @@
+name: package upgrades
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: package-upgrades
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  upgrade:
+    name: upgrade packages
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          submodules: true
+
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: dotnet --version
+        run: dotnet --version
+
+      - name: Ensure Rust with rustfmt
+        run: |
+          if ! command -v rustup >/dev/null 2>&1 && [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup component add rustfmt
+          rustfmt --version
+
+      - name: full upgrade, build and test
+        id: full
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/bump-packages.py codegen/ax25sdl.slnx | tee "$RUNNER_TEMP/upgrades.txt"
+          dotnet build codegen/ax25sdl.slnx --nologo
+          dotnet test codegen/ax25sdl.slnx --nologo --no-build
+
+      - name: security fallback, build and test
+        id: security
+        if: steps.full.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard
+          git clean -fdx -e .dotnet
+          python3 scripts/bump-packages.py codegen/ax25sdl.slnx --vulnerable-only | tee "$RUNNER_TEMP/upgrades.txt"
+          dotnet build codegen/ax25sdl.slnx --nologo
+          dotnet test codegen/ax25sdl.slnx --nologo --no-build
+
+      - name: commit and push
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -u
+          if git diff --cached --quiet; then
+            echo "nothing to upgrade"
+            exit 0
+          fi
+          if [ "${{ steps.full.outcome }}" = "failure" ]; then
+            subject="chore(deps): security package fixes"
+          else
+            subject="chore(deps): package upgrades"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          {
+            echo "$subject"
+            echo
+            echo "Built and tested before commit. Changed by scripts/bump-packages.py:"
+            echo
+            cat "$RUNNER_TEMP/upgrades.txt"
+          } > "$RUNNER_TEMP/commit-msg.txt"
+          git commit -q -F "$RUNNER_TEMP/commit-msg.txt"
+          git pull -q --rebase origin main
+          git push origin HEAD:main
