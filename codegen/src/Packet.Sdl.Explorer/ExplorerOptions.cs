@@ -129,9 +129,18 @@ public enum Invariants
     /// rest). Data lost in a give-up is reported as such, never accepted.
     /// </summary>
     GiveUpLoss = 2048,
+    /// <summary>
+    /// A station that has received RNR from its peer sends no I frame until it
+    /// receives RR, REJ, SREJ or a frame that resets or ends the link (§6.4.9:
+    /// it "stops transmitting I frames until the busy condition is cleared").
+    /// Checked on the frames sent, not on the station's peer-busy flag, so a
+    /// figure that ignores RNR is caught. Only RNR raises it, and on today's
+    /// tables only <see cref="ExplorerOptions.LocalBusy"/> produces one.
+    /// </summary>
+    PeerBusyHold = 4096,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>

@@ -603,6 +603,26 @@ public sealed class Stepper
     {
         ArgumentNullException.ThrowIfNull(s);
         var outcome = ApplyMove(s, move, number);
+        // The peer-busy hold: an RNR reaching a table-driven station raises
+        // it, and a frame that clears the busy condition or resets or ends the
+        // link lowers it; an I frame sent while it is up is a violation.
+        if (move.Kind is MoveKind.Deliver or MoveKind.Duplicate && !(move.Station == Station.B && s.StubPeer is not null))
+        {
+            var heard = HeardBusyAfter(s.HeardBusy(move.Station), s.Incoming(move.Station)[0].Type);
+            outcome = outcome with
+            {
+                Next = move.Station == Station.A ? outcome.Next with { HeardBusyA = heard } : outcome.Next with { HeardBusyB = heard },
+            };
+        }
+        else if (move.Kind == MoveKind.Pop && outcome.Violation is null && On(Invariants.PeerBusyHold) && s.HeardBusy(move.Station)
+                 && outcome.Record.Effects.Any(e => e.StartsWith("frame I ", StringComparison.Ordinal)))
+        {
+            outcome = outcome with
+            {
+                Violation = new Violation(Invariants.PeerBusyHold, move.Station,
+                    $"station {move.Station} sent an I frame although its peer's RNR has not been cleared (§6.4.9: a station that receives RNR stops transmitting I frames until the busy condition is cleared)"),
+            };
+        }
         // The give-up rule: a frame reaching a station after its peer gave up
         // was sent at or after the give-up (T1 only fires with both channels
         // empty), so the station has heard it.
@@ -615,6 +635,14 @@ public sealed class Stepper
         }
         return outcome;
     }
+
+    /// <summary>The peer-busy hold after receiving a frame of this type: RNR raises it; RR, REJ, SREJ and the frames that reset or end the link lower it; anything else leaves it.</summary>
+    private static bool HeardBusyAfter(bool heard, string type) => type switch
+    {
+        "RNR" => true,
+        "RR" or "REJ" or "SREJ" or "SABM" or "SABME" or "UA" or "DM" or "DISC" or "FRMR" => false,
+        _ => heard,
+    };
 
     private StepOutcome ApplyMove(SystemState s, Move move, int number)
     {

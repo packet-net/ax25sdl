@@ -1322,4 +1322,267 @@ public class CalibrationTests(ITestOutputHelper output)
         var act = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, DataBeforeConfirm = true });
         act.Should().Throw<ArgumentException>();
     }
+
+    // ─── Coverage batch 4: the peer-busy family (ExplorerOptions.LocalBusy) ──
+
+    private static ExplorerOptions Busy(FlowControlAt at, int ab, int ba) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, FramesAb = ab, FramesBa = ba, LocalBusy = at,
+    };
+
+    [Fact]
+    public void Busy_B_Holds_A_And_Clears_Cleanly()
+    {
+        // B enters its local busy condition (RNR), A stops sending and polls,
+        // B answers RNR F=1, then B clears (RR) and the data drains.
+        var result = Run(Busy(FlowControlAt.B, 2, 0));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(1069);
+        result.FiredTransitions.Should().Contain(new[]
+        {
+            "Connected/t22_rnr_received_yes", "Connected/t26_i_received_yes_yes_yes_yes_no",
+            "TimerRecovery/t19_rnr_received_yes_yes_no", "TimerRecovery/t19_rnr_received_yes_yes_yes",
+        });
+    }
+
+    [Fact]
+    public void Busy_A_While_B_Sends_Is_Clean()
+    {
+        var result = Run(Busy(FlowControlAt.A, 1, 2));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(2369);
+    }
+
+    [Fact]
+    public void Busy_Both_Is_Clean_Behind_Hypothesis_H1()
+    {
+        // Both stations busy once, both sending: clean once a station left in
+        // TimerRecovery counts as at rest (#91 otherwise). Reaches the busy
+        // station's own poll (RNR command P=1) at its peer in TimerRecovery.
+        var result = Run(Busy(FlowControlAt.Both, 1, 1) with { TimerRecoveryIsQuiescent = true });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(20221);
+        result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t19_rnr_received_no_yes_yes", "TimerRecovery/t19_rnr_received_no_no_yes" });
+    }
+
+    [Fact]
+    public void Busy_B_Then_A_Lost_Poll_Strands_B_In_Timer_Recovery()
+    {
+        // #91 after a busy period: clearing the busy condition starts T1 with
+        // nothing outstanding (DL-FLOW-ON's busy arm), B's poll is lost, and B
+        // never gets the F=1 response that is figc4.5's only exit.
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with { Budget = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[7].Transition.Should().Be(Stepper.BusyLeaveId);
+        result.Trace[9].Transition.Should().Be("t12_t1_expiry");
+        result.Trace[9].Actor.Should().Be("B");
+        result.Trace[^1].SummaryB.Should().StartWith("TimerRecovery").And.Contain("t1=stopped");
+        result.CounterexampleLength.Should().Be(21);
+    }
+
+    [Fact]
+    public void Busy_B_Outlasting_N2_Polls_Tears_The_Link_Down()
+    {
+        // Unfiled (docs/explorer.md, H5): with frames outstanding, each poll
+        // answered by RNR F=1 takes figc4.5 t19_rnr_received_yes_yes_no, which
+        // restarts T1 without resetting RC (and re-queues the outstanding frame
+        // again), so after N2 RNR answers the link goes down with DL-ERROR I.
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with { LongBusy = true });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace.Count(r => r.Transition == "t19_rnr_received_yes_yes_no").Should().Be(4);
+        result.Trace[16].Transition.Should().Be("t21_t1_expiry_yes_no");
+        result.Trace[16].Effects.Should().Contain(e => e.Contains("DL-ERROR Indication (I)", StringComparison.Ordinal));
+        result.CounterexampleLength.Should().Be(18);
+    }
+
+    [Fact]
+    public void Busy_B_Under_Reordering_Meets_H4_Then_H2()
+    {
+        // ax25spec#95 (H4): B's busy-clearing RR is overtaken by a newer RR, A
+        // takes it as an N(r) error and resets; a1 reordered behind the SABM
+        // draws REJ nr=0 = V(s) on the new link, and figc4.7's do-while
+        // re-queues frames never sent (H2).
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with
+        {
+            Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.MachineError);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[9].Transition.Should().Be("t21_rr_received_no_no");
+        result.CounterexampleLength.Should().Be(16);
+    }
+
+    [Fact]
+    public void H3_The_Tables_Busy_Flow_Off_Arm_Emits_RNR_Without_N_r()
+    {
+        // Once own receiver busy is set, a DL-FLOW-OFF takes figc4.4
+        // t05_dl_flow_off_request_yes, whose RNR has no N(r) staged (H3; the
+        // #43 checks are off so the search gets past #43).
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with
+        {
+            FlowControl = FlowControlAt.B, Invariants = Invariants.Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery),
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.MachineError);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[2].Transition.Should().Be(Stepper.BusyEnterId);
+        result.Trace[3].Action.Should().StartWith("DL_FLOW_OFF_request");
+        result.CounterexampleLength.Should().Be(4);
+    }
+
+    [Fact]
+    public void Flow_Control_In_Timer_Recovery_Reaches_The_Figc4_5_No_Op_Arms()
+    {
+        // #43 on figc4.5: with both #43 checks off, DL-FLOW-OFF and DL-FLOW-ON
+        // in Timer Recovery take the empty not-busy arms.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, FlowControl = FlowControlAt.B,
+            Invariants = Invariants.Default & ~(Invariants.BusyTracksFlow | Invariants.FlowOffDelivery),
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(1170);
+        result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t05_dl_flow_off_request_no", "TimerRecovery/t06_dl_flow_on_request_no" });
+    }
+
+    [Fact]
+    public void Seeded_A_Station_That_Ignores_RNR_Breaks_The_Peer_Busy_Hold()
+    {
+        // The seeded fixture drops set_peer_receiver_busy from Connected's RNR
+        // arms: A keeps sending after B's RNR. busy-b on the real tables is clean.
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with { TablesDir = Fixtures.RnrIgnoredDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.PeerBusyHold);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[1].Transition.Should().Be("t22_rnr_received_yes");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Seeded_A_Busy_Station_That_Delivers_Is_Caught()
+    {
+        // The seeded fixture reads peer receiver busy where Connected's I-frame
+        // arms test own receiver busy, so busy B accepts and delivers a0.
+        var result = Run(Busy(FlowControlAt.B, 2, 0) with { TablesDir = Fixtures.BusyDeliversDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.FlowOffDelivery);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[1].Transition.Should().Be(Stepper.BusyEnterId);
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Long_Busy_Needs_A_Busy_Station_And_Busy_Needs_The_Table_Driven_Peer()
+    {
+        var a = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, LongBusy = true });
+        a.Should().Throw<ArgumentException>();
+        var b = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { LocalBusy = FlowControlAt.A });
+        b.Should().Throw<ArgumentException>();
+    }
+
+    // ─── Coverage batch 4: T3 (ExplorerOptions.T3) ──────────────────────
+
+    [Theory]
+    [InlineData(0, 0, 0, 5)]
+    [InlineData(2, 1, 1, 758)]
+    public void T3_On_A_Live_Link_Is_Clean(int ab, int ba, int budget, int states)
+    {
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, FramesAb = ab, FramesBa = ba, Budget = budget, T3 = true });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain("Connected/t13_t3_expiry");
+    }
+
+    [Fact]
+    public void T3_Finds_A_Dead_Peer_And_Gives_Up_Honestly()
+    {
+        // An idle link whose keepalive polls are lost: the T3 loop gives up
+        // after N2 polls (its threshold is N2, no loss before it), which the
+        // give-up rule accepts.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, N2 = 2, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(33);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t21_t1_expiry_yes_yes_no");
+    }
+
+    [Fact]
+    public void T3_A_Release_Give_Up_Settles_Once_The_Peer_Polls()
+    {
+        // gu-release with T3: B never hears A give up, and with T3 modelled it
+        // is not settled until its keepalive finds A gone.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A,
+            AcceptGiveUp = true, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(95);
+    }
+
+    [Fact]
+    public void Seeded_Without_A_T3_Arm_A_Peer_Left_Up_Never_Settles()
+    {
+        // The seeded fixture removes figc4.4's T3 expiry arm: B never learns
+        // that A gave up. Before T3 was modelled such a B counted as settled;
+        // with T3 it does not, so the run is a deadlock.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.T3DeadDir, FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A,
+            AcceptGiveUp = true, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[4].Transition.Should().Be("t02_t1_expiry_yes");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void Seeded_A_Link_With_No_Keepalive_Is_Not_At_Rest()
+    {
+        // The seeded fixture starts T3 at neither end of a cold connect: both
+        // idle with T1 and T3 stopped, which the keepalive rule refuses.
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.NoKeepaliveDir, Seed = SeedKind.Disconnected, FramesAb = 0, T3 = true });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(2);
+        var real = Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, T3 = true });
+        real.Outcome.Should().Be(Outcome.NoViolation);
+        real.StatesExplored.Should().Be(10);
+    }
+
+    [Fact]
+    public void T3_Turns_Hypothesis_H1_Into_A_Livelock()
+    {
+        // #91: the stranded station's peer keeps polling it from T3, and the
+        // polls are answered from Timer Recovery and change nothing.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        result.StatesExplored.Should().Be(1448);
+    }
+
+    [Fact]
+    public void T3_Makes_A_Reset_From_Timer_Recovery_Fault_Free()
+    {
+        // ax25spec#167 with no fault: A's keepalive poll takes it to Timer
+        // Recovery, its layer 3 resets, figc4.5 t07 sends SABM and stays in
+        // Timer Recovery, and the reset is never confirmed.
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A, T3 = true });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        result.Trace[2].Transition.Should().Be("t13_t3_expiry");
+        result.Trace[3].Transition.Should().Be("t07_dl_connect_request");
+        result.Trace[3].SummaryA.Should().StartWith("TimerRecovery");
+        result.StatesExplored.Should().Be(45);
+    }
 }

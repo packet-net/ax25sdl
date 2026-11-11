@@ -67,6 +67,10 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.DmIgnored => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored"),
     TableSetKind.ReconnectSwallowed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed"),
     TableSetKind.ConfirmAsDisconnect => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-confirm-as-disconnect"),
+    TableSetKind.RnrIgnored => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rnr-ignored"),
+    TableSetKind.BusyDelivers => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-busy-delivers"),
+    TableSetKind.T3Dead => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead"),
+    TableSetKind.NoKeepalive => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-no-keepalive"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -260,6 +264,10 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.DmIgnored => "seeded dm-ignored",
     TableSetKind.ReconnectSwallowed => "seeded reconnect-swallowed",
     TableSetKind.ConfirmAsDisconnect => "seeded confirm-as-disconnect",
+    TableSetKind.RnrIgnored => "seeded rnr-ignored",
+    TableSetKind.BusyDelivers => "seeded busy-delivers",
+    TableSetKind.T3Dead => "seeded t3-dead",
+    TableSetKind.NoKeepalive => "seeded no-keepalive",
     _ => "seeded livelock",
 };
 

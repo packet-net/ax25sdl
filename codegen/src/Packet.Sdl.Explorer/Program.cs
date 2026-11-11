@@ -189,6 +189,7 @@ try
                         "deadlock" => Invariants.Deadlock,
                         "flow-off-delivery" => Invariants.FlowOffDelivery,
                         "busy-tracks-flow" => Invariants.BusyTracksFlow,
+                        "peer-busy-hold" => Invariants.PeerBusyHold,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }

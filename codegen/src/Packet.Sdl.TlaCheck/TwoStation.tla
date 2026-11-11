@@ -290,7 +290,7 @@ S0 ==
      rel |-> [s \in Stations |-> FALSE],
      loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
-     busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE],
+     busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE], hb |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -467,11 +467,20 @@ CanBusyOff(s) == viol = NoViol /\ BusyOffReady(sys, s)
 \* after the give-up (T1 only fires with both channels empty), so s heard it.
 Heard(r, s) == [r EXCEPT !.sys.heard[s] = @ \/ (AcceptGiveUp /\ sys.gave[Other(s)] # 0)]
 
+\* The peer-busy hold (Stepper.HeardBusyAfter): an RNR reaching a table-driven
+\* station raises it; RR, REJ, SREJ and the frames that reset or end the link
+\* lower it.
+HeardBusyAfter(h, t) ==
+    IF t = "RNR" THEN TRUE
+    ELSE IF t \in {"RR", "REJ", "SREJ", "SABM", "SABME", "UA", "DM", "DISC", "FRMR"} THEN FALSE
+    ELSE h
+HeardBusy(r, s, f) == IF Table(s) THEN [r EXCEPT !.sys.hb[s] = HeardBusyAfter(sys.hb[s], f.type)] ELSE r
+
 Deliver(s) ==
     /\ CanDeliver(s)
     /\ LET f == Head(sys.ch[s])
-       IN  Take(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
-                      ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), s), "deliver", s, f)
+       IN  Take(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
+                      ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), s), s, f), "deliver", s, f)
 
 Drop(s) ==
     /\ viol = NoViol
@@ -485,8 +494,8 @@ Dup(s) ==
     /\ viol = NoViol
     /\ sys.ch[s] # <<>> /\ sys.budget > 0 /\ "dup" \in Faults
     /\ LET f == Head(sys.ch[s])
-       IN  Take(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
-                      ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), s), "duplicate", s, f)
+       IN  Take(HeardBusy(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
+                      ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), s), s, f), "duplicate", s, f)
 
 Reorder(s) ==
     /\ viol = NoViol
@@ -494,9 +503,16 @@ Reorder(s) ==
     /\ LET q == sys.ch[s]
        IN  TakeChannel([sys EXCEPT !.ch[s] = <<q[2], q[1]>> \o SubSeq(q, 3, Len(q)), !.budget = @ - 1], "reorder", s, q[1])
 
+\* A pop is the only move that sends I frames: one sent while the peer-busy
+\* hold is up is a violation (PeerBusyHold).
 Pop(s) ==
     /\ CanPop(s)
-    /\ Take(Inject(sys, s, Event("I_frame_pops_off_queue"), sys.ch[s], sys.budget, FALSE), "pop", s, NoFrm)
+    /\ LET r == Inject(sys, s, Event("I_frame_pops_off_queue"), sys.ch[s], sys.budget, FALSE)
+           out == r.sys.ch[Other(s)]
+           sentI == \E i \in (Len(sys.ch[Other(s)]) + 1)..Len(out) : out[i].type = "I"
+       IN  Take(IF r.viol = NoViol /\ "PeerBusyHold" \in StepChecks /\ sys.hb[s] /\ sentI
+                THEN [r EXCEPT !.viol = Viol("PeerBusyHold", s, "station " \o s \o " sent an I frame although its peer's RNR has not been cleared")]
+                ELSE r, "pop", s, NoFrm)
 
 Seize(s) ==
     /\ CanSeize(s)
@@ -670,5 +686,25 @@ QuiescenceLive == (<>[]CanProgressOrT1 => []<><<TookProgressOrT1>>_vars) => []<>
 \* The explorer's SelectiveProgress (timer-free): T1 is not progress, so a
 \* path that completes only through a T1 expiry does not count.
 TimerFreeLive == (<>[]CanProgress => []<><<TookProgress>>_vars) => []<>Quiescent
+
+\* With T3Moves or BusyAt (used instead of the two above): the keepalive, or
+\* a peer polling a busy station that answers RNR, gives a cycle of moves
+\* (poll, answer, back to Connected) that the disjunctive fairness accepts
+\* for ever while a one-shot layer 3 move (a release, a reconnect, leaving
+\* the busy condition, a submission) waits, so TLC would report a lasso
+\* where the explorer's AG EF finds a path out. Each such move gets its own
+\* weak fairness too. Still sound in the same direction: from a region with
+\* no path to quiescence a round-robin schedule meets every fairness
+\* conjunct without leaving it. Kept apart from the two above so that rows
+\* without these options check exactly the formula they always did.
+Took(kind, s) == last'.move = kind /\ last'.at = s
+OneShotFair ==
+    \A s \in Stations :
+        /\ (<>[]CanRelease(s) => []<><<Took("release", s)>>_vars)
+        /\ (<>[]CanReconnect(s) => []<><<Took("reconnect", s)>>_vars)
+        /\ (<>[]CanBusyOff(s) => []<><<Took("busy-off", s)>>_vars)
+        /\ (<>[]CanSubmit(s) => []<><<Took("submit", s)>>_vars)
+QuiescenceLiveL3 == ((<>[]CanProgressOrT1 => []<><<TookProgressOrT1>>_vars) /\ OneShotFair) => []<>Quiescent
+TimerFreeLiveL3 == ((<>[]CanProgress => []<><<TookProgress>>_vars) /\ OneShotFair) => []<>Quiescent
 
 =============================================================================

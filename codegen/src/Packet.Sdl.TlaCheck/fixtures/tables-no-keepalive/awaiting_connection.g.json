@@ -79,10 +79,6 @@
           "kind": "processing"
         },
         {
-          "verb": "Start T3",
-          "kind": "processing"
-        },
-        {
           "verb": "V(s) := 0",
           "kind": "processing"
         },
@@ -100,7 +96,7 @@
         }
       ],
       "next": "Connected",
-      "notes": "",
+      "notes": "SEEDED DEFECT (TlaCheck fixture): Start T3 removed, so the initiator of a connect has no keepalive.",
       "references": [],
       "loops": []
     },
