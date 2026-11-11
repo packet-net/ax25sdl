@@ -53,6 +53,12 @@ jobs:
           python3 scripts/bump-packages.py codegen/ax25sdl.slnx | tee "$RUNNER_TEMP/upgrades.txt"
           dotnet build codegen/ax25sdl.slnx --nologo
           dotnet test codegen/ax25sdl.slnx --nologo --no-build
+          # Codegen drift, as ci.yml: a generator bump that changes output must fail the gate.
+          # Scoped to the generated paths, since the package edits are already in the tree.
+          dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --csharp
+          git diff --exit-code -- spec/csharp/ codegen/closed-set-values.yaml
+          dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
+          git diff --exit-code -- spec/json/
 
       - name: security fallback, build and test
         id: security
@@ -65,6 +71,12 @@ jobs:
           python3 scripts/bump-packages.py codegen/ax25sdl.slnx --vulnerable-only | tee "$RUNNER_TEMP/upgrades.txt"
           dotnet build codegen/ax25sdl.slnx --nologo
           dotnet test codegen/ax25sdl.slnx --nologo --no-build
+          # Codegen drift, as ci.yml: a generator bump that changes output must fail the gate.
+          # Scoped to the generated paths, since the package edits are already in the tree.
+          dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --csharp
+          git diff --exit-code -- spec/csharp/ codegen/closed-set-values.yaml
+          dotnet run --project codegen/src/Packet.Sdl.CodeGen --configuration Release -- --json
+          git diff --exit-code -- spec/json/
 
       - name: commit and push
         if: success()
