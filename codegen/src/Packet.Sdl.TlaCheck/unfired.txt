@@ -1,0 +1,107 @@
+# Rows of the current Data Link tables that no calibration scenario fires,
+# each accounted for with a reason. TlaCheck compares this list with the
+# never-fired set of a full calibration run and fails if a listed row fires or
+# an unfired row is not listed, so the accounting cannot rot. docs/tla.md
+# ("Rows not fired") explains each group.
+#
+# A group line is "group <name>: <status>: <reason>", where the status is one
+# of:
+#   spec     unreachable in the specification as transcribed (the reason names the issue)
+#   harness  not reachable in this harness (the reason says what is missing)
+#   not-yet  not yet reached: recorded from bounded attempts, or an existing
+#            mechanism could reach it
+# The rows under a group line are table keys, State/transition or
+# Subroutine:path.
+
+group never-called: spec: the subroutines no page calls (ax25spec#54)
+Set_Version_2_2:t01_set_version_2_2
+Set_Version_2_0:t01_set_version_2_0
+Establish_Extended_Data_Link:t01_establish_extended_data_link_yes
+Establish_Extended_Data_Link:t02_establish_extended_data_link_no
+
+group mod128-srej: spec: Enquiry Response's modulo 128 SREJ paths need a responder at modulo 128, which the tables never set (ax25spec#54)
+Enquiry_Response:t04_enquiry_response_yes_no_yes_no_yes
+Enquiry_Response:t05_enquiry_response_yes_no_yes_no_no
+
+group queue-while-initiated: spec: a pop with Layer 3 Initiated set in the Awaiting pages; every arm that sets the flag empties the queue, and DL-DATA Request discards while it is set (no issue: the figures never queue there)
+AwaitingConnection/t10_i_frame_pops_off_queue_yes
+AwaitingV22Connection/t05_i_frame_pops_off_queue_yes
+
+group flow-busy-h3: spec: the DL-FLOW-OFF and DL-FLOW-ON busy arms; behind ax25spec#43 nothing sets own receiver busy, and with the injected busy condition they are reached but fail as H3 (no N(r) staged, fixed with #43 by ax25spec PR #109), which is not counted as fired
+Connected/t05_dl_flow_off_request_yes
+Connected/t06_dl_flow_on_request_yes_yes
+Connected/t06_dl_flow_on_request_yes_no
+TimerRecovery/t05_dl_flow_off_request_yes
+TimerRecovery/t06_dl_flow_on_request_yes_yes
+TimerRecovery/t06_dl_flow_on_request_yes_no
+
+group dl-data-in-figc4.6: harness: DL-DATA Request in figc4.6 with Layer 3 Initiated; figc4.6 with the flag set is reached (a reconnect at modulo 128), but the harness's layer 3 offers data only before its reconnect, which waits until everything is delivered
+AwaitingV22Connection/t04_dl_data_request_yes
+
+group pop-self-loops: harness: pops that push the frame straight back (peer busy, window full, a pop while awaiting a connection); the pop move is taken only when it changes something
+AwaitingConnection/t10_i_frame_pops_off_queue_no
+AwaitingV22Connection/t05_i_frame_pops_off_queue_no
+Connected/t03_i_frame_pops_off_queue_yes
+Connected/t03_i_frame_pops_off_queue_no_yes
+TimerRecovery/t03_i_frame_pops_off_queue_yes
+TimerRecovery/t03_i_frame_pops_off_queue_no_yes
+
+group layer3-misuse: harness: inputs a well-behaved layer 3 never sends (a release of a link that is down or already going down, primitives a page has no arm for); missing: a misbehaving layer 3
+Disconnected/t01_dl_disconnect_request
+Disconnected/t04_all_other_primitives__from_upper_layer
+Connected/t08_all_other_primitives__from_upper_layer
+TimerRecovery/t26_all_other_primitives__from_upper_layer
+AwaitingRelease/t01_dl_disconnect_request
+AwaitingRelease/t06_all_other_primitives__from_upper_layer
+
+group seed-only: harness: runs in every cold-connect seed, but seed steps are not counted as fired; missing: counting seed steps
+Disconnected/t03_dl_connect_request
+
+group data-in-timer-recovery: harness: layer 3 holding data counts as work pending, so T1 never fires (and nothing enters Timer Recovery) while a submission is due; missing: data offered after recovery has begun
+TimerRecovery/t02_dl_data_request
+
+group tr-lower-catch-all: harness: every frame type the harness models has its own Timer Recovery arm; missing: XID and TEST frames
+TimerRecovery/t25_all_other_primitives__from_lower_layer
+
+group sabm-declined: harness: able_to_establish false for a SABM; missing: a peer that declines SABM (the harness declines only SABME)
+Disconnected/t13_sabm_received_no
+
+group i-frame-p1: not-yet: an I frame with P = 1, which no table sends (ax25spec#60 proposes one), and the REJ with F = 1 only such a frame draws (the last two also need an N(r) out of range); needs an injected I frame with P = 1
+Connected/t26_i_received_yes_yes_yes_yes_yes
+Connected/t26_i_received_yes_yes_yes_no_yes_yes
+Connected/t26_i_received_yes_yes_yes_no_no_yes_yes_yes
+Connected/t26_i_received_yes_yes_yes_no_no_no_yes
+TimerRecovery/t22_i_received_yes_yes_yes_yes_yes
+TimerRecovery/t22_i_received_yes_yes_yes_no_yes_yes
+TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_yes_yes
+TimerRecovery/t22_i_received_yes_yes_yes_no_no_no_yes
+TimerRecovery/t23_rej_received_yes_yes_yes
+TimerRecovery/t23_rej_received_yes_yes_no
+TimerRecovery/t23_rej_received_yes_no_yes
+TimerRecovery/t23_rej_received_yes_no_no
+
+group nr-error-reordering: not-yet: an N(r) outside [V(a), V(s)] on these arms; on a FIFO channel none arrives, so they need channel reordering at more positions and with SREJ than the ro rows use (ax25spec#95)
+Connected/t22_rnr_received_no_yes
+Connected/t24_srej_received_no_no
+Connected/t25_rej_received_no_yes
+TimerRecovery/t18_rr_received_no_yes_no_yes
+TimerRecovery/t18_rr_received_no_yes_no_no
+TimerRecovery/t19_rnr_received_yes_no_yes
+TimerRecovery/t19_rnr_received_no_yes_no_yes
+TimerRecovery/t19_rnr_received_no_yes_no_no
+TimerRecovery/t19_rnr_received_no_no_no
+TimerRecovery/t23_rej_received_no_yes_no_yes
+TimerRecovery/t23_rej_received_no_yes_no_no
+TimerRecovery/t23_rej_received_no_no_no_yes
+TimerRecovery/t24_srej_received_yes_no_no
+TimerRecovery/t24_srej_received_no_no_yes
+TimerRecovery/t24_srej_received_no_no_no
+
+group reject-naming-vs: not-yet: a REJ or SREJ naming no outstanding frame (N(r) = V(s), or V(s) = V(a)); three are REJ or SREJ command arms, unreached mainly because no table sends those commands and the injection gate excludes N(r) = V(s) by construction; on a FIFO channel a table only sends such a reject from a stale duplicate (#40, fixed) or with a window above half the modulus (#13)
+TimerRecovery/t23_rej_received_no_yes_yes_yes
+TimerRecovery/t24_srej_received_yes_yes_no_yes
+TimerRecovery/t24_srej_received_no_yes_yes_yes
+TimerRecovery/t24_srej_received_no_yes_no_yes
+
+group tr-srej-out-of-sequence: not-yet: an out-of-sequence I frame two or more ahead reaching a station in Timer Recovery with SREJ and no SREJ outstanding; masked by #42/#47 with the checks on, it fires in the explorer with reject coherence, sequence sanity and delivery off at 1 + 3 frames, SREJ, four drops (38 621 states), which TLC does not finish within its 600 s limit, so it is not in the suite (its sibling with an SREJ outstanding fires in tr-srej-rc-off)
+TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes

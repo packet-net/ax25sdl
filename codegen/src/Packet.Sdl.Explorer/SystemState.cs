@@ -127,6 +127,30 @@ public sealed record SystemState
 
     public bool UiDoneB { get; init; }
 
+    /// <summary>
+    /// With <see cref="ExplorerOptions.FrameErrors"/>, the link resets each
+    /// station has made (sent SABM or SABME from Connected or TimerRecovery):
+    /// 0 none, 1 only honest ones (on a corrupted frame), 2 an unjustified one.
+    /// </summary>
+    public int ResetA { get; init; }
+
+    public int ResetB { get; init; }
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.FrameErrors"/>, how far the station's
+    /// layer 3 has been told of a reset: 0 nothing, 1 a DL-ERROR Indication
+    /// since the last connect report, 2 a DL-CONNECT Confirm or Indication
+    /// after it.
+    /// </summary>
+    public int ToldA { get; init; }
+
+    public int ToldB { get; init; }
+
+    /// <summary>With <see cref="ExplorerOptions.Inject"/>, whether the station has put its injected frame on the air.</summary>
+    public bool InjectedA { get; init; }
+
+    public bool InjectedB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -163,6 +187,12 @@ public sealed record SystemState
     public bool UiSent(Station s) => s == Station.A ? UiSentA : UiSentB;
 
     public bool UiDone(Station s) => s == Station.A ? UiDoneA : UiDoneB;
+
+    public bool Injected(Station s) => s == Station.A ? InjectedA : InjectedB;
+
+    public int Reset(Station s) => s == Station.A ? ResetA : ResetB;
+
+    public int Told(Station s) => s == Station.A ? ToldA : ToldB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -203,7 +233,9 @@ public sealed record SystemState
           .Append("|y").Append(BusyUsedA ? '1' : '0').Append(BusyUsedB ? '1' : '0')
           .Append("|t").Append(T3LoopA ? '1' : '0').Append(T3LoopB ? '1' : '0')
           .Append(HeardBusyA ? '1' : '0').Append(HeardBusyB ? '1' : '0')
-          .Append("|v").Append(UiSentA ? '1' : '0').Append(UiSentB ? '1' : '0').Append(UiDoneA ? '1' : '0').Append(UiDoneB ? '1' : '0');
+          .Append("|v").Append(UiSentA ? '1' : '0').Append(UiSentB ? '1' : '0').Append(UiDoneA ? '1' : '0').Append(UiDoneB ? '1' : '0')
+          .Append("|e").Append(Inv(ResetA)).Append(Inv(ResetB)).Append(Inv(ToldA)).Append(Inv(ToldB))
+          .Append("|i").Append(InjectedA ? '1' : '0').Append(InjectedB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

@@ -45,6 +45,16 @@ public enum TableSetKind
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
     NoKeepalive,
+    /// <summary>A seeded-defect fixture (fixtures/tables-frame-error-unreported): Connected's control field error arm (version 2.0) does not report DL-ERROR (L).</summary>
+    FrameErrorUnreported,
+    /// <summary>A seeded-defect fixture (fixtures/tables-frame-error-arms-deleted): Timer Recovery has no frame-error arms, so a corrupted frame falls to its lower-layer catch-all.</summary>
+    FrameErrorArmsDeleted,
+    /// <summary>A seeded-defect fixture (fixtures/tables-reset-unconfirmed): AwaitingConnection does not confirm a connect layer 3 initiated.</summary>
+    ResetUnconfirmed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-rr-resets): an in-window RR in Connected resets the link.</summary>
+    RrResets,
+    /// <summary>A seeded-defect fixture (fixtures/tables-reset-wrong-code): Connected reports a reset by the peer (SABM, V(s) != V(a)) as DL-ERROR (A), not (F).</summary>
+    ResetWrongCode,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -551,6 +561,74 @@ public static class Scenarios
         {
             FramesAb = 1, UnitData = FlowControlAt.Both, Budget = 1, Faults = FaultKinds.Drop,
         }, "UnitData at A, 5");
+
+        // Coverage batch 6, part 1: frame errors (FrameErrors), one channel
+        // fault, no other faults unless stated (a duplicated UA would reset
+        // the link without justification, #114, and the reset rule never
+        // lets that rest).
+        const FrameErrors FE3 = FrameErrors.ControlField | FrameErrors.InfoNotPermitted | FrameErrors.Length;
+        const FrameErrors FE5 = FE3 | FrameErrors.N1 | FrameErrors.IResponse;
+        ExplorerOptions Fe(ExplorerOptions o, FrameErrors fe) => o with { FrameErrors = fe, Budget = 1, Faults = FaultKinds.None };
+        Add("fe-cold", "frame-error control", TableSetKind.Current, o => Fe(o, FE3) with { Seed = SeedKind.Disconnected, FramesAb = 0 }, "clean");
+        Add("fe-v22", "frame-error control", TableSetKind.Current, o => Fe(o, FE3) with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0 }, "clean");
+        Add("fe-release", "frame-error control (honest reset, nothing lost)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, Release = ReleaseBy.A }, "clean");
+        Add("fe-a1", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1 }, "ResetLoss, 4");
+        Add("fe-a1-srej", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1, Srej = true }, "ResetLoss, 4");
+        Add("fe-ab1-ctl", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "ResetLoss, 4");
+        Add("fe-a2-k1-info", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, "ResetLoss, 6");
+        Add("fe-iresp", "frame-error control", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with { FramesAb = 1 }, "clean");
+        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "Quiescence");
+        Add("fe-tr-b3", "ax25spec#50", TableSetKind.Current, o => Fe(o, FrameErrors.N1 | FrameErrors.IResponse) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop,
+        }, "Deadlock, 4");
+        Add("fe-iresp-trq", "ax25spec#175, #176", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop, TimerRecoveryIsQuiescent = true,
+        }, "clean");
+        Add("busy-a-tr2", "#91 (H1)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.A, Budget = 2, Faults = FaultKinds.Drop,
+        }, "Deadlock, 14");
+        Add("t3-reconnect-cold-mod128", "ax25spec#167 (fault-free with T3, modulo 128)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
+        }, "Quiescence");
+
+        // From the review of batch 6: rows the first cut recorded as not fired.
+        Add("tr-rej", "#91 (H1)", TableSetKind.Current, o => o with { FramesAb = 1, FramesBa = 3, K = 2, Budget = 3, Faults = FaultKinds.Drop }, "Deadlock, 17");
+        Add("tr-srej-rc-off", "#42 (runaway), masked by #42/#47 with the checks on", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, Srej = true, Budget = 4, Faults = FaultKinds.Drop,
+            Invariants = Default & ~Invariants.RejectCoherence & ~Invariants.Delivery,
+        }, "SequenceSanity at A, 24");
+        Add("dl-error-u", "ax25spec#168", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, LocalBusy = FlowControlAt.B, LongBusy = true, T3 = true, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "Deadlock, 6");
+
+        // Coverage batch 6, part 2: injected frames (Inject, InjectedFrame).
+        ExplorerOptions Inj(ExplorerOptions o, FlowControlAt at, InjectedFrame f) => o with { Inject = at, InjectedFrame = f, Budget = 0 };
+        Add("inj-rej-busy-tr", "ax25spec#171", TableSetKind.Current, o => Inj(o, FlowControlAt.A, InjectedFrame.RejPoll) with
+        {
+            FramesAb = 0, FramesBa = 1, LocalBusy = FlowControlAt.B, Budget = 1, Faults = FaultKinds.Drop,
+        }, "BusyIndication at B, 6");
+        Add("inj-rej-tr", "REJ poll control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.RejPoll) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-srej-tr", "ax25spec#164 (accepted)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejCommand) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-srejp-tr", "ax25spec#164 (accepted)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejPoll) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("inj-ua-cold", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { Seed = SeedKind.Disconnected, FramesAb = 0 }, "clean");
+        Add("inj-ua-v22", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0 }, "clean");
+        Add("inj-ua-release", "UA F=0 control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.UaF0) with { FramesAb = 0, Release = ReleaseBy.A }, "clean");
+        Add("inj-frmr-srej", "FRMR control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 0, Srej = true }, "clean");
+        Add("inj-frmr-t3", "FRMR control", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 0, T3 = true }, "clean");
+        Add("inj-frmr-a1", "ax25spec#50", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.Frmr) with { FramesAb = 1 }, "Deadlock, 4");
+        Add("seeded-fe-unreported", "seeded (frame error reported)", TableSetKind.FrameErrorUnreported, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "FrameError at B, 2");
+        Add("seeded-fe-arms-deleted", "seeded (frame error on a catch-all)", TableSetKind.FrameErrorArmsDeleted, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "FrameError at A, 3");
+        Add("seeded-reset-unconfirmed", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "Deadlock, 4");
+        Add("seeded-reset-unconfirmed-a", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, "Deadlock, 6");
+        Add("seeded-reset-wrong-code", "seeded (told by the reset's own code)", TableSetKind.ResetWrongCode, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "Deadlock, 4");
+        Add("seeded-rr-resets", "seeded (unjustified reset never rests)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, Budget = 0 }, "Deadlock, 6");
+        Add("seeded-rr-resets-loss", "seeded (unjustified reset is no reset loss)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 2, K = 1, Budget = 0 }, "Deadlock, 6");
 
         return list;
     }

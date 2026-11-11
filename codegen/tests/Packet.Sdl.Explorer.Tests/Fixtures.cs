@@ -60,6 +60,21 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which neither end of a cold connect starts T3.</summary>
     public static string NoKeepaliveDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-no-keepalive");
 
+    /// <summary>The TlaCheck seeded fixture in which Connected's control field error arm (version 2.0) does not report DL-ERROR (L).</summary>
+    public static string FrameErrorUnreportedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-unreported");
+
+    /// <summary>The TlaCheck seeded fixture in which Timer Recovery has no frame-error arms.</summary>
+    public static string FrameErrorArmsDeletedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-arms-deleted");
+
+    /// <summary>The TlaCheck seeded fixture in which Awaiting Connection does not confirm a connect layer 3 initiated.</summary>
+    public static string ResetUnconfirmedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed");
+
+    /// <summary>The TlaCheck seeded fixture in which Connected reports a reset by the peer as DL-ERROR (A), not (F).</summary>
+    public static string ResetWrongCodeDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code");
+
+    /// <summary>The TlaCheck seeded fixture in which an in-window RR in Connected resets the link.</summary>
+    public static string RrResetsDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets");
+
     public static string ReconnectSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed");
 
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);

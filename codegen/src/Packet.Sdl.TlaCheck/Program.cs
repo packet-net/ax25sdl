@@ -24,7 +24,12 @@ deadlock), and the same number of distinct states (clean runs).
   --heap SIZE       TLC heap per run (default 2g)
   --timeout S       seconds per TLC run (default 600)
 
-exit code: 0 every row agrees, 1 some row disagrees or a run failed
+A full calibration run (no --only, no --grid) also checks the accounting:
+the rows no scenario fires must be exactly those unfired.txt records as
+not fired, each with its status and reason.
+
+exit code: 0 every row agrees (and the accounting holds), 1 some row
+disagrees, a run failed, or the accounting does not hold
 """;
 
 string? jar = Environment.GetEnvironmentVariable("TLA2TOOLS_JAR");
@@ -78,6 +83,11 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.UiArmDeleted => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-arm-deleted"),
     TableSetKind.T3Dead => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead"),
     TableSetKind.NoKeepalive => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-no-keepalive"),
+    TableSetKind.FrameErrorUnreported => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-unreported"),
+    TableSetKind.FrameErrorArmsDeleted => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-arms-deleted"),
+    TableSetKind.ResetUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed"),
+    TableSetKind.RrResets => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets"),
+    TableSetKind.ResetWrongCode => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -115,9 +125,19 @@ for (var idx = 0; idx < scenarios.Count; idx++)
     sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Agree ? "yes" : "**no**: " + r.Why)} |\n");
 }
 Console.WriteLine(sb.ToString());
-Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current),
-    scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList()));
-return results.Values.All(r => r.Agree) ? 0 : 1;
+var currentRuns = scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList();
+Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current), currentRuns));
+// The accounting check (unfired.txt) needs the whole calibration suite: a
+// subset or the grid fires less, so it is skipped then.
+var accounted = true;
+if (only is null && !grid)
+{
+    var (ok, text) = Coverage.CheckExpectedUnfired(Dir(TableSetKind.Current),
+        Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "unfired.txt"), Coverage.NeverFired(Dir(TableSetKind.Current), currentRuns));
+    Console.WriteLine(text);
+    accounted = ok;
+}
+return results.Values.All(r => r.Agree) && accounted ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
 
@@ -244,7 +264,8 @@ static (string Kind, string Station, int Steps, List<string> Tids, string Note) 
         case "deadlock":
             // Under the give-up rule a deadlock in a settled honest give-up
             // that lost data is reported as that loss, as the explorer does.
-            return (lastStep?.Field("lossy") == "yes" ? "GiveUpLoss" : "Deadlock", "", steps, tids, "");
+            // So is a settled honest frame-error reset that lost data.
+            return (lastStep?.Field("lossy") switch { "yes" => "GiveUpLoss", "reset" => "ResetLoss", _ => "Deadlock" }, "", steps, tids, "");
         case "temporal":
             // The lasso: the states TLC prints, the last being "Back to state n" or a stuttering marker.
             return (phase == Phase.TimerFree ? "SelectiveProgress" : "Quiescence", "", r.Trace.Count, tids, "");
@@ -282,6 +303,11 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.UiArmDeleted => "seeded ui-arm-deleted",
     TableSetKind.T3Dead => "seeded t3-dead",
     TableSetKind.NoKeepalive => "seeded no-keepalive",
+    TableSetKind.FrameErrorUnreported => "seeded frame-error-unreported",
+    TableSetKind.FrameErrorArmsDeleted => "seeded frame-error-arms-deleted",
+    TableSetKind.ResetUnconfirmed => "seeded reset-unconfirmed",
+    TableSetKind.RrResets => "seeded rr-resets",
+    TableSetKind.ResetWrongCode => "seeded reset-wrong-code",
     _ => "seeded livelock",
 };
 
