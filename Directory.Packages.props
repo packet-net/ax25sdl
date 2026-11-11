@@ -7,64 +7,64 @@
 
   <ItemGroup>
     <!-- Persistence -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
-    <PackageVersion Include="Dapper" Version="2.1.66" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+    <PackageVersion Include="Dapper" Version="2.1.89" />
 
     <!-- Auth -->
     <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
     <PackageVersion Include="Fido2.AspNet" Version="4.0.0-beta.16" />
-    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.5.0" />
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
 
     <!-- Logging / telemetry (opt-in only) -->
-    <PackageVersion Include="Serilog" Version="4.2.0" />
+    <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
-    <PackageVersion Include="OpenTelemetry" Version="1.10.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
+    <PackageVersion Include="OpenTelemetry" Version="1.21.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />
 
     <!-- HTTP + validation -->
     <PackageVersion Include="Refit" Version="8.0.0" />
-    <PackageVersion Include="FluentValidation" Version="11.11.0" />
-    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.0" />
+    <PackageVersion Include="FluentValidation" Version="11.12.0" />
+    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.1" />
 
     <!-- Serial / IO -->
-    <PackageVersion Include="System.IO.Ports" Version="10.0.0" />
+    <PackageVersion Include="System.IO.Ports" Version="10.0.15" />
 
     <!-- MQTT (SP-001 spike — LinBPQ feed ingestion) -->
     <PackageVersion Include="MQTTnet" Version="4.3.7.1207" />
 
     <!-- YAML for SDL DSL -->
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
-    <PackageVersion Include="JsonSchema.Net" Version="7.3.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="7.4.0" />
 
     <!-- SDL codegen: Scriban for templating, Roslyn for parse-back validation,
          CommandLineParser for the codegen tool's CLI. -->
-    <PackageVersion Include="Scriban" Version="7.2.2" />
+    <PackageVersion Include="Scriban" Version="7.6.1" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageVersion Include="CommandLineParser" Version="2.9.1" />
 
     <!-- Packet.Term: Terminal.Gui v2 (Turbo Vision-style full-window TUI) +
          Microsoft.Extensions.Configuration for the JSON settings file. -->
-    <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
+    <PackageVersion Include="Terminal.Gui" Version="2.5.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.15" />
 
     <!-- Testing -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.2" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
-    <PackageVersion Include="FsCheck.Xunit" Version="3.1.0" />
-    <PackageVersion Include="Testcontainers" Version="4.1.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-    <PackageVersion Include="AwesomeAssertions" Version="9.2.0" />
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
-    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
+    <PackageVersion Include="FsCheck.Xunit" Version="3.6.0" />
+    <PackageVersion Include="Testcontainers" Version="4.16.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.15" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.85" />
 
     <!-- Fuzzing (SP-004 — AX.25 / KISS wire-format fuzzer) -->
-    <PackageVersion Include="SharpFuzz" Version="2.2.0" />
+    <PackageVersion Include="SharpFuzz" Version="2.3.0" />
 
     <!-- Build housekeeping -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
