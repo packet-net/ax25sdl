@@ -246,6 +246,35 @@ public sealed record ExplorerOptions
     public bool AcceptGiveUp { get; init; }
 
     /// <summary>
+    /// A local busy condition (§6.4.10, "Whenever a TNC enters a busy
+    /// condition, it indicates this by sending an RNR response at the next
+    /// opportunity"), injected by the harness at the stations named here, once
+    /// each, on an established link (Connected or TimerRecovery). Entering it
+    /// does what the figures draw for DL-FLOW-OFF Request once #43 and H3 are
+    /// fixed (ax25spec PR #109): Set Own Receiver Busy, N(r) := V(r), RNR
+    /// response F = 0, Clear Acknowledge Pending. Leaving it, which is enabled
+    /// whenever the condition still holds, does what the figures draw for
+    /// DL-FLOW-ON Request with H3's N(r) box: Clear Own Receiver Busy,
+    /// N(r) := V(r), RR command P = 0, Clear Acknowledge Pending, and when T1
+    /// is not running Stop T3 and Start T1. On today's tables nothing else sets
+    /// own receiver busy (#43), so this is how the peer-busy and own-busy arms
+    /// are reached. Table-driven stations only. Off by default.
+    /// </summary>
+    public FlowControlAt LocalBusy { get; init; } = FlowControlAt.None;
+
+    /// <summary>
+    /// Model T3 expiry: a T3_expiry move at a station whose T3 is running and
+    /// whose T1 is not, under the quiescent-timeout rule T1 uses (nothing in
+    /// flight, owed, ready to pop or waiting to be submitted anywhere), on a
+    /// page with a T3 arm (figc4.4 only; figc4.5 has none, #91). Two rules come
+    /// with it: at rest a Connected station keeps its keepalive (T1 or T3
+    /// running), and with <see cref="AcceptGiveUp"/> a station left up after
+    /// its peer gave up is never settled (its T3 will find the peer gone). Off
+    /// by default.
+    /// </summary>
+    public bool T3 { get; init; }
+
+    /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase
     /// seeds only (Disconnected or AwaitingV22Connection) and carry no data
     /// phase, so both frame counts must be 0; the scenario ends at "link

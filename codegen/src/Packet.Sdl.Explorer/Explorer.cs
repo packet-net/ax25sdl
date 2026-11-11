@@ -30,7 +30,7 @@ public sealed record ExplorationResult(
     /// <summary>
     /// The table transitions fired on any edge the search applied (including a
     /// violating one), as "State/transition id", for arm-coverage reporting.
-    /// Stub-peer rules and the pinned retransmission are not table rows and
+    /// Stub-peer rules and the pinned harness transitions (retransmission, local busy) are not table rows and
     /// are left out.
     /// </summary>
     public IReadOnlySet<string> FiredTransitions { get; init; } = new HashSet<string>(StringComparer.Ordinal);
@@ -133,7 +133,7 @@ public static class Explorer
             {
                 var outcome = stepper.Apply(state, move, node.Depth + 1);
                 edges++;
-                if (outcome.Record.Transition is { } tid && !tid.StartsWith("v20:", StringComparison.Ordinal) && tid != DataLinkMachine.RetransmitTransitionId)
+                if (outcome.Record.Transition is { } tid && !tid.StartsWith("v20:", StringComparison.Ordinal) && !tid.StartsWith("pinned:", StringComparison.Ordinal))
                     fired.Add(state.Machine(move.Station).State + "/" + tid);
                 if (outcome.Violation is not null)
                 {
@@ -258,7 +258,7 @@ public static class Explorer
                 foreach (var (target, kind) in e)
                 {
                     if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
-                    if (excludeT1 && kind == MoveKind.T1Expiry) continue;
+                    if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                     if (target != i) { stuck = false; break; }
                 }
             }
@@ -278,7 +278,7 @@ public static class Explorer
             foreach (var (target, kind) in e)
             {
                 if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
-                if (excludeT1 && kind == MoveKind.T1Expiry) continue;
+                if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                 reverse[target].Add(i);
             }
         }

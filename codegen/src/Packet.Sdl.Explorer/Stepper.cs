@@ -31,6 +31,12 @@ public enum MoveKind
     Release,
     /// <summary>DL_CONNECT_request from the station's layer 3 on a live or waiting link (<see cref="ExplorerOptions.Reconnect"/>).</summary>
     Reconnect,
+    /// <summary>The station enters its local busy condition (<see cref="ExplorerOptions.LocalBusy"/>): own receiver busy, RNR response.</summary>
+    BusyOn,
+    /// <summary>The station leaves its local busy condition: own receiver busy cleared, RR command.</summary>
+    BusyOff,
+    /// <summary>T3_expiry at the station (<see cref="ExplorerOptions.T3"/>; quiescent-timeout rule, T1 not running).</summary>
+    T3Expiry,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -114,6 +120,8 @@ public sealed class Stepper
             throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
         if (_o.Reconnect != ReconnectBy.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
+        if (_o.LocalBusy != FlowControlAt.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -239,8 +247,8 @@ public sealed class Stepper
         // variables or timers).
         var bAtRest = s.StubPeer is not null
             ? s.StubPeer.Connected
-            : QuiescentState(s.B.State) && s.B.QueueEntries.Count == 0 && s.B.Vs == s.B.Va && !s.SeizeOwedB;
-        return QuiescentState(s.A.State) && bAtRest
+            : QuiescentState(s.B.State) && s.B.QueueEntries.Count == 0 && s.B.Vs == s.B.Va && !s.SeizeOwedB && KeepsAlive(s.B);
+        return QuiescentState(s.A.State) && bAtRest && KeepsAlive(s.A)
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && s.A.QueueEntries.Count == 0
             && s.A.Vs == s.A.Va
@@ -266,6 +274,15 @@ public sealed class Stepper
         };
         return Match(s.ReportA, s.A.State) && (s.StubPeer is not null || Match(s.ReportB, s.B.State));
     }
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.T3"/>, the keepalive rule: a station at
+    /// rest in Connected has T1 or T3 running, so an idle link still polls its
+    /// peer (§4.4.5.2: T3 runs whenever T1 does not on an established link).
+    /// Without T3 modelled the timer is not observed and every station passes.
+    /// </summary>
+    private bool KeepsAlive(DataLinkMachine m) =>
+        !_o.T3 || m.State != "Connected" || m.T1 == TimerStatus.Running || m.T3 == TimerStatus.Running;
 
     private const int Honest = 1;
     private const int Unjustified = 2;
@@ -299,8 +316,10 @@ public sealed class Stepper
         if (!ReportsMatch(s)) return false;
         // A station still up counts only if nothing its peer sent after giving
         // up reached it: one that received the DM and stayed up is not settled.
+        // With T3 modelled none still up is: its T3 polls and finds the peer
+        // gone, so the give-up has settled only once both are Disconnected.
         bool Settled(DataLinkMachine m, bool heard) =>
-            m.State == "Disconnected" || (!heard && QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
+            m.State == "Disconnected" || (!_o.T3 && !heard && QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
         return Settled(s.A, s.HeardGiveUpA) && (s.StubPeer is not null || Settled(s.B, s.HeardGiveUpB))
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && !s.SeizeOwedA && !s.SeizeOwedB;
@@ -416,6 +435,13 @@ public sealed class Stepper
             // Layer 3 resets a live or waiting link, under the same gate.
             if (ReconnectReady(s, station))
                 moves.Add(new Move(MoveKind.Reconnect, station));
+
+            // The local busy condition: entered once on an established link,
+            // left whenever it still holds.
+            if (BusyOnReady(s, station))
+                moves.Add(new Move(MoveKind.BusyOn, station));
+            if (BusyOffReady(s, station))
+                moves.Add(new Move(MoveKind.BusyOff, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -431,6 +457,18 @@ public sealed class Stepper
             {
                 if (s.Machine(station).T1 == TimerStatus.Running && Handles(s.Machine(station), "T1_expiry"))
                     moves.Add(new Move(MoveKind.T1Expiry, station));
+            }
+            // T3 (the idle keepalive) fires under the same rule and only while
+            // T1 is not running: the figures stop T3 whenever they start T1.
+            if (_o.T3)
+            {
+                foreach (var station in new[] { Station.A, Station.B })
+                {
+                    if (station == Station.B && s.StubPeer is not null) continue;
+                    var m = s.Machine(station);
+                    if (m.T3 == TimerStatus.Running && m.T1 != TimerStatus.Running && Handles(m, "T3_expiry"))
+                        moves.Add(new Move(MoveKind.T3Expiry, station));
+                }
             }
         }
 
@@ -448,6 +486,20 @@ public sealed class Stepper
     private bool ReconnectReady(SystemState s, Station station) =>
         Reconnects(station) && !s.Reconnected(station) && IsLinkState(s.Machine(station).State)
         && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
+
+    private bool LocalBusies(Station station) => _o.LocalBusy switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
+    private bool BusyOnReady(SystemState s, Station station) =>
+        LocalBusies(station) && !s.BusyUsed(station) && IsDataState(s.Machine(station).State) && !s.Machine(station).OwnReceiverBusy;
+
+    private bool BusyOffReady(SystemState s, Station station) =>
+        LocalBusies(station) && s.BusyUsed(station) && IsDataState(s.Machine(station).State) && s.Machine(station).OwnReceiverBusy;
 
     private bool DropAllowed(Frame head, Station into)
     {
@@ -628,9 +680,57 @@ public sealed class Stepper
             }
             case MoveKind.T1Expiry:
                 return Inject(s, station, new EventInput("T1_expiry"), "T1 expiry (quiescent timeout: nothing in flight)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.T3Expiry:
+                return Inject(s, station, new EventInput("T3_expiry"), "T3 expiry (idle keepalive: nothing in flight, T1 not running)", incoming, s.Budget, clearOwed: false, number);
+            case MoveKind.BusyOn:
+            case MoveKind.BusyOff:
+                return LocalBusy(s, station, move.Kind == MoveKind.BusyOn, number);
             default:
                 throw new ArgumentOutOfRangeException(nameof(move));
         }
+    }
+
+    /// <summary>Transition ids the harness reports for the local busy condition (not table rows).</summary>
+    public const string BusyEnterId = "pinned:local_busy_enter";
+
+    public const string BusyLeaveId = "pinned:local_busy_leave";
+
+    /// <summary>
+    /// Enter or leave the local busy condition (<see cref="ExplorerOptions.LocalBusy"/>):
+    /// the action stacks the figures draw for DL-FLOW-OFF and DL-FLOW-ON
+    /// Request with #43 and H3 fixed. Entering: Set Own Receiver Busy,
+    /// N(r) := V(r), RNR response F = 0, Clear Acknowledge Pending. Leaving:
+    /// Clear Own Receiver Busy, N(r) := V(r), RR command P = 0, Clear
+    /// Acknowledge Pending, and when T1 is not running Stop T3, Start T1. No
+    /// table row runs, so no per-step check can fire here.
+    /// </summary>
+    private static StepOutcome LocalBusy(SystemState s, Station station, bool enter, int number)
+    {
+        var m = s.Machine(station).Clone();
+        m.SetVariable("own_receiver_busy", enter ? "true" : "false");
+        m.SetVariable("ack_pending", "false");
+        Frame frame;
+        if (enter)
+        {
+            frame = new Frame("RNR", Command: false, Pf: false, Nr: m.Vr, Ns: null, Data: null);
+        }
+        else
+        {
+            frame = new Frame("RR", Command: true, Pf: false, Nr: m.Vr, Ns: null, Data: null);
+            if (m.T1 != TimerStatus.Running)
+            {
+                m.SetTimer("t3", TimerStatus.Stopped);
+                m.SetTimer("t1", TimerStatus.Running);
+            }
+        }
+        var outgoing = new List<Frame>(s.Outgoing(station)) { frame };
+        var next = station == Station.A
+            ? s with { A = m, ToB = outgoing, BusyUsedA = s.BusyUsedA || enter }
+            : s with { B = m, ToA = outgoing, BusyUsedB = s.BusyUsedB || enter };
+        var record = new StepRecord(number, station.ToString(),
+            enter ? "local busy condition entered (own receiver busy, RNR)" : "local busy condition cleared (RR)",
+            enter ? BusyEnterId : BusyLeaveId, new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+        return new StepOutcome(next, record, null);
     }
 
     private EventInput? FrameInput(DataLinkMachine m, Frame frame, Station into)
@@ -752,6 +852,14 @@ public sealed class Stepper
                         {
                             violation = new Violation(Invariants.FlowOffDelivery, station,
                                 $"station {station} delivered `{ue.Detail}` upward while its layer 3 has flow off (DL_FLOW_OFF_request issued and not yet lifted): the busy condition did not hold the data back");
+                        }
+                        // With the local busy condition modelled, a station
+                        // whose own receiver was busy when the event arrived
+                        // delivers nothing either (§6.4.10).
+                        if (violation is null && On(Invariants.FlowOffDelivery) && _o.LocalBusy != FlowControlAt.None && pre.OwnReceiverBusy)
+                        {
+                            violation = new Violation(Invariants.FlowOffDelivery, station,
+                                $"station {station} delivered `{ue.Detail}` upward while its own receiver is busy (local busy condition): the busy condition did not hold the data back");
                         }
                         var submitted = Submitted(peer);
                         var expected = delivered < submitted.Length ? submitted[delivered] : null;
