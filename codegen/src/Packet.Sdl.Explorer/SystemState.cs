@@ -82,6 +82,11 @@ public sealed record SystemState
 
     public bool ReconnectPendingB { get; init; }
 
+    /// <summary>The last link report station A's data link gave its layer 3: 0 none yet, 1 up (DL_CONNECT_confirm or DL_CONNECT_indication), 2 down (DL_DISCONNECT_indication or DL_DISCONNECT_confirm). At rest it must match the station's state.</summary>
+    public int ReportA { get; init; }
+
+    public int ReportB { get; init; }
+
     /// <summary>With <see cref="ExplorerOptions.AcceptGiveUp"/>: frames dropped on either channel since station A last made progress.</summary>
     public int LossesA { get; init; }
 
@@ -115,6 +120,8 @@ public sealed record SystemState
     public bool Reconnected(Station s) => s == Station.A ? ReconnectedA : ReconnectedB;
 
     public bool ReconnectPending(Station s) => s == Station.A ? ReconnectPendingA : ReconnectPendingB;
+
+    public int Report(Station s) => s == Station.A ? ReportA : ReportB;
 
     public int Losses(Station s) => s == Station.A ? LossesA : LossesB;
 
@@ -156,7 +163,8 @@ public sealed record SystemState
           .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0')
           .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB))
           .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0')
-          .Append("|c").Append(ReconnectedA ? '1' : '0').Append(ReconnectedB ? '1' : '0').Append(ReconnectPendingA ? '1' : '0').Append(ReconnectPendingB ? '1' : '0');
+          .Append("|c").Append(ReconnectedA ? '1' : '0').Append(ReconnectedB ? '1' : '0').Append(ReconnectPendingA ? '1' : '0').Append(ReconnectPendingB ? '1' : '0')
+          .Append("|u").Append(Inv(ReportA)).Append(Inv(ReportB));
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

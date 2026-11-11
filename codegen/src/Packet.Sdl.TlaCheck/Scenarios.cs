@@ -21,6 +21,8 @@ public enum TableSetKind
     DmIgnored,
     /// <summary>A seeded-defect fixture (fixtures/tables-reconnect-swallowed): Connected ignores DL-CONNECT Request.</summary>
     ReconnectSwallowed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-confirm-as-disconnect): AwaitingConnection reports a completed connect as DL-DISCONNECT Indication.</summary>
+    ConfirmAsDisconnect,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -296,10 +298,22 @@ public static class Scenarios
         // submitting until the link is reported up again. This scenario was a
         // MachineError on main (A's layer 3 submitted into Disconnected at
         // step 15); now the whole graph is explored.
-        Add("l3-down-mod128", "layer 3 link-down", TableSetKind.Current, o => o with
+        Add("l3-down-mod128", "#114/#50 (was a MachineError)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = true, DataAfterConfirm = true, FramesAb = 1, FramesBa = 1,
             Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 7");
+        // The same with a third fault: the path on which A's link goes down
+        // with a0 held and comes back on B's retried SABME (the explorer's
+        // replay test). The verdict is the same deadlock, but the state count
+        // depends on layer 3 stopping on the disconnect: with the link-up
+        // flag left set in TwoStation.tla alone, TLC finds 12384 states
+        // against the explorer's 12394. TlaCheck compares the counts on
+        // deadlock rows, so this row pins the rule in both tools.
+        Add("l3-down-mod128-b3", "#114/#50 (layer 3 link-down pin)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, DataAfterConfirm = true, FramesAb = 1, FramesBa = 1,
+            Budget = 3, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
         }, "Deadlock, 7");
 
         // DL_CONNECT_request on a live or waiting link (ExplorerOptions.Reconnect),
@@ -316,10 +330,12 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.Both,
         }, "clean");
-        // figc4.5's DL-CONNECT Request stays in Timer Recovery, so the UA that
-        // answers its own SABM arrives on an up link and resets it (#114); the
-        // reset clears Layer 3 Initiated and the layer 3 never gets a confirm.
-        Add("reconnect-tr", "#114 (figc4.5 t07)", TableSetKind.Current, o => o with
+        // ax25spec#167: figc4.5's DL-CONNECT Request stays in Timer Recovery
+        // (the July 1998 figure ends that column in Awaiting Connection), so
+        // the UA that answers its own SABM arrives on an up link and resets it
+        // (#114); the reset clears Layer 3 Initiated and the layer 3 never
+        // gets a confirm.
+        Add("reconnect-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => o with
         {
             FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.A,
         }, "Deadlock, 12");
@@ -373,6 +389,15 @@ public static class Scenarios
         // the link stays up and quiet but A's layer 3 never hears back. Both
         // tools must call that stuck (reconnect-a on the real tables is clean).
         Add("seeded-reconnect-swallowed", "seeded (reconnect answer)", TableSetKind.ReconnectSwallowed, o => o with { FramesAb = 2, Reconnect = ReconnectBy.A }, "Deadlock, 7");
+        // The report rule: a connect reported to layer 3 as DL-DISCONNECT
+        // Indication while the station goes Connected. The indication would
+        // otherwise answer the reconnect; at rest each layer 3's last report
+        // must match its station's state, so both tools call it stuck
+        // (reconnect-cold on the real tables is clean).
+        Add("seeded-confirm-as-disconnect", "seeded (link report)", TableSetKind.ConfirmAsDisconnect, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A,
+        }, "Deadlock, 3");
 
         return list;
     }

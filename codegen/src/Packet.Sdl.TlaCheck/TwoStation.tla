@@ -160,10 +160,10 @@ Route(s, m, fx, acc, flowOff, i) ==
                                           ELSE vf]
                 ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"}
                      THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN TRUE ELSE @, !.conn = TRUE,
-                                      !.pend = IF fe.prim = "DL_CONNECT_confirm" THEN FALSE ELSE @]
+                                      !.pend = IF fe.prim = "DL_CONNECT_confirm" THEN FALSE ELSE @, !.rep = 1]
                 ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_DISCONNECT_indication", "DL_DISCONNECT_confirm"}
                      THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN FALSE ELSE @,
-                                      !.pend = IF fe.prim = "DL_DISCONNECT_indication" THEN FALSE ELSE @]
+                                      !.pend = IF fe.prim = "DL_DISCONNECT_indication" THEN FALSE ELSE @, !.rep = 2]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
@@ -195,7 +195,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         m == IF ran THEN Persist(c) ELSE pre
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
-                    pend |-> S.pend[s], v |-> v1],
+                    pend |-> S.pend[s], rep |-> S.rep[s], v |-> v1],
                    S.off[s], 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -217,7 +217,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
                    THEN Viol("BusyTracksFlow", s, "station " \o s \o " took " \o c.tid \o " on DL_FLOW_ON_request but its own-receiver-busy condition is still set")
               ELSE NoViol
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
-                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up, !.pend[s] = r.pend,
+                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up, !.pend[s] = r.pend, !.rep[s] = r.rep,
                            !.loss[s] = loss, !.gave[s] = gave,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
@@ -278,7 +278,7 @@ S0 ==
      up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
      rel |-> [s \in Stations |-> FALSE],
      loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
-     rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE],
+     rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -307,6 +307,12 @@ SeedState == [IF DataAfterConfirm THEN S1 ELSE Submit(Submit(S1, "A", 1), "B", 1
 
 AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery")
 
+\* At rest each table-driven station's last link report to its layer 3
+\* (rep: 0 none, 1 up, 2 down) matches its state (Stepper.ReportsMatch).
+ReportsMatch(S) ==
+    LET Match(r, st) == (r = 1 => st \in DataStates) /\ (r = 2 => st = "Disconnected")
+    IN  Match(S.rep["A"], S.m["A"].st) /\ (StubB \/ Match(S.rep["B"], S.m["B"].st))
+
 \* The give-up rule's settled state, data aside (Stepper.GiveUpSettled): some
 \* station gave up honestly and none without justification, each table-driven
 \* station Disconnected or at rest as plain quiescence has it and deaf to its
@@ -317,6 +323,7 @@ GiveUpSettled(S) ==
     IN  /\ (S.gave["A"] = 1 \/ S.gave["B"] = 1)
         /\ S.gave["A"] # 2 /\ S.gave["B"] # 2
         /\ ~S.pend["A"] /\ ~S.pend["B"]
+        /\ ReportsMatch(S)
         /\ Settled(S.m["A"], S.heard["A"]) /\ (StubB \/ Settled(S.m["B"], S.heard["B"]))
         /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
         /\ ~S.owed["A"] /\ ~S.owed["B"]
@@ -463,6 +470,10 @@ Release(s) ==
 Reconnect(s) ==
     /\ CanReconnect(s)
     /\ LET r == Inject(sys, s, Event(UpperEvent(sys.m[s], "DL_CONNECT_request")), sys.ch[s], sys.budget, FALSE)
+           \* pend is set after the dispatch, so an arm that answered the
+           \* request within the same dispatch would be overwritten and the
+           \* request left pending. No current arm does: each sends SABM(E)
+           \* or nothing.
        IN  Take([r EXCEPT !.sys.rcn[s] = TRUE, !.sys.pend[s] = TRUE], "reconnect", s, NoFrm)
 
 T1(s) ==
@@ -494,6 +505,7 @@ PlainQuiescent ==
 \* A layer 3 still waiting for the answer to its reconnect is never at rest.
 Quiescent ==
     /\ ~sys.pend["A"] /\ ~sys.pend["B"]
+    /\ ReportsMatch(sys)
     /\ \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
        \/ /\ ~(AcceptGiveUp /\ (sys.gave["A"] = 2 \/ sys.gave["B"] = 2))
           /\ PlainQuiescent

@@ -24,6 +24,9 @@ internal static class Fixtures
     public static string DmIgnoredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored");
 
     /// <summary>The TlaCheck seeded fixture in which Connected ignores DL-CONNECT Request.</summary>
+    /// <summary>The TlaCheck seeded fixture in which Awaiting Connection reports a completed connect as DL-DISCONNECT Indication.</summary>
+    public static string ConfirmAsDisconnectDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-confirm-as-disconnect");
+
     public static string ReconnectSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed");
 
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);

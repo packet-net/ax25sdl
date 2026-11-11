@@ -217,6 +217,7 @@ public sealed class Stepper
         // A layer 3 still waiting for the answer to its DL_CONNECT_request
         // (Reconnect) is never at rest.
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        if (!ReportsMatch(s)) return false;
         if (_o.AcceptGiveUp)
         {
             // The give-up rule: no rest counts after an unjustified give-up,
@@ -245,6 +246,25 @@ public sealed class Stepper
             && s.A.Vs == s.A.Va
             && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
             && !s.SeizeOwedA;
+    }
+
+    /// <summary>
+    /// At rest, each table-driven station's last link report to its layer 3
+    /// matches its state: "up" only while Connected or TimerRecovery, "down"
+    /// only while Disconnected (no report yet constrains nothing). So a
+    /// DL_DISCONNECT_indication answers a reconnect only if the station
+    /// really is down, and a layer 3 told the link is down while it is up (or
+    /// the reverse) is never at rest.
+    /// </summary>
+    private static bool ReportsMatch(SystemState s)
+    {
+        static bool Match(int report, string state) => report switch
+        {
+            1 => IsDataState(state),
+            2 => state == "Disconnected",
+            _ => true,
+        };
+        return Match(s.ReportA, s.A.State) && (s.StubPeer is not null || Match(s.ReportB, s.B.State));
     }
 
     private const int Honest = 1;
@@ -276,6 +296,7 @@ public sealed class Stepper
         if (s.GaveUpA != Honest && s.GaveUpB != Honest) return false;
         if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        if (!ReportsMatch(s)) return false;
         // A station still up counts only if nothing its peer sent after giving
         // up reached it: one that received the DM and stayed up is not settled.
         bool Settled(DataLinkMachine m, bool heard) =>
@@ -595,6 +616,11 @@ public sealed class Stepper
             case MoveKind.Reconnect:
             {
                 var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_CONNECT_request")), "DL_CONNECT_request (layer 3 resets the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
+                // The pending flag is set after the dispatch, so an arm that
+                // answered the request within the same dispatch (a confirm or
+                // a disconnect indication from the DL-CONNECT arm itself)
+                // would be overwritten and the request left pending. No
+                // current arm does: each sends SABM(E) or nothing.
                 var next = station == Station.A
                     ? outcome.Next with { ReconnectedA = true, ReconnectPendingA = true }
                     : outcome.Next with { ReconnectedB = true, ReconnectPendingB = true };
@@ -701,6 +727,7 @@ public sealed class Stepper
         var acked = s.Acked(station);
         var linkUp = s.LinkUp(station);
         var reconnectPending = s.ReconnectPending(station);
+        var report = s.Report(station);
         var connectReported = false;
         var effectsText = new List<string>();
 
@@ -743,6 +770,7 @@ public sealed class Stepper
                     case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" } ue:
                         if (_o.DataAfterConfirm) linkUp = true;
                         if (ue.Primitive == "DL_CONNECT_confirm") reconnectPending = false;
+                        report = 1;
                         connectReported = true;
                         break;
                     case UpperEffect { Primitive: "DL_DISCONNECT_indication" or "DL_DISCONNECT_confirm" } ue:
@@ -751,6 +779,7 @@ public sealed class Stepper
                         // indication; what it had already offered stays counted.
                         if (_o.DataAfterConfirm) linkUp = false;
                         if (ue.Primitive == "DL_DISCONNECT_indication") reconnectPending = false;
+                        report = 2;
                         break;
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
@@ -836,6 +865,8 @@ public sealed class Stepper
             LinkUpB = station == Station.B ? linkUp : s.LinkUpB,
             ReconnectPendingA = station == Station.A ? reconnectPending : s.ReconnectPendingA,
             ReconnectPendingB = station == Station.B ? reconnectPending : s.ReconnectPendingB,
+            ReportA = station == Station.A ? report : s.ReportA,
+            ReportB = station == Station.B ? report : s.ReportB,
             LossesA = station == Station.A ? losses : s.LossesA,
             LossesB = station == Station.B ? losses : s.LossesB,
             GaveUpA = station == Station.A ? gaveUp : s.GaveUpA,

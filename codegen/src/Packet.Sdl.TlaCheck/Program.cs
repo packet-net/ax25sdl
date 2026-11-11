@@ -66,6 +66,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.ReleaseStuck => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck"),
     TableSetKind.DmIgnored => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored"),
     TableSetKind.ReconnectSwallowed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed"),
+    TableSetKind.ConfirmAsDisconnect => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-confirm-as-disconnect"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -138,6 +139,12 @@ Row Compare(Scenario s)
     elapsed += safety.Elapsed;
     var (kind, station, steps, tids, note) = Verdict(safety, Phase.Safety, o, depthBound);
     var states = safety.Distinct;
+    // The safety run explores the whole graph unless a per-step check fires,
+    // and so does the explorer before it reports a deadlock or a liveness
+    // verdict, so on those rows the two distinct-state counts must match too:
+    // that pins harness bookkeeping (the link-up flag, say) that changes the
+    // graph without changing the verdict.
+    var safetyClean = kind == "clean";
 
     if (kind == "clean" && o.Invariants.HasFlag(Invariants.Deadlock))
     {
@@ -190,8 +197,13 @@ Row Compare(Scenario s)
                 why.Add($"transitions fired: {ex.FiredTransitions.Count} by the explorer, {tlcTransitions.Count} by TLC, {ex.FiredTransitions.Except(tlcTransitions).Union(tlcTransitions.Except(ex.FiredTransitions)).Count()} differ");
         }
     }
-    else if (kind is not ("Quiescence" or "SelectiveProgress"))
+    else if (kind is "Quiescence" or "SelectiveProgress")
     {
+        if (safetyClean && states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
+    }
+    else
+    {
+        if (safetyClean && states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
         if (exStation != station) why.Add($"station '{exStation}' vs '{station}'");
         if (steps != ex.CounterexampleLength) why.Add($"length {ex.CounterexampleLength} vs {steps}");
         else if (tids.Count != steps) why.Add($"TLC trace has {tids.Count} steps, expected {steps}");
@@ -247,6 +259,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.ReleaseStuck => "seeded release-stuck",
     TableSetKind.DmIgnored => "seeded dm-ignored",
     TableSetKind.ReconnectSwallowed => "seeded reconnect-swallowed",
+    TableSetKind.ConfirmAsDisconnect => "seeded confirm-as-disconnect",
     _ => "seeded livelock",
 };
 

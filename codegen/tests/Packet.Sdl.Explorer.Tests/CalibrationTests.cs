@@ -1117,6 +1117,19 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Layer3_Link_Down_With_A_Third_Fault_Pins_The_State_Count()
+    {
+        // TlaCheck row l3-down-mod128-b3: the verdict is unchanged, but the
+        // graph depends on layer 3 stopping on the disconnect, so the state
+        // count is pinned here and compared with TLC's.
+        var result = Run(LinkDownScenario(3));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(7);
+        result.StatesExplored.Should().Be(12394);
+    }
+
+    [Fact]
     public void Reconnect_On_A_Live_Or_Waiting_Link_Is_Answered_By_The_Confirm()
     {
         // DL_CONNECT_request once everything is delivered: from Connected
@@ -1128,17 +1141,17 @@ public class CalibrationTests(ITestOutputHelper output)
         [
             (new() { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Reconnect = ReconnectBy.A }, 40, "Connected/t07_dl_connect_request_no"),
             (new() { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Srej = true, Reconnect = ReconnectBy.Both }, 150, "Connected/t07_dl_connect_request_yes"),
-            (new() { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A }, 7, "AwaitingConnection/t07_dl_connect_request"),
+            (new() { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A }, 8, "AwaitingConnection/t07_dl_connect_request"),
             (new()
             {
                 TablesDir = Fixtures.CurrentDir, Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Budget = 2,
                 Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.A,
-            }, 106, "AwaitingV22Connection/t02_dl_connect_request"),
+            }, 121, "AwaitingV22Connection/t02_dl_connect_request"),
             (new()
             {
                 TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Budget = 2,
                 Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.Both,
-            }, 1051, "Connected/t07_dl_connect_request_no"),
+            }, 1139, "Connected/t07_dl_connect_request_no"),
         ];
         foreach (var (options, states, arm) in cases)
         {
@@ -1152,14 +1165,17 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Reconnect_From_Timer_Recovery_Is_Never_Confirmed()
     {
-        // #114, reached through figc4.5 t07. A's RR is lost, A polls from
+        // ax25spec#167, which shows through #114. A's RR is lost, A polls from
         // Timer Recovery, then its layer 3 resets the link: figc4.5 sends SABM
         // but stays in Timer Recovery. The poll answer takes A to Connected,
         // so the UA answering A's own SABM is "unexpected" (figc4.4 t17): DL-ERROR
         // K, a second reset with Layer 3 Initiated cleared, and the link comes
         // up through t04_ua_received_yes_no_yes, which sends no
         // DL_CONNECT_confirm. Everything is delivered and both ends are
-        // Connected; A's layer 3 never hears back.
+        // Connected; A's layer 3 never hears back. Controls (docs/explorer.md):
+        // with only t07's next state set to Awaiting Connection, as the July
+        // 1998 figure draws it, the run is clean; with #114 fixed and the slip
+        // kept, B delivers a0 twice.
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.A,
@@ -1220,6 +1236,26 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[4].Effects.Should().BeEmpty();
         result.Trace[^1].SummaryA.Should().StartWith("Connected");
         result.CounterexampleLength.Should().Be(7);
+    }
+
+    [Fact]
+    public void Seeded_A_Connect_Reported_As_A_Disconnect_Does_Not_Answer_The_Reconnect()
+    {
+        // The seeded fixture reports the completed connect as
+        // DL_DISCONNECT_indication while A goes Connected. That indication
+        // would answer A's reconnect; the report rule (at rest each layer 3's
+        // last report matches its station's state) refuses it as rest.
+        // reconnect-cold on the real tables is clean.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.ConfirmAsDisconnectDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_yes", "the seeded arm");
+        result.Trace[^1].Effects.Should().ContainSingle(e => e.Contains("DL_DISCONNECT_indication", StringComparison.Ordinal));
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(3);
     }
 
     [Fact]
