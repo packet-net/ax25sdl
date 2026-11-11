@@ -257,7 +257,7 @@ public class CalibrationTests(ITestOutputHelper output)
         // AwaitingV22Connection. #48: the DM tears the attempt down instead
         // of degrading to SABM. Either way the link never comes up: a
         // deadlock, two steps from the seed. (A's frame was never queued:
-        // figc4.2 drops it while layer 3 initiated, ax25spec#161.)
+        // figc4.2 discards it while layer 3 initiated, ax25spec#161.)
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
@@ -280,16 +280,19 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Outcome.Should().Be(Outcome.NoViolation);
     }
 
-    // ─── ax25spec#161: data offered before DL-CONNECT Confirm is dropped ──
+    // ─── ax25spec#161: data offered before DL-CONNECT Confirm is discarded ──
 
     [Fact]
-    public void Defect161_Data_Offered_Before_The_Connect_Confirm_Is_Dropped_Silently()
+    public void Data_Offered_Before_The_Connect_Confirm_Is_Discarded_Silently()
     {
         // The Disconnected seed submits DL_CONNECT_request and then one
         // DL_DATA_request. figc4.2 draws no Yes/No on "Layer 3 Initiated?";
-        // read as figc4.6 labels it (ax25spec#162), the layer-3-initiated
-        // arm does nothing, so the frame is never queued and no DL_ERROR is
-        // raised. The link comes up and the frame is simply gone: a
+        // the July 1998 edition of the figure (Figure C4.3, printed page 87)
+        // labels it Yes skips, No pushes, so discarding the frame while layer
+        // 3 initiated is the figure's own intent, not a defect in the reading.
+        // What the row shows: the frame is never queued and no indication
+        // reaches layer 3 (the missing indication is the open point on
+        // ax25spec#161). The link comes up and the frame is simply gone: a
         // deadlock with 0 of 1 delivered, two steps from the seed.
         var result = Run(new ExplorerOptions
         {

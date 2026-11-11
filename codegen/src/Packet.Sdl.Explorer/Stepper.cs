@@ -126,7 +126,8 @@ public sealed class Stepper
     /// Build the seeded state. All data is submitted up front (DL_DATA_request
     /// per frame) so the queues start full; the Disconnected seed additionally
     /// has A issue DL_CONNECT_request first (so its SABM/SABME is in flight and
-    /// its data is submitted behind the connection attempt, where figc4.2 drops it while layer 3 initiated: ax25spec#161).
+    /// its data is submitted behind the connection attempt, where figc4.2 discards it while layer 3 initiated, as the
+    /// 1998 edition of the figure labels it, with no indication to layer 3: ax25spec#161).
     /// With <see cref="ExplorerOptions.DataAfterConfirm"/> nothing is submitted
     /// here: each station's layer 3 submits its data by Submit moves once its
     /// link is up.

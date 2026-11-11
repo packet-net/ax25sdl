@@ -90,8 +90,9 @@ public static class Scenarios
             Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 0, Budget = 0,
         }, "clean");
 
-        // ax25spec#161: figc4.2 read as figc4.6 labels it drops data offered
-        // before DL-CONNECT Confirm, with no error.
+        // ax25spec#161: figc4.2 discards data offered before DL-CONNECT
+        // Confirm, as the 1998 edition of the figure (Figure C4.3) labels its
+        // "Layer 3 Initiated?" decision, with no indication to layer 3.
         Add("d161-data-before-confirm", "ax25spec#161", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = false, PeerDeclinesSabme = true, FramesAb = 1, Budget = 0,
