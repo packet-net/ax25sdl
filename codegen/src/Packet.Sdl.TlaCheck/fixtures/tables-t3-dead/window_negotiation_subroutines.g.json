@@ -1,0 +1,130 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "management_data_link",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.6",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Initiate_Window_Notification",
+      "paths": [
+        {
+          "id": "t01_initiate_window_notification_yes",
+          "guard": "k_notification_requested",
+          "actions": [
+            {
+              "verb": "Add Receive k Parameter field to XID Command",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_initiate_window_notification_no",
+          "guard": "not k_notification_requested",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Window_Notification_Response",
+      "paths": [
+        {
+          "id": "t01_window_notification_response_yes_yes",
+          "guard": "k_parameter_field_present and transmit_k_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Transmit k From XID Command",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive k Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_window_notification_response_yes_no",
+          "guard": "k_parameter_field_present and not transmit_k_acceptable",
+          "actions": [
+            {
+              "verb": "Set Transmit k to Default",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive k Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_window_notification_response_no",
+          "guard": "not k_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Complete_Window_Notification",
+      "paths": [
+        {
+          "id": "t01_complete_window_notification_yes_yes",
+          "guard": "k_parameter_field_present and transmit_k_acceptable",
+          "actions": [
+            {
+              "verb": "Accept Receive k from XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_complete_window_notification_yes_no",
+          "guard": "k_parameter_field_present and not transmit_k_acceptable",
+          "actions": [
+            {
+              "verb": "Set Receive k to Default",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_complete_window_notification_no",
+          "guard": "not k_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

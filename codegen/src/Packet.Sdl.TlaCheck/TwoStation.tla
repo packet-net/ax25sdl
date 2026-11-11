@@ -32,6 +32,9 @@ CONSTANTS
     ReconnectAt,       \* stations whose layer 3 issues DL_CONNECT_request once on a live or waiting link, subset of {"A", "B"}
     DataBeforeConfirm, \* with DataAfterConfirm: A's layer 3 submits from the seed on, not waiting for its confirm
     AcceptGiveUp,      \* the give-up rule: an honest N2 give-up that has settled is quiescent (see GiveUpSettled)
+    BusyAt,            \* stations that enter a local busy condition once (own receiver busy, RNR), subset of {"A", "B"}
+    LongBusy,          \* with BusyAt: the busy period may outlast the peer's retries (no T1 hold)
+    T3Moves,           \* model T3 expiry (idle keepalive), the keepalive rest rule and the stricter give-up settle
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -178,7 +181,10 @@ Max(x, y) == IF x >= y THEN x ELSE y
 \* (Stepper.GiveUpThreshold): Establish_Data_Link starts RC at 1, so the
 \* connect loops give up after N2 transmissions; DL-DISCONNECT starts it at
 \* 0, and Connected's T1 expiry sets it to 1 only after a first loss.
-GiveUpThreshold(page) == IF page \in {"AwaitingConnection", "AwaitingV22Connection"} THEN N2 ELSE N2 + 1
+\* With T3Moves, a Timer Recovery loop entered by a T3 expiry (RC := 1, then
+\* the poll, no loss before it) gives up after N2 polls.
+GiveUpThreshold(page, t3loop) ==
+    IF page \in {"AwaitingConnection", "AwaitingV22Connection"} \/ (page = "TimerRecovery" /\ t3loop) THEN N2 ELSE N2 + 1
 
 \* Dispatch e at station s of system S; newIn becomes s's incoming channel.
 \* Returns the next system state, the per-step violation and the transition.
@@ -193,10 +199,12 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         ok == ran /\ c.err = ""
         v1 == IF ran /\ c.err # "" THEN Viol("MachineError", s, "interpreter error at station " \o s \o ": " \o c.err) ELSE v0
         m == IF ran THEN Persist(c) ELSE pre
+        \* With a local busy condition modelled, a station whose own receiver
+        \* was busy delivers nothing either (the flow-off delivery check).
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
                     pend |-> S.pend[s], rep |-> S.rep[s], v |-> v1],
-                   S.off[s], 1)
+                   S.off[s] \/ (BusyAt # {} /\ pre.own), 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
         acked == IF ok /\ ~reset THEN S.acked[s] + ((m.va - pre.va) % m.mod) ELSE S.acked[s]
@@ -206,8 +214,11 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         \* attempts, else unjustified (2, sticky).
         loss == IF AcceptGiveUp /\ ok /\ (r.conn \/ acked > S.acked[s]) THEN 0 ELSE S.loss[s]
         gave == IF AcceptGiveUp /\ ok /\ e.ev = "T1_expiry" /\ m.st = "Disconnected"
-                THEN Max(S.gave[s], IF loss >= GiveUpThreshold(pre.st) THEN 1 ELSE 2)
+                THEN Max(S.gave[s], IF loss >= GiveUpThreshold(pre.st, S.t3loop[s]) THEN 1 ELSE 2)
                 ELSE S.gave[s]
+        \* A Timer Recovery loop entered by T3 lasts until the station leaves
+        \* Timer Recovery.
+        t3loop == IF ok THEN m.st = "TimerRecovery" /\ (S.t3loop[s] \/ e.ev = "T3_expiry") ELSE S.t3loop[s]
         flowOffNow == ok /\ e.ev = "DL_FLOW_OFF_request"
         flowOnNow == ok /\ e.ev = "DL_FLOW_ON_request"
         v2 == IF r.v # NoViol THEN r.v
@@ -218,7 +229,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
               ELSE NoViol
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
                            !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up, !.pend[s] = r.pend, !.rep[s] = r.rep,
-                           !.loss[s] = loss, !.gave[s] = gave,
+                           !.loss[s] = loss, !.gave[s] = gave, !.t3loop[s] = t3loop,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
          viol |-> v2,
@@ -279,6 +290,7 @@ S0 ==
      rel |-> [s \in Stations |-> FALSE],
      loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
+     busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -307,6 +319,10 @@ SeedState == [IF DataAfterConfirm THEN S1 ELSE Submit(Submit(S1, "A", 1), "B", 1
 
 AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery")
 
+\* With T3Moves, the keepalive rule (Stepper.KeepsAlive): at rest a Connected
+\* station has T1 or T3 running.
+KeepsAlive(m) == ~T3Moves \/ m.st # "Connected" \/ m.t1 = "running" \/ m.t3 = "running"
+
 \* At rest each table-driven station's last link report to its layer 3
 \* (rep: 0 none, 1 up, 2 down) matches its state (Stepper.ReportsMatch).
 ReportsMatch(S) ==
@@ -319,7 +335,8 @@ ReportsMatch(S) ==
 \* peer since the peer gave up (the stub always is), nothing in flight, nothing
 \* owed.
 GiveUpSettled(S) ==
-    LET Settled(m, heard) == m.st = "Disconnected" \/ (~heard /\ AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
+    \* With T3Moves no station still up is settled: its T3 finds the peer gone.
+    LET Settled(m, heard) == m.st = "Disconnected" \/ (~T3Moves /\ ~heard /\ AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
     IN  /\ (S.gave["A"] = 1 \/ S.gave["B"] = 1)
         /\ S.gave["A"] # 2 /\ S.gave["B"] # 2
         /\ ~S.pend["A"] /\ ~S.pend["B"]
@@ -378,6 +395,36 @@ ReconnectReady(S, s) ==
     /\ s \in ReconnectAt /\ Table(s) /\ ~S.rcn[s] /\ S.m[s].st \in LinkStates
     /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
 
+\* The local busy condition (BusyAt): entered once on an established link,
+\* left whenever it still holds.
+BusyOnReady(S, s) == s \in BusyAt /\ Table(s) /\ ~S.busy[s] /\ S.m[s].st \in DataStates /\ ~S.m[s].own
+BusyOffReady(S, s) == s \in BusyAt /\ Table(s) /\ S.busy[s] /\ S.m[s].st \in DataStates /\ S.m[s].own
+
+\* A short busy period leaves the peer one retry for the poll that finds it
+\* cleared: while the station is busy its peer's T1 does not fire in Timer
+\* Recovery once RC has reached N2 - 1 (Stepper.BusyHoldsT1).
+BusyHoldsT1(S, s) ==
+    /\ BusyAt # {} /\ ~LongBusy
+    /\ Other(s) \in BusyAt /\ S.m[Other(s)].own
+    /\ S.m[s].st = "TimerRecovery" /\ S.m[s].rc >= N2 - 1
+
+\* Entering the condition does what the figures draw for DL-FLOW-OFF Request
+\* with #43 and H3 fixed: Set Own Receiver Busy, N(r) := V(r), RNR response
+\* F = 0, Clear Acknowledge Pending. Leaving it does what they draw for
+\* DL-FLOW-ON Request with H3's box: Clear Own Receiver Busy, N(r) := V(r),
+\* RR command P = 0, Clear Acknowledge Pending, and when T1 is not running
+\* Stop T3, Start T1 (Stepper.LocalBusy). No table row runs.
+LocalBusy(S, s, enter) ==
+    LET m == S.m[s]
+        m2 == IF enter THEN [m EXCEPT !.own = TRUE, !.ack = FALSE]
+              ELSE [m EXCEPT !.own = FALSE, !.ack = FALSE,
+                             !.t3 = IF m.t1 # "running" THEN "stopped" ELSE @, !.t1 = "running"]
+        f == IF enter THEN Frm("RNR", FALSE, FALSE, m.vr, None, "") ELSE Frm("RR", TRUE, FALSE, m.vr, None, "")
+    IN  [sys |-> [S EXCEPT !.m[s] = m2, !.ch[Other(s)] = Append(@, f), !.busy[s] = @ \/ enter],
+         viol |-> NoViol,
+         tid |-> IF enter THEN "pinned:local_busy_enter" ELSE "pinned:local_busy_leave",
+         arms |-> {}]
+
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
 \* flight, owed, ready to pop or waiting to be submitted anywhere. A pending
 \* release does not hold T1 back: it is a layer-3 decision, as flow control is.
@@ -405,7 +452,16 @@ CanFlowOff(s) ==
 CanSubmit(s) == viol = NoViol /\ SubmitReady(sys, s)
 CanRelease(s) == viol = NoViol /\ ReleaseReady(sys, s)
 CanReconnect(s) == viol = NoViol /\ ReconnectReady(sys, s)
-CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
+CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry") /\ ~BusyHoldsT1(sys, s)
+\* T3 (the idle keepalive) fires under the same rule and only while no T1 runs
+\* at either station (the figures stop T3 whenever they start T1, and T3 is
+\* longer than T1, section 6.7.1.3), on a page with a T3 arm.
+CanT3(s) ==
+    /\ viol = NoViol /\ T3Moves /\ Table(s) /\ Quiet(sys)
+    /\ sys.m["A"].t1 # "running" /\ (StubB \/ sys.m["B"].t1 # "running")
+    /\ sys.m[s].t3 = "running" /\ Handles(sys.m[s].st, "T3_expiry")
+CanBusyOn(s) == viol = NoViol /\ BusyOnReady(sys, s)
+CanBusyOff(s) == viol = NoViol /\ BusyOffReady(sys, s)
 
 \* The give-up rule: a frame reaching s after its peer gave up was sent at or
 \* after the give-up (T1 only fires with both channels empty), so s heard it.
@@ -480,6 +536,19 @@ T1(s) ==
     /\ CanT1(s)
     /\ Take(Inject(sys, s, Event("T1_expiry"), sys.ch[s], sys.budget, FALSE), "T1-expiry", s, NoFrm)
 
+T3(s) ==
+    /\ CanT3(s)
+    /\ Take(Inject(sys, s, Event("T3_expiry"), sys.ch[s], sys.budget, FALSE), "T3-expiry", s, NoFrm)
+
+\* The local busy condition (BusyAt).
+BusyOn(s) ==
+    /\ CanBusyOn(s)
+    /\ Take(LocalBusy(sys, s, TRUE), "busy-on", s, NoFrm)
+
+BusyOff(s) ==
+    /\ CanBusyOff(s)
+    /\ Take(LocalBusy(sys, s, FALSE), "busy-off", s, NoFrm)
+
 (***************************************************************************)
 (* Quiescence                                                              *)
 (***************************************************************************)
@@ -495,8 +564,8 @@ PlainQuiescent ==
            THEN /\ sys.rel["A"] \/ sys.rel["B"]
                 /\ a.st = "Disconnected" /\ b.st = "Disconnected"
                 /\ a.q = <<>> /\ b.q = <<>> /\ ~sys.owed["A"] /\ ~sys.owed["B"]
-           ELSE /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~sys.owed["A"]
-                /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"]
+           ELSE /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~sys.owed["A"] /\ KeepsAlive(a)
+                /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"] /\ KeepsAlive(b)
         /\ sys.ch["A"] = <<>> /\ sys.ch["B"] = <<>>
         /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
 
@@ -523,9 +592,10 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B")
     \/ T1("A") \/ T1("B")
+    \/ T3("A") \/ T3("B")
     \/ Rest
 
 Spec == Init /\ [][Next]_vars
@@ -585,13 +655,14 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* The argument needs every progress move to be a real (non-stuttering) step,
 \* or a move that changes nothing could be "taken" without TLC seeing it and
 \* the fairness would be discharged falsely. The tick in last guarantees it.
-ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release", "reconnect"}
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release", "reconnect", "busy-on", "busy-off"}
 
-CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s) \/ CanReconnect(s)
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s) \/ CanReconnect(s) \/ CanBusyOn(s) \/ CanBusyOff(s)
 
-CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s)
+\* The timers: T1, and T3 with T3Moves.
+CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s) \/ CanT3(s)
 TookProgress == last'.move \in ProgressKinds
-TookProgressOrT1 == last'.move \in ProgressKinds \cup {"T1-expiry"}
+TookProgressOrT1 == last'.move \in ProgressKinds \cup {"T1-expiry", "T3-expiry"}
 
 \* The explorer's Quiescence: T1 expiries count as progress.
 QuiescenceLive == (<>[]CanProgressOrT1 => []<><<TookProgressOrT1>>_vars) => []<>Quiescent

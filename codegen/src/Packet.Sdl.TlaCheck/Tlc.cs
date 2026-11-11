@@ -111,6 +111,13 @@ public sealed class Tlc
             ReconnectBy.Both => new[] { "A", "B" },
             _ => Array.Empty<string>(),
         };
+        var busyAt = o.LocalBusy switch
+        {
+            FlowControlAt.A => new[] { "A" },
+            FlowControlAt.B => new[] { "B" },
+            FlowControlAt.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var stepChecks = new List<string>();
         if (On(Invariants.RejectCoherence)) stepChecks.Add("RejectCoherence");
         if (On(Invariants.Delivery)) stepChecks.Add("Delivery");
@@ -150,6 +157,9 @@ public sealed class Tlc
         C("ReconnectAt", Set(reconnectAt));
         C("DataBeforeConfirm", Bool(o.DataBeforeConfirm));
         C("AcceptGiveUp", Bool(o.AcceptGiveUp));
+        C("BusyAt", Set(busyAt));
+        C("LongBusy", Bool(o.LongBusy));
+        C("T3Moves", Bool(o.T3));
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
         C("StepChecks", Set(stepChecks));

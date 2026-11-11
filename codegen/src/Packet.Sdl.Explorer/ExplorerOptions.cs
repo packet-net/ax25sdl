@@ -275,8 +275,9 @@ public sealed record ExplorerOptions
     public bool LongBusy { get; init; }
 
     /// <summary>
-    /// Model T3 expiry: a T3_expiry move at a station whose T3 is running and
-    /// whose T1 is not, under the quiescent-timeout rule T1 uses (nothing in
+    /// Model T3 expiry: a T3_expiry move at a station whose T3 is running,
+    /// while no T1 runs at either station (T3 is longer than T1, §6.7.1.3, so
+    /// a running T1 expires first), under the quiescent-timeout rule T1 uses (nothing in
     /// flight, owed, ready to pop or waiting to be submitted anywhere), on a
     /// page with a T3 arm (figc4.4 only; figc4.5 has none, #91). Two rules come
     /// with it: at rest a Connected station keeps its keepalive (T1 or T3

@@ -1,0 +1,157 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "reassembler",
+  "state": "Ready",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc6.2",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_dl_data_indication_yes_yes",
+      "from": "Ready",
+      "on": "DL_DATA_indication",
+      "guard": "segment_header_present and first_segment",
+      "actions": [
+        {
+          "verb": "Allocate Buffers for All Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Accumulate First Segment",
+          "kind": "processing"
+        },
+        {
+          "verb": "N := Remaining Segment Number",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start TR210",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReassemblingData",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t01_dl_data_indication_yes_no",
+      "from": "Ready",
+      "on": "DL_DATA_indication",
+      "guard": "segment_header_present and not first_segment",
+      "actions": [
+        {
+          "verb": "Discard: Segment",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t01_dl_data_indication_no",
+      "from": "Ready",
+      "on": "DL_DATA_indication",
+      "guard": "not segment_header_present",
+      "actions": [
+        {
+          "verb": "DL_DATA_indication",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_yes",
+      "from": "Ready",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_header_present and first_segment",
+      "actions": [
+        {
+          "verb": "Allocate Buffers for All Segments",
+          "kind": "processing"
+        },
+        {
+          "verb": "Accumulate First Segment",
+          "kind": "processing"
+        },
+        {
+          "verb": "N := Remaining Segment Number",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start TR210",
+          "kind": "processing"
+        }
+      ],
+      "next": "ReassemblingUnitData",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_yes_no",
+      "from": "Ready",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "segment_header_present and not first_segment",
+      "actions": [
+        {
+          "verb": "Discard: Segment",
+          "kind": "processing"
+        },
+        {
+          "verb": "DL-ERROR Indication (Z)",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_dl_unit_data_indication_no",
+      "from": "Ready",
+      "on": "DL_UNIT_DATA_indication",
+      "guard": "not segment_header_present",
+      "actions": [
+        {
+          "verb": "DL_UNIT_DATA_indication",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_all_other_dl_primitives__from_lower_layer",
+      "from": "Ready",
+      "on": "all_other_dl_primitives__from_lower_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Send Unmodified Primitive",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

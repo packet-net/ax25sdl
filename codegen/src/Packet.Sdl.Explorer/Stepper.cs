@@ -464,14 +464,16 @@ public sealed class Stepper
                     moves.Add(new Move(MoveKind.T1Expiry, station));
             }
             // T3 (the idle keepalive) fires under the same rule and only while
-            // T1 is not running: the figures stop T3 whenever they start T1.
-            if (_o.T3)
+            // no T1 runs at either station: the figures stop T3 whenever they
+            // start T1, and T3 is longer than T1 (§6.7.1.3), so a running T1,
+            // here or at the peer, expires first.
+            if (_o.T3 && s.A.T1 != TimerStatus.Running && (s.StubPeer is not null || s.B.T1 != TimerStatus.Running))
             {
                 foreach (var station in new[] { Station.A, Station.B })
                 {
                     if (station == Station.B && s.StubPeer is not null) continue;
                     var m = s.Machine(station);
-                    if (m.T3 == TimerStatus.Running && m.T1 != TimerStatus.Running && Handles(m, "T3_expiry"))
+                    if (m.T3 == TimerStatus.Running && Handles(m, "T3_expiry"))
                         moves.Add(new Move(MoveKind.T3Expiry, station));
                 }
             }
