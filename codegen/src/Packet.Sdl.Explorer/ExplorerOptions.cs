@@ -66,6 +66,16 @@ public enum ReleaseBy
     Both,
 }
 
+/// <summary>Which stations' layer 3 issues DL_CONNECT_request on a live or waiting link (<see cref="ExplorerOptions.Reconnect"/>).</summary>
+public enum ReconnectBy
+{
+    None,
+    /// <summary>Station A's layer 3 only.</summary>
+    A,
+    /// <summary>Either station's layer 3.</summary>
+    Both,
+}
+
 /// <summary>What plays station B.</summary>
 public enum PeerKind
 {
@@ -181,6 +191,38 @@ public sealed record ExplorerOptions
     /// Table-driven peer only. Off by default.
     /// </summary>
     public ReleaseBy Release { get; init; } = ReleaseBy.None;
+
+    /// <summary>
+    /// With <see cref="Release"/>: the release may also come while the link
+    /// is still being set up (AwaitingConnection, AwaitingV22Connection), not
+    /// only on an established link. Figures C4.2 and C4.6 draw a Save
+    /// (Requeue) for DL-DISCONNECT Request there, which codegen does not emit
+    /// yet (packet-net/ax25sdl#97), so the generated tables route it to the
+    /// page's upper-layer catch-all, which drops it. Off by default.
+    /// </summary>
+    public bool ReleaseEarly { get; init; }
+
+    /// <summary>
+    /// Layer 3 resets the link: the layer 3 of each station named here issues
+    /// DL_CONNECT_request once, on a live or waiting link (AwaitingConnection,
+    /// AwaitingV22Connection, Connected or TimerRecovery), once every frame
+    /// either station submitted has been delivered upward at its peer (the
+    /// same gate as the release). The layer 3 then waits for the answer:
+    /// quiescence requires that every such request was answered by
+    /// DL_CONNECT_confirm or DL_DISCONNECT_indication. Table-driven peer only.
+    /// Off by default.
+    /// </summary>
+    public ReconnectBy Reconnect { get; init; } = ReconnectBy.None;
+
+    /// <summary>
+    /// With <see cref="DataAfterConfirm"/>: station A's layer 3 does not wait
+    /// for DL_CONNECT_confirm but submits its data by moves from the seed on,
+    /// so data can be offered while the connection is still being set up
+    /// (where figc4.2 discards it while layer 3 initiated, ax25spec#161), or
+    /// after it is up. B's layer 3 still waits for its indication. Off by
+    /// default.
+    /// </summary>
+    public bool DataBeforeConfirm { get; init; }
 
     /// <summary>
     /// The give-up rule. A station that exhausts its N2 retries (a T1 expiry

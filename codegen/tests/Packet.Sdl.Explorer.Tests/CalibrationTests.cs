@@ -1042,4 +1042,284 @@ public class CalibrationTests(ITestOutputHelper output)
         result.CounterexampleLength.Should().Be(16);
         result.FiredTransitions.Should().Contain("TimerRecovery/t24_srej_received_yes_no_yes");
     }
+
+    // ─── Coverage batch 3: layer 3 primitives ──
+
+    private static ExplorerOptions LinkDownScenario(int budget) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, DataAfterConfirm = true,
+        FramesAb = 1, FramesBa = 1, Budget = budget, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+    };
+
+    [Fact]
+    public void Layer3_Link_Down_The_Scenario_That_Was_A_MachineError_Now_Explores_Its_Whole_Graph()
+    {
+        // On main, A's layer 3 kept submitting after DL_DISCONNECT_indication
+        // and the DL_DATA_request reached Disconnected, which had no arm for
+        // it: a MachineError at 15 steps. Now an upper-layer primitive with no
+        // arm goes to the page's catch-all, and layer 3 stops submitting when
+        // told the link is down, so the search runs to the end and reports the
+        // shortest deadlock: the duplicated UA of #114 resetting the link (#50).
+        var result = Run(LinkDownScenario(2));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[3].Transition.Should().Be("t17_ua_received_no");
+        result.CounterexampleLength.Should().Be(7);
+        result.StatesExplored.Should().Be(3620);
+        result.FiredTransitions.Should().NotContain("Disconnected/t04_all_other_primitives__from_upper_layer",
+            "a layer 3 told its link is down submits nothing until the link is reported up again");
+    }
+
+    [Fact]
+    public void Layer3_Link_Down_Stops_Submitting_And_Resumes_After_The_Next_Indication()
+    {
+        // The path to main's MachineError, replayed with one more drop in the
+        // budget: A's link goes down (DM, DL_DISCONNECT_indication) with a0
+        // not yet offered, so A's layer 3 holds it; B's retried SABME then
+        // reaches A, A reports DL_CONNECT_indication, and a0 is offered.
+        var o = LinkDownScenario(3);
+        var stepper = new Stepper(o, Fixtures.Tables(o.TablesDir));
+        var s = stepper.Seed();
+        Move[] path =
+        [
+            new(MoveKind.Drop, Station.B), new(MoveKind.T1Expiry, Station.A), new(MoveKind.Duplicate, Station.B),
+            new(MoveKind.Deliver, Station.A), new(MoveKind.Submit, Station.B), new(MoveKind.Pop, Station.B),
+            new(MoveKind.Deliver, Station.A), new(MoveKind.SeizeConfirm, Station.A), new(MoveKind.Deliver, Station.B),
+            new(MoveKind.Deliver, Station.A), new(MoveKind.Deliver, Station.B), new(MoveKind.Deliver, Station.A),
+            new(MoveKind.Deliver, Station.B), new(MoveKind.Deliver, Station.A),
+        ];
+        var n = 0;
+        foreach (var move in path)
+        {
+            stepper.EnabledMoves(s).Should().Contain(move, $"step {n + 1}");
+            var outcome = stepper.Apply(s, move, ++n);
+            output.WriteLine(outcome.Record.Render());
+            outcome.Violation.Should().BeNull();
+            s = outcome.Next;
+        }
+        s.A.State.Should().Be("Disconnected");
+        s.LinkUpA.Should().BeFalse();
+        s.OfferedA.Should().Be(0);
+        stepper.EnabledMoves(s).Should().NotContain(new Move(MoveKind.Submit, Station.A));
+
+        // The UA A sent B is lost, B's T1 retries the SABME, A accepts it.
+        foreach (var move in new Move[] { new(MoveKind.Drop, Station.B), new(MoveKind.T1Expiry, Station.B), new(MoveKind.Deliver, Station.A) })
+        {
+            stepper.EnabledMoves(s).Should().Contain(move);
+            var outcome = stepper.Apply(s, move, ++n);
+            output.WriteLine(outcome.Record.Render());
+            outcome.Violation.Should().BeNull();
+            s = outcome.Next;
+        }
+        s.A.State.Should().Be("Connected");
+        s.LinkUpA.Should().BeTrue();
+        stepper.EnabledMoves(s).Should().Contain(new Move(MoveKind.Submit, Station.A));
+    }
+
+    [Fact]
+    public void Layer3_Link_Down_With_A_Third_Fault_Pins_The_State_Count()
+    {
+        // TlaCheck row l3-down-mod128-b3: the verdict is unchanged, but the
+        // graph depends on layer 3 stopping on the disconnect, so the state
+        // count is pinned here and compared with TLC's.
+        var result = Run(LinkDownScenario(3));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(7);
+        result.StatesExplored.Should().Be(12394);
+    }
+
+    [Fact]
+    public void Reconnect_On_A_Live_Or_Waiting_Link_Is_Answered_By_The_Confirm()
+    {
+        // DL_CONNECT_request once everything is delivered: from Connected
+        // (v2.0 and, with the version 2.2 flag, through Awaiting V2.2
+        // Connection), from Awaiting Connection and from Awaiting V2.2
+        // Connection, with faults on the last two. Each layer 3 gets its
+        // DL_CONNECT_confirm and the link ends up.
+        (ExplorerOptions Options, int States, string Arm)[] cases =
+        [
+            (new() { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Reconnect = ReconnectBy.A }, 40, "Connected/t07_dl_connect_request_no"),
+            (new() { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Srej = true, Reconnect = ReconnectBy.Both }, 150, "Connected/t07_dl_connect_request_yes"),
+            (new() { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A }, 8, "AwaitingConnection/t07_dl_connect_request"),
+            (new()
+            {
+                TablesDir = Fixtures.CurrentDir, Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Budget = 2,
+                Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.A,
+            }, 121, "AwaitingV22Connection/t02_dl_connect_request"),
+            (new()
+            {
+                TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Budget = 2,
+                Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.Both,
+            }, 1139, "Connected/t07_dl_connect_request_no"),
+        ];
+        foreach (var (options, states, arm) in cases)
+        {
+            var result = Run(options);
+            result.Outcome.Should().Be(Outcome.NoViolation);
+            result.StatesExplored.Should().Be(states);
+            result.FiredTransitions.Should().Contain(arm);
+        }
+    }
+
+    [Fact]
+    public void Reconnect_From_Timer_Recovery_Is_Never_Confirmed()
+    {
+        // ax25spec#167, which shows through #114. A's RR is lost, A polls from
+        // Timer Recovery, then its layer 3 resets the link: figc4.5 sends SABM
+        // but stays in Timer Recovery. The poll answer takes A to Connected,
+        // so the UA answering A's own SABM is "unexpected" (figc4.4 t17): DL-ERROR
+        // K, a second reset with Layer 3 Initiated cleared, and the link comes
+        // up through t04_ua_received_yes_no_yes, which sends no
+        // DL_CONNECT_confirm. Everything is delivered and both ends are
+        // Connected; A's layer 3 never hears back. Controls (docs/explorer.md):
+        // with only t07's next state set to Awaiting Connection, as the July
+        // 1998 figure draws it, the run is clean; with #114 fixed and the slip
+        // kept, B delivers a0 twice.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[5].Transition.Should().Be("t07_dl_connect_request");
+        result.Trace[5].SummaryA.Should().StartWith("TimerRecovery");
+        result.Trace[7].Transition.Should().Be("t18_rr_received_yes_yes_yes");
+        result.Trace[9].Transition.Should().Be("t17_ua_received_no");
+        result.Trace[11].Transition.Should().Be("t04_ua_received_yes_no_yes");
+        result.Trace[11].Effects.Should().BeEmpty();
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.Violation.Message.Should().Contain("delivered at A: 0/0, at B: 1/1");
+        result.CounterexampleLength.Should().Be(12);
+    }
+
+    [Fact]
+    public void Reconnect_Of_A_Mod128_Link_Crosses_Into_A_Dm_And_One_End_Goes_Down()
+    {
+        // The #44/#54 link: A at modulo 128 with the version 2.2 flag clear, B
+        // with the flag set at modulo 8. B resets through Awaiting V2.2
+        // Connection but sends SABM (Establish_Data_Link follows the modulus),
+        // the SABM is lost, and B's T1 retry sends SABME (drawn as SABME). A
+        // resets too, through Awaiting Connection, sending SABME; B's SABME
+        // reaches it there and figc4.2 answers DM (the crossing of #115). B
+        // tears down on the DM (#48) while A comes up on B's UA.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0,
+            Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.Both,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[2].Actor.Should().Be("B");
+        result.Trace[2].Transition.Should().Be("t07_dl_connect_request_yes");
+        result.Trace[2].Effects.Should().ContainSingle(e => e.Contains("SABM command", StringComparison.Ordinal));
+        result.Trace[4].Transition.Should().Be("t13_t1_expiry_no");
+        result.Trace[6].Transition.Should().Be("t17_sabme_received");
+        result.Trace[9].Transition.Should().Be("t11_dm_received_yes");
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.Trace[^1].SummaryB.Should().StartWith("Disconnected");
+        result.CounterexampleLength.Should().Be(10);
+    }
+
+    [Fact]
+    public void Seeded_A_Reconnect_That_Is_Never_Answered_Is_Stuck()
+    {
+        // The seeded fixture ignores DL-CONNECT Request in Connected: the link
+        // stays up and quiet with everything delivered, but A's layer 3 never
+        // hears back. The answer rule must refuse that as rest; reconnect-a on
+        // the real tables is clean.
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.ReconnectSwallowedDir, FramesAb = 2, Reconnect = ReconnectBy.A });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[4].Transition.Should().Be("t07_dl_connect_request_no", "the seeded arm: no SABM, no state change");
+        result.Trace[4].Effects.Should().BeEmpty();
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(7);
+    }
+
+    [Fact]
+    public void Seeded_A_Connect_Reported_As_A_Disconnect_Does_Not_Answer_The_Reconnect()
+    {
+        // The seeded fixture reports the completed connect as
+        // DL_DISCONNECT_indication while A goes Connected. That indication
+        // would answer A's reconnect; the report rule (at rest each layer 3's
+        // last report matches its station's state) refuses it as rest.
+        // reconnect-cold on the real tables is clean.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.ConfirmAsDisconnectDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_yes", "the seeded arm");
+        result.Trace[^1].Effects.Should().ContainSingle(e => e.Contains("DL_DISCONNECT_indication", StringComparison.Ordinal));
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Reconnect_Is_For_The_Table_Driven_Peer_Only()
+    {
+        var act = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Reconnect = ReconnectBy.A });
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(SeedKind.Disconnected, "t11_all_other_primitives__from_upper_layer", "t04_ua_received_yes_yes")]
+    [InlineData(SeedKind.AwaitingV22Connection, "t06_all_other_primitives__from_upper_layer", "t12_ua_received_yes_yes")]
+    public void Release_While_Connecting_Is_Dropped_Because_Codegen_Does_Not_Emit_The_Requeue(SeedKind seed, string dropped, string connect)
+    {
+        // packet-net/ax25sdl#97. Figures C4.2 and C4.6 draw a Save (Requeue)
+        // for DL-DISCONNECT Request while awaiting the connection; the
+        // generated tables have no arm for it, so it goes to the upper-layer
+        // catch-all, which does nothing, and the link comes up regardless. The
+        // layer 3 asked for the link down and it ends up.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = seed, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[0].Transition.Should().Be(dropped);
+        result.Trace[2].Transition.Should().Be(connect);
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Release_Early_Needs_A_Releasing_Station()
+    {
+        var act = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, ReleaseEarly = true });
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Data_Offered_Before_The_Confirm_As_A_Move_Leaves_A_Gap()
+    {
+        // ax25spec#161 with the submission as a move: a0 is offered while A
+        // awaits the UA and figc4.2 discards it (Layer 3 Initiated, the empty
+        // arm); a1 is offered once the link is up and delivered, so B delivers
+        // a1 where a0 was due.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, DataAfterConfirm = true, DataBeforeConfirm = true, FramesAb = 2,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Delivery);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[0].Transition.Should().Be("t09_dl_data_request_yes");
+        result.Trace[0].Effects.Should().BeEmpty();
+        result.Trace[3].Transition.Should().Be("t02_dl_data_request");
+        result.Violation.Message.Should().Contain("delivered `a1` upward where A's submission #0 is `a0`");
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void Data_Before_Confirm_Is_A_Variant_Of_Data_Offered_By_Moves()
+    {
+        var act = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, DataBeforeConfirm = true });
+        act.Should().Throw<ArgumentException>();
+    }
 }

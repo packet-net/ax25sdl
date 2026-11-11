@@ -29,6 +29,8 @@ public enum MoveKind
     Submit,
     /// <summary>DL_DISCONNECT_request from the station's layer 3 once the exchange is complete (<see cref="ExplorerOptions.Release"/>).</summary>
     Release,
+    /// <summary>DL_CONNECT_request from the station's layer 3 on a live or waiting link (<see cref="ExplorerOptions.Reconnect"/>).</summary>
+    Reconnect,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -108,6 +110,12 @@ public sealed class Stepper
             throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
         if (_o.Release != ReleaseBy.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("the orderly release is for the table-driven peer only (the v2.0 stub has no data phase to complete)", nameof(options));
+        if (_o.ReleaseEarly && _o.Release == ReleaseBy.None)
+            throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
+        if (_o.Reconnect != ReconnectBy.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
+        if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
+            throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
             throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
         foreach (var (state, page) in tables.States)
@@ -144,7 +152,7 @@ public sealed class Stepper
         var state = new SystemState { A = NewMachine(Station.A, initial), B = NewMachine(Station.B, initial), StubPeer = stub };
 
         if (_o.Seed == SeedKind.Disconnected)
-            state = Require(Inject(state, Station.A, new EventInput("DL_CONNECT_request"), "DL_CONNECT_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
+            state = Require(Inject(state, Station.A, new EventInput(UpperEvent(state.A, "DL_CONNECT_request")), "DL_CONNECT_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
 
         if (_o.Seed == SeedKind.AwaitingV22Connection)
         {
@@ -162,13 +170,15 @@ public sealed class Stepper
             state = state with { A = a, ToB = new[] { new Frame("SABME", Command: true, Pf: true, Nr: null, Ns: null, Data: null) } };
         }
 
+        // With DataBeforeConfirm, A's layer 3 treats the link as usable as soon
+        // as it has asked for it.
         if (_o.DataAfterConfirm)
-            return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0 };
+            return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0, LinkUpA = _o.DataBeforeConfirm };
 
         foreach (var label in _submittedA)
-            state = Require(Inject(state, Station.A, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
+            state = Require(Inject(state, Station.A, new EventInput(UpperEvent(state.A, "DL_DATA_request"), Data: label), "DL_DATA_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
         foreach (var label in _submittedB)
-            state = Require(Inject(state, Station.B, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (seed)", state.ToB, state.Budget, clearOwed: false, number: 0));
+            state = Require(Inject(state, Station.B, new EventInput(UpperEvent(state.B, "DL_DATA_request"), Data: label), "DL_DATA_request (seed)", state.ToB, state.Budget, clearOwed: false, number: 0));
 
         return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0 };
 
@@ -204,6 +214,10 @@ public sealed class Stepper
     public bool IsQuiescent(SystemState s)
     {
         ArgumentNullException.ThrowIfNull(s);
+        // A layer 3 still waiting for the answer to its DL_CONNECT_request
+        // (Reconnect) is never at rest.
+        if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        if (!ReportsMatch(s)) return false;
         if (_o.AcceptGiveUp)
         {
             // The give-up rule: no rest counts after an unjustified give-up,
@@ -234,6 +248,25 @@ public sealed class Stepper
             && !s.SeizeOwedA;
     }
 
+    /// <summary>
+    /// At rest, each table-driven station's last link report to its layer 3
+    /// matches its state: "up" only while Connected or TimerRecovery, "down"
+    /// only while Disconnected (no report yet constrains nothing). So a
+    /// DL_DISCONNECT_indication answers a reconnect only if the station
+    /// really is down, and a layer 3 told the link is down while it is up (or
+    /// the reverse) is never at rest.
+    /// </summary>
+    private static bool ReportsMatch(SystemState s)
+    {
+        static bool Match(int report, string state) => report switch
+        {
+            1 => IsDataState(state),
+            2 => state == "Disconnected",
+            _ => true,
+        };
+        return Match(s.ReportA, s.A.State) && (s.StubPeer is not null || Match(s.ReportB, s.B.State));
+    }
+
     private const int Honest = 1;
     private const int Unjustified = 2;
 
@@ -262,6 +295,8 @@ public sealed class Stepper
     {
         if (s.GaveUpA != Honest && s.GaveUpB != Honest) return false;
         if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
+        if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        if (!ReportsMatch(s)) return false;
         // A station still up counts only if nothing its peer sent after giving
         // up reached it: one that received the DM and stayed up is not settled.
         bool Settled(DataLinkMachine m, bool heard) =>
@@ -297,6 +332,13 @@ public sealed class Stepper
     {
         ReleaseBy.Both => true,
         ReleaseBy.A => station == Station.A,
+        _ => false,
+    };
+
+    private bool Reconnects(Station station) => _o.Reconnect switch
+    {
+        ReconnectBy.Both => true,
+        ReconnectBy.A => station == Station.A,
         _ => false,
     };
 
@@ -370,6 +412,10 @@ public sealed class Stepper
             // everything either side submitted has been delivered.
             if (ReleaseReady(s, station))
                 moves.Add(new Move(MoveKind.Release, station));
+
+            // Layer 3 resets a live or waiting link, under the same gate.
+            if (ReconnectReady(s, station))
+                moves.Add(new Move(MoveKind.Reconnect, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -395,7 +441,12 @@ public sealed class Stepper
         _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
 
     private bool ReleaseReady(SystemState s, Station station) =>
-        Releases(station) && !s.Released(station) && IsDataState(s.Machine(station).State)
+        Releases(station) && !s.Released(station)
+        && (_o.ReleaseEarly ? IsLinkState(s.Machine(station).State) : IsDataState(s.Machine(station).State))
+        && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
+
+    private bool ReconnectReady(SystemState s, Station station) =>
+        Reconnects(station) && !s.Reconnected(station) && IsLinkState(s.Machine(station).State)
         && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
 
     private bool DropAllowed(Frame head, Station into)
@@ -408,6 +459,16 @@ public sealed class Stepper
 
     private bool Handles(DataLinkMachine m, string eventName) =>
         _eventsByState.TryGetValue(m.State, out var events) && events.Contains(eventName);
+
+    /// <summary>
+    /// The event an upper-layer primitive raises in the station's current
+    /// state: its own arm when the page has one, else the page's
+    /// <c>all_other_primitives__from_upper_layer</c> catch-all (pinned
+    /// semantic 5). With neither, the primitive itself, which the
+    /// interpreter then reports as a missing arm.
+    /// </summary>
+    private string UpperEvent(DataLinkMachine m, string primitive) =>
+        Handles(m, primitive) || !Handles(m, "all_other_primitives__from_upper_layer") ? primitive : "all_other_primitives__from_upper_layer";
 
     /// <summary>
     /// A pop is enabled only when it changes something: a window-full or
@@ -538,7 +599,7 @@ public sealed class Stepper
             case MoveKind.Submit:
             {
                 var label = Submitted(station)[s.Offered(station)];
-                var outcome = Inject(s, station, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (layer 3, link up)", incoming, s.Budget, clearOwed: false, number);
+                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DATA_request"), Data: label), _o.DataBeforeConfirm && station == Station.A ? "DL_DATA_request (layer 3, not waiting for the confirm)" : "DL_DATA_request (layer 3, link up)", incoming, s.Budget, clearOwed: false, number);
                 var next = station == Station.A
                     ? outcome.Next with { OfferedA = s.OfferedA + 1 }
                     : outcome.Next with { OfferedB = s.OfferedB + 1 };
@@ -546,10 +607,23 @@ public sealed class Stepper
             }
             case MoveKind.Release:
             {
-                var outcome = Inject(s, station, new EventInput("DL_DISCONNECT_request"), "DL_DISCONNECT_request (layer 3 releases the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
+                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DISCONNECT_request")), "DL_DISCONNECT_request (layer 3 releases the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
                 var next = station == Station.A
                     ? outcome.Next with { ReleasedA = true }
                     : outcome.Next with { ReleasedB = true };
+                return outcome with { Next = next };
+            }
+            case MoveKind.Reconnect:
+            {
+                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_CONNECT_request")), "DL_CONNECT_request (layer 3 resets the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
+                // The pending flag is set after the dispatch, so an arm that
+                // answered the request within the same dispatch (a confirm or
+                // a disconnect indication from the DL-CONNECT arm itself)
+                // would be overwritten and the request left pending. No
+                // current arm does: each sends SABM(E) or nothing.
+                var next = station == Station.A
+                    ? outcome.Next with { ReconnectedA = true, ReconnectPendingA = true }
+                    : outcome.Next with { ReconnectedB = true, ReconnectPendingB = true };
                 return outcome with { Next = next };
             }
             case MoveKind.T1Expiry:
@@ -652,6 +726,8 @@ public sealed class Stepper
         var delivered = s.DeliveredAt(station);
         var acked = s.Acked(station);
         var linkUp = s.LinkUp(station);
+        var reconnectPending = s.ReconnectPending(station);
+        var report = s.Report(station);
         var connectReported = false;
         var effectsText = new List<string>();
 
@@ -691,9 +767,19 @@ public sealed class Stepper
                         }
                         break;
                     }
-                    case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" }:
+                    case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" } ue:
                         if (_o.DataAfterConfirm) linkUp = true;
+                        if (ue.Primitive == "DL_CONNECT_confirm") reconnectPending = false;
+                        report = 1;
                         connectReported = true;
+                        break;
+                    case UpperEffect { Primitive: "DL_DISCONNECT_indication" or "DL_DISCONNECT_confirm" } ue:
+                        // Layer 3 stops submitting once it is told the link is
+                        // down, and resumes after the next confirm or
+                        // indication; what it had already offered stays counted.
+                        if (_o.DataAfterConfirm) linkUp = false;
+                        if (ue.Primitive == "DL_DISCONNECT_indication") reconnectPending = false;
+                        report = 2;
                         break;
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
@@ -777,6 +863,10 @@ public sealed class Stepper
             FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
             LinkUpA = station == Station.A ? linkUp : s.LinkUpA,
             LinkUpB = station == Station.B ? linkUp : s.LinkUpB,
+            ReconnectPendingA = station == Station.A ? reconnectPending : s.ReconnectPendingA,
+            ReconnectPendingB = station == Station.B ? reconnectPending : s.ReconnectPendingB,
+            ReportA = station == Station.A ? report : s.ReportA,
+            ReportB = station == Station.B ? report : s.ReportB,
             LossesA = station == Station.A ? losses : s.LossesA,
             LossesB = station == Station.B ? losses : s.LossesB,
             GaveUpA = station == Station.A ? gaveUp : s.GaveUpA,
@@ -793,6 +883,9 @@ public sealed class Stepper
     private bool On(Invariants inv) => _o.Invariants.HasFlag(inv);
 
     private static bool IsDataState(string state) => state is "Connected" or "TimerRecovery";
+
+    /// <summary>A live or waiting link: established, or being set up.</summary>
+    private static bool IsLinkState(string state) => state is "AwaitingConnection" or "AwaitingV22Connection" or "Connected" or "TimerRecovery";
 
     private static Violation? SequenceSanityCheck(Station station, DataLinkMachine m)
     {

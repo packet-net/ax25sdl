@@ -1,0 +1,134 @@
+{
+  "$schema": "./schema.json",
+  "kind": "subroutines",
+  "machine": "management_data_link",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.3",
+    "url": ""
+  },
+  "subroutines": [
+    {
+      "name": "Initiate_COP_Negotiation",
+      "paths": [
+        {
+          "id": "t01_initiate_cop_negotiation_yes",
+          "guard": "COP_negotiation_requested",
+          "actions": [
+            {
+              "verb": "Set Full or Half Duplex",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive COP Parameter field to XID Command",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_initiate_cop_negotiation_no",
+          "guard": "not COP_negotiation_requested",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "COP_Negotiation_Response",
+      "paths": [
+        {
+          "id": "t01_cop_negotiation_response_yes_yes",
+          "guard": "COP_parameter_field_present and full_duplex_acceptable",
+          "actions": [
+            {
+              "verb": "Set Full Duplex",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive COP Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_cop_negotiation_response_yes_no",
+          "guard": "COP_parameter_field_present and not full_duplex_acceptable",
+          "actions": [
+            {
+              "verb": "Set Half Duplex",
+              "kind": "processing"
+            },
+            {
+              "verb": "Add Receive COP Parameter field to XID Response",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_cop_negotiation_response_no",
+          "guard": "not COP_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    },
+    {
+      "name": "Complete_COP_Negotiation",
+      "paths": [
+        {
+          "id": "t01_complete_cop_negotiation_yes_yes",
+          "guard": "COP_parameter_field_present and full_duplex_acceptable",
+          "actions": [
+            {
+              "verb": "Set Full Duplex",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t02_complete_cop_negotiation_yes_no",
+          "guard": "COP_parameter_field_present and not full_duplex_acceptable",
+          "actions": [
+            {
+              "verb": "Set Half Duplex",
+              "kind": "processing"
+            }
+          ],
+          "notes": "",
+          "references": [],
+          "loops": []
+        },
+        {
+          "id": "t03_complete_cop_negotiation_no",
+          "guard": "not COP_parameter_field_present",
+          "actions": [],
+          "notes": "",
+          "references": [],
+          "loops": []
+        }
+      ],
+      "notes": "",
+      "references": []
+    }
+  ]
+}

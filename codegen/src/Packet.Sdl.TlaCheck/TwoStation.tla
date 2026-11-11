@@ -28,6 +28,9 @@ CONSTANTS
     Peer,              \* what plays B: "tables", "v20-frmr" or "v20-dm"
     FlowAt,            \* stations whose layer 3 issues DL_FLOW_OFF / DL_FLOW_ON, subset of {"A", "B"}
     ReleaseAt,         \* stations whose layer 3 releases the link once everything is delivered, subset of {"A", "B"}
+    ReleaseEarly,      \* the release may also come while the link is being set up (Awaiting*Connection)
+    ReconnectAt,       \* stations whose layer 3 issues DL_CONNECT_request once on a live or waiting link, subset of {"A", "B"}
+    DataBeforeConfirm, \* with DataAfterConfirm: A's layer 3 submits from the seed on, not waiting for its confirm
     AcceptGiveUp,      \* the give-up rule: an honest N2 give-up that has settled is quiescent (see GiveUpSettled)
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
@@ -54,6 +57,8 @@ Submitted(s) ==
 
 StubB == Peer # "tables"
 DataStates == {"Connected", "TimerRecovery"}
+\* A live or waiting link: established, or being set up.
+LinkStates == {"AwaitingConnection", "AwaitingV22Connection", "Connected", "TimerRecovery"}
 KnownStates == {"Disconnected", "AwaitingConnection", "AwaitingV22Connection", "Connected", "AwaitingRelease", "TimerRecovery"}
 
 NoViol == [kind |-> "none", at |-> "", msg |-> ""]
@@ -79,6 +84,13 @@ FrameEvent(m, f) ==
         ELSE IF f.cmd /\ f.type \in {"I", "RR", "RNR", "REJ", "SREJ"} /\ Handles(m.st, "i_or_s_command_received") THEN "i_or_s_command_received"
         ELSE IF Handles(m.st, "all_other_primitives__from_lower_layer") THEN "all_other_primitives__from_lower_layer"
         ELSE ""
+
+\* An upper-layer primitive raises its own arm if the page has one, else the
+\* page's upper-layer catch-all (pinned semantic 5); with neither, itself,
+\* which Dispatch then reports as a missing arm.
+UpperEvent(m, p) ==
+    IF Handles(m.st, p) \/ ~Handles(m.st, "all_other_primitives__from_upper_layer") THEN p
+    ELSE "all_other_primitives__from_upper_layer"
 
 FrameInput(m, f, into) ==
     [ev |-> FrameEvent(m, f), pf |-> IF f.pf THEN 1 ELSE 0, cmd |-> IF f.cmd THEN 1 ELSE 0,
@@ -118,9 +130,12 @@ EmitterReject(s, m, f) ==
 
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
-\* order and flow-off), a seize request to the owed flag, and a connect
-\* confirm or indication to the link-up flag (with DataAfterConfirm) and to
-\* conn (progress, for the give-up rule).
+\* order and flow-off), a seize request to the owed flag, a connect confirm
+\* or indication to the link-up flag (with DataAfterConfirm) and to conn
+\* (progress, for the give-up rule), a disconnect indication or confirm to
+\* the link-up flag (layer 3 stops submitting until the link is reported up
+\* again), and a connect confirm or disconnect indication to pend (the answer
+\* a reconnecting layer 3 waits for).
 RECURSIVE Route(_, _, _, _, _, _)
 Route(s, m, fx, acc, flowOff, i) ==
     IF i > Len(fx) THEN acc
@@ -144,7 +159,11 @@ Route(s, m, fx, acc, flowOff, i) ==
                                                         ELSE "'" \o expected \o "' is next: out-of-order, duplicate or gapped delivery"))
                                           ELSE vf]
                 ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"}
-                     THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN TRUE ELSE @, !.conn = TRUE]
+                     THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN TRUE ELSE @, !.conn = TRUE,
+                                      !.pend = IF fe.prim = "DL_CONNECT_confirm" THEN FALSE ELSE @, !.rep = 1]
+                ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_DISCONNECT_indication", "DL_DISCONNECT_confirm"}
+                     THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN FALSE ELSE @,
+                                      !.pend = IF fe.prim = "DL_DISCONNECT_indication" THEN FALSE ELSE @, !.rep = 2]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
@@ -175,7 +194,8 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         v1 == IF ran /\ c.err # "" THEN Viol("MachineError", s, "interpreter error at station " \o s \o ": " \o c.err) ELSE v0
         m == IF ran THEN Persist(c) ELSE pre
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
-                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE, v |-> v1],
+                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
+                    pend |-> S.pend[s], rep |-> S.rep[s], v |-> v1],
                    S.off[s], 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -197,7 +217,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
                    THEN Viol("BusyTracksFlow", s, "station " \o s \o " took " \o c.tid \o " on DL_FLOW_ON_request but its own-receiver-busy condition is still set")
               ELSE NoViol
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
-                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up,
+                           !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up, !.pend[s] = r.pend, !.rep[s] = r.rep,
                            !.loss[s] = loss, !.gave[s] = gave,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
@@ -258,12 +278,13 @@ S0 ==
      up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
      rel |-> [s \in Stations |-> FALSE],
      loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
+     rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
 
 S1 ==
-    CASE Seed = "disconnected" -> Seeded(Inject(S0, "A", Event("DL_CONNECT_request"), <<>>, 0, FALSE))
+    CASE Seed = "disconnected" -> Seeded(Inject(S0, "A", Event(UpperEvent(S0.m["A"], "DL_CONNECT_request")), <<>>, 0, FALSE))
       [] Seed = "awaiting-v22" -> [S0 EXCEPT !.m["A"] = AwaitingV22A, !.ch["B"] = <<Frm("SABME", TRUE, TRUE, None, None, "")>>]
       [] OTHER -> S0
 
@@ -272,16 +293,25 @@ S1 ==
 RECURSIVE Submit(_, _, _)
 Submit(S, s, i) ==
     IF i > Len(Submitted(s)) THEN S
-    ELSE Submit(Seeded(Inject(S, s, [Event("DL_DATA_request") EXCEPT !.data = Submitted(s)[i]], S.ch[s], S.budget, FALSE)), s, i + 1)
+    ELSE Submit(Seeded(Inject(S, s, [Event(UpperEvent(S.m[s], "DL_DATA_request")) EXCEPT !.data = Submitted(s)[i]], S.ch[s], S.budget, FALSE)), s, i + 1)
 
+\* With DataBeforeConfirm, A's layer 3 treats the link as usable as soon as it
+\* has asked for it.
 SeedState == [IF DataAfterConfirm THEN S1 ELSE Submit(Submit(S1, "A", 1), "B", 1)
-              EXCEPT !.budget = Budget, !.acked = [s \in Stations |-> 0]]
+              EXCEPT !.budget = Budget, !.acked = [s \in Stations |-> 0],
+                     !.up = [s \in Stations |-> @[s] \/ (s = "A" /\ DataAfterConfirm /\ DataBeforeConfirm)]]
 
 (***************************************************************************)
 (* The give-up rule's settled state (Stepper.GiveUpSettled)                *)
 (***************************************************************************)
 
 AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery")
+
+\* At rest each table-driven station's last link report to its layer 3
+\* (rep: 0 none, 1 up, 2 down) matches its state (Stepper.ReportsMatch).
+ReportsMatch(S) ==
+    LET Match(r, st) == (r = 1 => st \in DataStates) /\ (r = 2 => st = "Disconnected")
+    IN  Match(S.rep["A"], S.m["A"].st) /\ (StubB \/ Match(S.rep["B"], S.m["B"].st))
 
 \* The give-up rule's settled state, data aside (Stepper.GiveUpSettled): some
 \* station gave up honestly and none without justification, each table-driven
@@ -292,6 +322,8 @@ GiveUpSettled(S) ==
     LET Settled(m, heard) == m.st = "Disconnected" \/ (~heard /\ AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
     IN  /\ (S.gave["A"] = 1 \/ S.gave["B"] = 1)
         /\ S.gave["A"] # 2 /\ S.gave["B"] # 2
+        /\ ~S.pend["A"] /\ ~S.pend["B"]
+        /\ ReportsMatch(S)
         /\ Settled(S.m["A"], S.heard["A"]) /\ (StubB \/ Settled(S.m["B"], S.heard["B"]))
         /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
         /\ ~S.owed["A"] /\ ~S.owed["B"]
@@ -337,7 +369,13 @@ SubmitReady(S, s) == DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < L
 \* Layer 3 releases an established link once everything either side
 \* submitted has been delivered (ReleaseAt), once per station.
 ReleaseReady(S, s) ==
-    /\ s \in ReleaseAt /\ Table(s) /\ ~S.rel[s] /\ S.m[s].st \in DataStates
+    /\ s \in ReleaseAt /\ Table(s) /\ ~S.rel[s] /\ S.m[s].st \in (IF ReleaseEarly THEN LinkStates ELSE DataStates)
+    /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
+
+\* Layer 3 resets a live or waiting link under the same gate (ReconnectAt),
+\* once per station, and then waits for its answer (pend).
+ReconnectReady(S, s) ==
+    /\ s \in ReconnectAt /\ Table(s) /\ ~S.rcn[s] /\ S.m[s].st \in LinkStates
     /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
 
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
@@ -366,6 +404,7 @@ CanFlowOff(s) ==
     /\ Handles(sys.m[s].st, "DL_FLOW_OFF_request")
 CanSubmit(s) == viol = NoViol /\ SubmitReady(sys, s)
 CanRelease(s) == viol = NoViol /\ ReleaseReady(sys, s)
+CanReconnect(s) == viol = NoViol /\ ReconnectReady(sys, s)
 CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
 
 \* The give-up rule: a frame reaching s after its peer gave up was sent at or
@@ -418,14 +457,24 @@ FlowOff(s) ==
 \* Layer 3 submits its next frame (DataAfterConfirm).
 SubmitData(s) ==
     /\ CanSubmit(s)
-    /\ LET r == Inject(sys, s, [Event("DL_DATA_request") EXCEPT !.data = Submitted(s)[sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
+    /\ LET r == Inject(sys, s, [Event(UpperEvent(sys.m[s], "DL_DATA_request")) EXCEPT !.data = Submitted(s)[sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
        IN  Take([r EXCEPT !.sys.offered[s] = @ + 1], "submit", s, NoFrm)
 
 \* Layer 3 releases the link (ReleaseAt).
 Release(s) ==
     /\ CanRelease(s)
-    /\ LET r == Inject(sys, s, Event("DL_DISCONNECT_request"), sys.ch[s], sys.budget, FALSE)
+    /\ LET r == Inject(sys, s, Event(UpperEvent(sys.m[s], "DL_DISCONNECT_request")), sys.ch[s], sys.budget, FALSE)
        IN  Take([r EXCEPT !.sys.rel[s] = TRUE], "release", s, NoFrm)
+
+\* Layer 3 resets the link (ReconnectAt).
+Reconnect(s) ==
+    /\ CanReconnect(s)
+    /\ LET r == Inject(sys, s, Event(UpperEvent(sys.m[s], "DL_CONNECT_request")), sys.ch[s], sys.budget, FALSE)
+           \* pend is set after the dispatch, so an arm that answered the
+           \* request within the same dispatch would be overwritten and the
+           \* request left pending. No current arm does: each sends SABM(E)
+           \* or nothing.
+       IN  Take([r EXCEPT !.sys.rcn[s] = TRUE, !.sys.pend[s] = TRUE], "reconnect", s, NoFrm)
 
 T1(s) ==
     /\ CanT1(s)
@@ -453,10 +502,13 @@ PlainQuiescent ==
 
 \* With AcceptGiveUp, a settled honest give-up with everything delivered is at
 \* rest too, and nothing is once a station has given up without justification.
+\* A layer 3 still waiting for the answer to its reconnect is never at rest.
 Quiescent ==
-    \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
-    \/ /\ ~(AcceptGiveUp /\ (sys.gave["A"] = 2 \/ sys.gave["B"] = 2))
-       /\ PlainQuiescent
+    /\ ~sys.pend["A"] /\ ~sys.pend["B"]
+    /\ ReportsMatch(sys)
+    /\ \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
+       \/ /\ ~(AcceptGiveUp /\ (sys.gave["A"] = 2 \/ sys.gave["B"] = 2))
+          /\ PlainQuiescent
 
 \* A quiescent state stutters, so TLC's deadlock check reports exactly the
 \* explorer's deadlocks: terminal states that are not quiescent.
@@ -471,8 +523,8 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B")
     \/ T1("A") \/ T1("B")
     \/ Rest
 
@@ -533,9 +585,9 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* The argument needs every progress move to be a real (non-stuttering) step,
 \* or a move that changes nothing could be "taken" without TLC seeing it and
 \* the fairness would be discharged falsely. The tick in last guarantees it.
-ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release"}
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release", "reconnect"}
 
-CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s)
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s) \/ CanReconnect(s)
 
 CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s)
 TookProgress == last'.move \in ProgressKinds
