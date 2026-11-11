@@ -23,6 +23,9 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          (DL_CONNECT_confirm at A, DL_CONNECT_indication at B); B may then have data too
   --release A|both       that station's layer 3 (or either's) issues DL_DISCONNECT_request once, on an established
                          link, when everything both sides submitted is delivered; quiescence is then both Disconnected
+  --accept-give-up       the give-up rule: a station that exhausts N2 after enough losses since its last progress
+                         has given up honestly, and a settled honest give-up with everything delivered is quiescent
+                         (one that lost data is a give-up-loss violation; an unjustified give-up never rests)
   --flow-control A|B|both   let that station's layer 3 issue DL_FLOW_OFF_request then DL_FLOW_ON_request
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
@@ -40,7 +43,7 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 
 string tables = "spec/json";
 int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
-bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
+bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
@@ -100,6 +103,7 @@ try
             case "--peer-declines-sabme": peerDeclines = true; break;
             case "--mod128": mod128 = true; break;
             case "--data-after-confirm": dataAfterConfirm = true; break;
+            case "--accept-give-up": acceptGiveUp = true; break;
             case "--selective-progress": selective = true; break;
             case "--rej-may-equal-vs": rejMayEqualVs = true; break;
             case "--quiescence-accepts-timer-recovery": trQuiescent = true; break;
@@ -175,6 +179,7 @@ try
         Peer = peer,
         FlowControl = flowControl,
         Release = release,
+        AcceptGiveUp = acceptGiveUp,
         FlowRounds = flowRounds,
         FlowOffAfterDelivered = flowOffAfter,
         Invariants = invariants,

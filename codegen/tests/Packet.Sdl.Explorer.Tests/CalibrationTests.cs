@@ -658,7 +658,9 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Actor.Should().Be("A");
         result.Trace[1].Transition.Should().Be("t03_dm_received_yes");
+        result.Trace[^1].SummaryA.Should().StartWith("Disconnected", "A is the station the DM tears down");
         result.CounterexampleLength.Should().Be(2);
     }
 
@@ -683,9 +685,9 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData(1, 2, 1, 15, Station.A)]
-    [InlineData(3, 1, 2, 17, Station.B)]
-    public void HypothesisH1_Also_Strands_A_Station_At_Other_Windows(int ab, int ba, int k, int length, Station stuck)
+    [InlineData(1, 2, 1, 15, Station.A, 12)]
+    [InlineData(3, 1, 2, 17, Station.B, 15)]
+    public void HypothesisH1_Also_Strands_A_Station_At_Other_Windows(int ab, int ba, int k, int length, Station stuck, int strandingStep)
     {
         // ax25spec#91 (H1) again, from scenarios that reach figc4.5 I-frame
         // arms the h1 row does not: the station is left in TimerRecovery with
@@ -699,6 +701,12 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         var summary = stuck == Station.A ? result.Trace[^1].SummaryA : result.Trace[^1].SummaryB;
         summary.Should().StartWith("TimerRecovery").And.Contain("t1=stopped");
+        // The stranding step: an I frame acknowledging everything outstanding
+        // arrives in TimerRecovery; Check_I_Frame_Acknowledged stops T1 and
+        // nothing on figc4.5 ever takes the station back to Connected.
+        var strand = result.Trace[strandingStep - 1];
+        strand.Actor.Should().Be(stuck.ToString());
+        strand.Transition.Should().Be("t22_i_received_yes_yes_yes_no_yes_no_no");
         result.CounterexampleLength.Should().Be(length);
     }
 
@@ -709,8 +717,9 @@ public class CalibrationTests(ITestOutputHelper output)
     {
         // A's layer 3 issues DL_DISCONNECT_request once both of its frames are
         // delivered: DISC, UA, both Disconnected, which is quiescence here.
-        Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Release = ReleaseBy.A })
-            .Outcome.Should().Be(Outcome.NoViolation);
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Release = ReleaseBy.A });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(44);
     }
 
     [Fact]
@@ -733,11 +742,12 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Release_Rescues_The_Station_Hypothesis_H1_Strands()
+    public void Release_Masks_Hypothesis_H1()
     {
         // The h1-k1 scenario with A's layer 3 releasing: the station stranded
         // in TimerRecovery (#91) is taken out of it by DL_DISCONNECT_request,
-        // so the run is clean. A release scenario therefore cannot see #91.
+        // so the run is clean. Nothing is fixed: the release masks #91, and a
+        // release scenario cannot see it (h1-k1 without the release does).
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 2, K = 1, Budget = 2,
@@ -745,6 +755,7 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.NoViolation);
         result.FiredTransitions.Should().Contain("TimerRecovery/t01_dl_disconnect_request");
+        result.StatesExplored.Should().Be(2890);
     }
 
     [Fact]
@@ -752,5 +763,283 @@ public class CalibrationTests(ITestOutputHelper output)
     {
         var act = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Release = ReleaseBy.A });
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Seeded_A_Station_Left_Connected_After_A_Release_Is_Stuck_Not_Released()
+    {
+        // The seeded fixture answers DISC with UA but leaves B Connected: the
+        // release ends with A Disconnected and B not, which the release rest
+        // must refuse. The same scenario on the real tables is release-a.
+        var result = Run(new ExplorerOptions { TablesDir = Fixtures.ReleaseStuckDir, FramesAb = 2, Release = ReleaseBy.A });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[5].Actor.Should().Be("B");
+        result.Trace[5].Transition.Should().Be("t19_disc_received", "the seeded arm: UA, but B stays Connected");
+        result.Trace[6].Transition.Should().Be("t03_ua_received_yes");
+        result.Trace[^1].SummaryA.Should().StartWith("Disconnected");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(9);
+    }
+
+    // ─── Coverage batch 2: the give-up rule (ExplorerOptions.AcceptGiveUp) ──
+
+    [Fact]
+    public void GiveUp_Seeded_A_Peer_That_Ignores_The_Dm_Is_Not_Settled()
+    {
+        // The seeded fixture ignores a DM in Connected. A gives up honestly
+        // from TimerRecovery and its DM reaches B, which stays up: B heard the
+        // give-up, so it is not settled, and the run is a plain deadlock. On
+        // the real tables B disconnects and the same state is the give-up loss.
+        var o = new ExplorerOptions
+        {
+            TablesDir = Fixtures.DmIgnoredDir, FramesAb = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        };
+        var result = Run(o);
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[4].Transition.Should().Be("t21_t1_expiry_yes_no");
+        result.Trace[5].Actor.Should().Be("B");
+        result.Trace[5].Transition.Should().Be("t20_dm_received", "the seeded arm: the DM is ignored");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(6);
+
+        var real = Run(o with { TablesDir = Fixtures.CurrentDir });
+        real.Violation!.Kind.Should().Be(Invariants.GiveUpLoss);
+        real.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void GiveUp_An_Honest_Connect_Give_Up_Is_Rest_Only_With_The_Rule()
+    {
+        // From figc4.6 with N2 = 2 and two drops, both SABMEs are lost and A
+        // gives up (t13_t1_expiry_yes, DL-ERROR G) with B never having heard
+        // anything. Without the rule that is a deadlock; with it, two losses
+        // are as many as the connect loop has attempts, so it is rest.
+        var o = new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, N2 = 2, Budget = 2, Faults = FaultKinds.Drop,
+        };
+        var without = Run(o);
+        without.Outcome.Should().Be(Outcome.Violation);
+        without.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        without.Trace[^1].Transition.Should().Be("t13_t1_expiry_yes");
+        without.CounterexampleLength.Should().Be(4);
+
+        var with = Run(o with { AcceptGiveUp = true });
+        with.Outcome.Should().Be(Outcome.NoViolation);
+        with.StatesExplored.Should().Be(17);
+        with.FiredTransitions.Should().Contain("AwaitingV22Connection/t13_t1_expiry_yes");
+    }
+
+    [Fact]
+    public void GiveUp_An_Honest_Release_Give_Up_Is_Rest()
+    {
+        // A releases with nothing to send; both DISCs are lost (N2 = 1, so the
+        // release loop has two attempts) and A gives up from AwaitingRelease,
+        // leaving B Connected with nothing outstanding, which T3 (not modelled)
+        // would later find out.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(15);
+        result.FiredTransitions.Should().Contain("AwaitingRelease/t02_t1_expiry_yes");
+    }
+
+    [Fact]
+    public void GiveUp_Data_Lost_In_An_Honest_Give_Up_Is_Reported_As_Such()
+    {
+        // B's frame and then its poll are lost: B gives up honestly in
+        // TimerRecovery (DL-ERROR I, two losses for a loop of N2 + 1 = 2
+        // attempts) and A disconnects on the DM, with b0 never delivered. That
+        // is not rest: it is reported as a give-up loss.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, FramesBa = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.GiveUpLoss);
+        result.Violation.Station.Should().BeNull();
+        result.Trace[4].Actor.Should().Be("B");
+        result.Trace[4].Transition.Should().Be("t21_t1_expiry_yes_no");
+        result.Violation.Message.Should().Contain("delivered at A: 0/1");
+        result.CounterexampleLength.Should().Be(6);
+        result.FiredTransitions.Should().Contain(["AwaitingRelease/t13_dm_received_no", "Disconnected/t05_all_other_commands"]);
+    }
+
+    [Fact]
+    public void GiveUp_The_Rule_Does_Not_Excuse_Defect9()
+    {
+        // d9 with the rule on: every loss was recovered and acknowledged, so
+        // the give-up at the end has fewer losses since the last progress than
+        // the loop has attempts. It stays the #9 deadlock, at the same length.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 3, FramesBa = 0, K = 4, N2 = 2, Budget = 3,
+            Faults = FaultKinds.Drop, DropScope = DropScope.InteriorI, AcceptGiveUp = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^2].Transition.Should().Be("t21_t1_expiry_yes_yes_no");
+        result.CounterexampleLength.Should().Be(30);
+
+        // Nor #44 masking #45: one drop where N2 = 2 needs two.
+        var cold = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { N2 = 2, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true });
+        cold.Outcome.Should().Be(Outcome.Violation);
+        cold.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        cold.Trace[^1].Transition.Should().Be("t05_t1_expiry_yes");
+        cold.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void GiveUp_Defect9_At_N2_Of_1_Kills_A_Link_Whose_Data_Was_All_Acknowledged()
+    {
+        // B's frame is lost; B polls, retransmits, and A's RR F=0 acknowledges
+        // it in TimerRecovery (t18_rr_received_no_no_yes: V(a) moves, T1 and
+        // RC do not). The next T1 expiry finds RC = N2 and tears the link down
+        // with everything delivered (DL-ERROR T). One loss cannot justify a
+        // loop of two attempts, so the rule leaves it a deadlock: #9.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, FramesBa = 1, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[8].Transition.Should().Be("t18_rr_received_no_no_yes");
+        result.Trace[9].Actor.Should().Be("B");
+        result.Trace[9].Transition.Should().Be("t21_t1_expiry_yes_yes_no");
+        result.Violation.Message.Should().Contain("delivered at A: 1/1");
+        result.CounterexampleLength.Should().Be(11);
+    }
+
+    // ─── Coverage batch 2: k = 7 and reordering ───────────────────────
+
+    [Fact]
+    public void K7_With_Srej_A_Reject_Naming_V_s_Reaches_The_Figc45_Arms_For_It()
+    {
+        // At k = 7 (above half the modulus, #13) a reject can name V(s). With
+        // reject coherence on that is the #13 verdict; off, the figc4.5 REJ
+        // and SREJ arms for N(r) = V(s) are reached and the run is clean.
+        var o = new ExplorerOptions { TablesDir = Fixtures.CurrentDir, FramesAb = 2, K = 7, Srej = true, Budget = 2, Faults = FaultKinds.Drop };
+        var on = Run(o);
+        on.Outcome.Should().Be(Outcome.Violation);
+        on.Violation!.Kind.Should().Be(Invariants.RejectCoherence);
+        on.CounterexampleLength.Should().Be(14);
+
+        var off = Run(o with { Invariants = Invariants.Default & ~Invariants.RejectCoherence });
+        off.Outcome.Should().Be(Outcome.NoViolation);
+        off.StatesExplored.Should().Be(149);
+        off.FiredTransitions.Should().Contain(["TimerRecovery/t23_rej_received_no_no_yes_yes", "TimerRecovery/t24_srej_received_yes_yes_yes_yes"]);
+    }
+
+    [Theory]
+    [InlineData(false, "TimerRecovery/t18_rr_received_yes_no_no")]
+    [InlineData(true, "TimerRecovery/t18_rr_received_yes_no_yes")]
+    public void Reorder_At_K1_A_Stale_Poll_Answer_Is_An_N_r_Error_And_Recovers(bool srej, string arm)
+    {
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, K = 1, Srej = srej, Budget = 3,
+            Faults = FaultKinds.Reorder | FaultKinds.Drop | FaultKinds.Duplicate,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(245);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void Reorder_A_Stale_Srej_Is_An_N_r_Error_And_Recovers()
+    {
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, K = 2, Srej = true, Budget = 2, Faults = FaultKinds.Reorder,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(60);
+        result.FiredTransitions.Should().Contain("Connected/t24_srej_received_no_yes");
+    }
+
+    [Fact]
+    public void Reorder_A_Stale_Rej_Resets_The_Link_And_The_Outstanding_Frame_Is_Lost()
+    {
+        // ax25spec#95 (reordering; docs/explorer.md H4). A reordered REJ nr=0 arrives after the RR nr=1 that
+        // overtook it: N(r) is below V(a), figc4.4 takes it as an N(r) error
+        // (DL-ERROR J) and re-establishes; B resets on the SABM (DL-ERROR F),
+        // and a1, outstanding at A, is never sent again.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, K = 2, Budget = 3, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[8].Actor.Should().Be("A");
+        result.Trace[8].Transition.Should().Be("t25_rej_received_no_no");
+        result.Trace[9].Transition.Should().Be("t14_sabm_received_yes");
+        result.Violation.Message.Should().Contain("delivered at A: 0/0, at B: 1/2");
+        result.CounterexampleLength.Should().Be(11);
+        result.FiredTransitions.Should().Contain(["TimerRecovery/t11_ua_received", "TimerRecovery/t18_rr_received_no_no_no"]);
+    }
+
+    [Fact]
+    public void Reorder_A_Stale_N_r_On_An_I_Frame_Resets_The_Link_And_Both_Ends_Lose_Data()
+    {
+        // ax25spec#95, the same family with every check on: A's I frame a0 (nr=0)
+        // is overtaken by A's RR nr=1, so B finds N(r) below V(a), discards a0
+        // and re-establishes; neither a0 nor b1 is ever delivered.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[6].Actor.Should().Be("B");
+        result.Trace[6].Transition.Should().Be("t26_i_received_yes_yes_no_no");
+        result.Violation.Message.Should().Contain("delivered at A: 1/2, at B: 0/1");
+        result.CounterexampleLength.Should().Be(9);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_no");
+    }
+
+    [Fact]
+    public void Reorder_An_I_Frame_From_Before_A_Reset_Is_Delivered_Again_After_It()
+    {
+        // ax25spec#95. A stale RR causes an N(r) error reset (as above); a copy of
+        // a0 sent before the reset is reordered behind the SABM and arrives
+        // after it, where N(s) = 0 = V(r) again, so B delivers a0 a second time.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, K = 2, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Delivery);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[14].Transition.Should().Be("t21_rr_received_no_no");
+        result.Trace[16].Transition.Should().Be("t14_sabm_received_yes");
+        result.Trace[^1].Transition.Should().Be("t26_i_received_yes_yes_yes_no_yes_no_no");
+        result.CounterexampleLength.Should().Be(18);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t23_rej_received_no_no_no_no");
+    }
+
+    [Fact]
+    public void Reorder_Scenario_With_Srej_Meets_The_Defect42_Runaway_First()
+    {
+        // The trace uses drops only: B's SREJ names the frame it just received
+        // (#42) and the SREJ count passes k. Reached on the way: the figc4.5
+        // SREJ arm for an out-of-window N(r).
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, K = 2, Srej = true, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.SequenceSanity);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t26_i_received_yes_yes_yes_no_no_yes_no_yes_yes");
+        result.CounterexampleLength.Should().Be(16);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t24_srej_received_yes_no_yes");
     }
 }

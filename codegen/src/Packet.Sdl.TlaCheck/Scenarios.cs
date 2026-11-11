@@ -15,6 +15,10 @@ public enum TableSetKind
     AckBroken,
     /// <summary>A seeded-defect fixture (fixtures/tables-livelock): in-sequence I frames are discarded and TimerRecovery never counts RC up.</summary>
     Livelock,
+    /// <summary>A seeded-defect fixture (fixtures/tables-release-stuck): Connected answers DISC with UA but stays Connected.</summary>
+    ReleaseStuck,
+    /// <summary>A seeded-defect fixture (fixtures/tables-dm-ignored): Connected ignores a DM and stays up.</summary>
+    DmIgnored,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -208,16 +212,98 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Srej = true, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.Both,
         }, "clean");
-        Add("release-a-tr", "release, #91 rescued", TableSetKind.Current, o => o with
+        Add("release-a-tr", "release, masks #91", TableSetKind.Current, o => o with
         {
             FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.A,
         }, "clean");
+
+        // Coverage batch 2: the give-up rule (ExplorerOptions.AcceptGiveUp). A
+        // station that exhausts N2 after enough losses since its last progress
+        // has given up honestly; a settled honest give-up with everything
+        // delivered is rest, one that lost data is reported as GiveUpLoss, and
+        // an unjustified give-up never rests.
+        Add("gu-v22", "give-up control", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, N2 = 2, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "clean");
+        Add("gu-release", "give-up control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        }, "clean");
+        Add("gu-loss", "give-up loss control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, FramesBa = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        }, "GiveUpLoss, 6");
+        // The rule does not excuse #9: a give-up after the acknowledgements
+        // progressed is unjustified, so the link dying stays a deadlock.
+        Add("d9-give-up", "#9", TableSetKind.Current, o => o with
+        {
+            FramesAb = 3, FramesBa = 0, K = 4, N2 = 2, Budget = 3, Faults = FaultKinds.Drop, DropScope = DropScope.InteriorI, AcceptGiveUp = true,
+        }, "Deadlock, 30");
+        Add("d9-n1-release", "#9, #91", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, FramesBa = 1, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
+        }, "Deadlock, 11");
+
+        // k = 7 with SREJ: a reject naming V(s) (the #13 regime, above half
+        // the modulus) reaches the figc4.5 REJ and SREJ arms for N(r) = V(s).
+        // With reject coherence on, that reject is the #13 verdict; off, the
+        // run is clean.
+        Add("k7-srej-rc-off", "#13 regime", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, K = 7, Srej = true, Budget = 2, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "clean");
+
+        // Reordering (off by default: one channel does not reorder; ax25spec#95
+        // is the verification item for it). A reordered frame can carry an
+        // N(r) the receiver has already passed, which figc4.4 and figc4.5 treat
+        // as an N(r) error. Reject coherence presupposes a FIFO channel, so the
+        // rows that reorder rejects run with it off.
+        Add("ro-k1", "reorder control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, K = 1, Budget = 3, Faults = FaultKinds.Reorder | FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "clean");
+        Add("ro-k1-srej", "reorder control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, K = 1, Srej = true, Budget = 3, Faults = FaultKinds.Reorder | FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "clean");
+        Add("ro-srej-rc-off", "reorder control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, K = 2, Srej = true, Budget = 2, Faults = FaultKinds.Reorder, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "clean");
+        Add("ro-stale-rej", "ax25spec#95", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, K = 2, Budget = 3, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "Deadlock, 11");
+        Add("ro-stale-i", "ax25spec#95", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop,
+        }, "Deadlock, 9");
+        Add("ro-reset-dup", "ax25spec#95", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, K = 2, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "Delivery at B, 18");
+        Add("ro-d42", "#42", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, K = 2, Srej = true, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "SequenceSanity at B, 16");
 
         // Seeded defects (fixtures/README.md): no real defect fails these two
         // checks on any table set, so each has a deliberately broken table to
         // prove it can fire, in both tools.
         Add("seeded-ack", "seeded (AckCoherence)", TableSetKind.AckBroken, o => o with { FramesAb = 1 }, "AckCoherence at A, 4");
         Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, "Quiescence");
+        // The release quiescence rule: B acknowledges A's DISC but stays
+        // Connected, so the link ends with one end Disconnected and the other
+        // not. Both tools must call that stuck, not released.
+        // The give-up rule's settled state: A gives up from TimerRecovery and
+        // its DM reaches B, which ignores it and stays up. A peer that heard
+        // the give-up and stayed up is not settled, in either tool.
+        Add("seeded-dm-ignored", "seeded (give-up rest)", TableSetKind.DmIgnored, o => o with
+        {
+            FramesAb = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "Deadlock");
+        Add("seeded-release-stuck", "seeded (release rest)", TableSetKind.ReleaseStuck, o => o with { FramesAb = 2, Release = ReleaseBy.A }, "Deadlock");
 
         return list;
     }
