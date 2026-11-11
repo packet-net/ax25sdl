@@ -42,6 +42,55 @@ public static class Coverage
         return arms;
     }
 
+    /// <summary>The rows (transition and subroutine-path keys) neither tool fired across the runs.</summary>
+    public static IReadOnlyList<string> NeverFired(string currentDir, IReadOnlyList<(IReadOnlySet<string> Explorer, IReadOnlySet<string> Tlc)> runs)
+    {
+        var ex = runs.SelectMany(r => r.Explorer).ToHashSet(StringComparer.Ordinal);
+        var tlc = runs.SelectMany(r => r.Tlc).ToHashSet(StringComparer.Ordinal);
+        return Inventory(currentDir).Where(a => !ex.Contains(a.Key) && !tlc.Contains(a.Key)).Select(a => a.Key).ToList();
+    }
+
+    /// <summary>All row keys of the current tables.</summary>
+    public static int RowCount(string currentDir) => Inventory(currentDir).Count;
+
+    /// <summary>
+    /// The accounting check: the rows never fired must be exactly the rows
+    /// <c>unfired.txt</c> records as unreachable, each with its group and
+    /// reason. A listed row that fires, or an unfired row that is not
+    /// listed, is reported and fails the run, so the list cannot rot.
+    /// </summary>
+    public static (bool Ok, string Text) CheckExpectedUnfired(string currentDir, string listPath, IReadOnlyList<string> neverFired)
+    {
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal);
+        var groups = new List<string>();
+        string? group = null;
+        foreach (var raw in File.ReadAllLines(listPath))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith('#')) continue;
+            if (line.StartsWith("group ", StringComparison.Ordinal))
+            {
+                group = line[6..line.IndexOf(':', StringComparison.Ordinal)];
+                groups.Add(group);
+                continue;
+            }
+            if (group is null) throw new InvalidOperationException($"{listPath}: row `{line}` before any group line");
+            if (!expected.TryAdd(line, group)) throw new InvalidOperationException($"{listPath}: row `{line}` listed twice");
+        }
+        var inventory = Inventory(currentDir).Select(a => a.Key).ToHashSet(StringComparer.Ordinal);
+        var unknown = expected.Keys.Where(k => !inventory.Contains(k)).ToList();
+        var never = neverFired.ToHashSet(StringComparer.Ordinal);
+        var firedButListed = expected.Keys.Where(k => inventory.Contains(k) && !never.Contains(k)).ToList();
+        var unlisted = neverFired.Where(k => !expected.ContainsKey(k)).ToList();
+        var sb = new StringBuilder();
+        var total = inventory.Count;
+        sb.Append(CultureInfo.InvariantCulture, $"Accounting: {total - never.Count} of {total} rows fired, {expected.Count - firedButListed.Count - unknown.Count} recorded unreachable in {groups.Count} groups ({Path.GetFileName(listPath)}), {unlisted.Count} unaccounted.\n");
+        foreach (var k in unknown) sb.Append("  listed but not a row of the current tables: ").Append(k).Append('\n');
+        foreach (var k in firedButListed) sb.Append("  listed as unreachable but fired: ").Append(k).Append(" (group ").Append(expected[k]).Append(")\n");
+        foreach (var k in unlisted) sb.Append("  never fired and not listed: ").Append(k).Append('\n');
+        return (unknown.Count == 0 && firedButListed.Count == 0 && unlisted.Count == 0, sb.ToString());
+    }
+
     public static string Report(string currentDir, IReadOnlyList<(IReadOnlySet<string> Explorer, IReadOnlySet<string> Tlc)> runs)
     {
         var arms = Inventory(currentDir);

@@ -24,7 +24,12 @@ deadlock), and the same number of distinct states (clean runs).
   --heap SIZE       TLC heap per run (default 2g)
   --timeout S       seconds per TLC run (default 600)
 
-exit code: 0 every row agrees, 1 some row disagrees or a run failed
+A full calibration run (no --only, no --grid) also checks the accounting:
+the rows no scenario fires must be exactly those unfired.txt records as
+unreachable, with their reasons.
+
+exit code: 0 every row agrees (and the accounting holds), 1 some row
+disagrees, a run failed, or the accounting does not hold
 """;
 
 string? jar = Environment.GetEnvironmentVariable("TLA2TOOLS_JAR");
@@ -119,9 +124,19 @@ for (var idx = 0; idx < scenarios.Count; idx++)
     sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Agree ? "yes" : "**no**: " + r.Why)} |\n");
 }
 Console.WriteLine(sb.ToString());
-Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current),
-    scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList()));
-return results.Values.All(r => r.Agree) ? 0 : 1;
+var currentRuns = scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList();
+Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current), currentRuns));
+// The accounting check (unfired.txt) needs the whole calibration suite: a
+// subset or the grid fires less, so it is skipped then.
+var accounted = true;
+if (only is null && !grid)
+{
+    var (ok, text) = Coverage.CheckExpectedUnfired(Dir(TableSetKind.Current),
+        Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "unfired.txt"), Coverage.NeverFired(Dir(TableSetKind.Current), currentRuns));
+    Console.WriteLine(text);
+    accounted = ok;
+}
+return results.Values.All(r => r.Agree) && accounted ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
 

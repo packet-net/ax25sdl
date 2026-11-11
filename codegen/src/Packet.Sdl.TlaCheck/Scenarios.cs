@@ -588,6 +588,11 @@ public static class Scenarios
         {
             FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.A, Budget = 2, Faults = FaultKinds.Drop,
         }, "Deadlock, 14");
+        Add("t3-reconnect-cold-mod128", "ax25spec#167 (fault-free with T3, modulo 128)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
+        }, "Quiescence");
+
         // Coverage batch 6, part 2: injected frames (Inject, InjectedFrame).
         ExplorerOptions Inj(ExplorerOptions o, FlowControlAt at, InjectedFrame f) => o with { Inject = at, InjectedFrame = f, Budget = 0 };
         Add("inj-rej-busy-tr", "ax25spec#171", TableSetKind.Current, o => Inj(o, FlowControlAt.A, InjectedFrame.RejPoll) with
