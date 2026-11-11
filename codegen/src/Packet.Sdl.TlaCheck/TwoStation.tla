@@ -27,6 +27,7 @@ CONSTANTS
     PeerDeclinesSabme, \* table-driven B refuses SABME (able_to_establish false) but accepts SABM
     Peer,              \* what plays B: "tables", "v20-frmr" or "v20-dm"
     FlowAt,            \* stations whose layer 3 issues DL_FLOW_OFF / DL_FLOW_ON, subset of {"A", "B"}
+    ReleaseAt,         \* stations whose layer 3 releases the link once everything is delivered, subset of {"A", "B"}
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -235,6 +236,7 @@ S0 ==
      deliv |-> [s \in Stations |-> 0], acked |-> [s \in Stations |-> 0],
      off |-> [s \in Stations |-> FALSE], rounds |-> [s \in Stations |-> 0],
      up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
+     rel |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -283,8 +285,15 @@ PopChanges(S, s) ==
 \* Layer 3 holds data and its link is up (DataAfterConfirm).
 SubmitReady(S, s) == DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < Len(Submitted(s))
 
+\* Layer 3 releases an established link once everything either side
+\* submitted has been delivered (ReleaseAt), once per station.
+ReleaseReady(S, s) ==
+    /\ s \in ReleaseAt /\ Table(s) /\ ~S.rel[s] /\ S.m[s].st \in DataStates
+    /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
+
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
-\* flight, owed, ready to pop or waiting to be submitted anywhere.
+\* flight, owed, ready to pop or waiting to be submitted anywhere. A pending
+\* release does not hold T1 back: it is a layer-3 decision, as flow control is.
 Quiet(S) ==
     /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
     /\ ~S.owed["A"] /\ ~S.owed["B"]
@@ -307,6 +316,7 @@ CanFlowOff(s) ==
     /\ sys.rounds[s] < FlowRounds /\ sys.deliv[s] >= FlowOffAfter
     /\ Handles(sys.m[s].st, "DL_FLOW_OFF_request")
 CanSubmit(s) == viol = NoViol /\ SubmitReady(sys, s)
+CanRelease(s) == viol = NoViol /\ ReleaseReady(sys, s)
 CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
 
 Deliver(s) ==
@@ -356,6 +366,12 @@ SubmitData(s) ==
     /\ LET r == Inject(sys, s, [Event("DL_DATA_request") EXCEPT !.data = Submitted(s)[sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
        IN  Take([r EXCEPT !.sys.offered[s] = @ + 1], "submit", s, NoFrm)
 
+\* Layer 3 releases the link (ReleaseAt).
+Release(s) ==
+    /\ CanRelease(s)
+    /\ LET r == Inject(sys, s, Event("DL_DISCONNECT_request"), sys.ch[s], sys.budget, FALSE)
+       IN  Take([r EXCEPT !.sys.rel[s] = TRUE], "release", s, NoFrm)
+
 T1(s) ==
     /\ CanT1(s)
     /\ Take(Inject(sys, s, Event("T1_expiry"), sys.ch[s], sys.budget, FALSE), "T1-expiry", s, NoFrm)
@@ -368,12 +384,17 @@ AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery
 
 \* Both stations at rest, nothing in flight or queued, everything sent
 \* acknowledged and everything submitted delivered, nothing owed. A v2.0
-\* stub is at rest once it is connected.
+\* stub is at rest once it is connected. With ReleaseAt, at rest means
+\* released: both Disconnected after a layer 3 issued its release.
 Quiescent ==
     LET a == sys.m["A"]
         b == sys.m["B"]
-    IN  /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~sys.owed["A"]
-        /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"]
+    IN  /\ IF ReleaseAt # {}
+           THEN /\ sys.rel["A"] \/ sys.rel["B"]
+                /\ a.st = "Disconnected" /\ b.st = "Disconnected"
+                /\ a.q = <<>> /\ b.q = <<>> /\ ~sys.owed["A"] /\ ~sys.owed["B"]
+           ELSE /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~sys.owed["A"]
+                /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"]
         /\ sys.ch["A"] = <<>> /\ sys.ch["B"] = <<>>
         /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
 
@@ -390,8 +411,8 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B")
     \/ T1("A") \/ T1("B")
     \/ Rest
 
@@ -452,9 +473,9 @@ WithinDepth == TLCGet("level") <= MaxDepth
 \* The argument needs every progress move to be a real (non-stuttering) step,
 \* or a move that changes nothing could be "taken" without TLC seeing it and
 \* the fairness would be discharged falsely. The tick in last guarantees it.
-ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit"}
+ProgressKinds == {"deliver", "pop", "seize-confirm", "flow-on", "flow-off", "submit", "release"}
 
-CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s)
+CanProgress == \E s \in Stations : CanDeliver(s) \/ CanPop(s) \/ CanSeize(s) \/ CanFlowOn(s) \/ CanFlowOff(s) \/ CanSubmit(s) \/ CanRelease(s)
 
 CanProgressOrT1 == CanProgress \/ \E s \in Stations : CanT1(s)
 TookProgress == last'.move \in ProgressKinds

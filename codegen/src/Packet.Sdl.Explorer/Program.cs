@@ -21,6 +21,8 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --mod128               seed A at modulo 128 so DL_CONNECT_request sends SABME
   --data-after-confirm   disconnected seed: each station's layer 3 submits its data only once the link is up
                          (DL_CONNECT_confirm at A, DL_CONNECT_indication at B); B may then have data too
+  --release A|both       that station's layer 3 (or either's) issues DL_DISCONNECT_request once, on an established
+                         link, when everything both sides submitted is delivered; quiescence is then both Disconnected
   --flow-control A|B|both   let that station's layer 3 issue DL_FLOW_OFF_request then DL_FLOW_ON_request
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
@@ -44,6 +46,7 @@ var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
 var peer = PeerKind.Tables;
 var flowControl = FlowControlAt.None;
+var release = ReleaseBy.None;
 var invariants = Invariants.Default;
 
 try
@@ -73,6 +76,15 @@ try
                     "both" => FlowControlAt.Both,
                     "none" => FlowControlAt.None,
                     var v => throw new ArgumentException($"unknown flow-control station `{v}` (A, B, both, none)"),
+                };
+                break;
+            case "--release":
+                release = Next(args, ref i) switch
+                {
+                    "A" or "a" => ReleaseBy.A,
+                    "both" => ReleaseBy.Both,
+                    "none" => ReleaseBy.None,
+                    var v => throw new ArgumentException($"unknown release station `{v}` (A, both, none)"),
                 };
                 break;
             case "--peer":
@@ -162,6 +174,7 @@ try
         DataAfterConfirm = dataAfterConfirm,
         Peer = peer,
         FlowControl = flowControl,
+        Release = release,
         FlowRounds = flowRounds,
         FlowOffAfterDelivered = flowOffAfter,
         Invariants = invariants,

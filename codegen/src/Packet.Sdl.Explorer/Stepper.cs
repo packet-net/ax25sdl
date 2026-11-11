@@ -27,6 +27,8 @@ public enum MoveKind
     FlowOn,
     /// <summary>DL_DATA_request for the station's next frame, once the link is up (<see cref="ExplorerOptions.DataAfterConfirm"/>).</summary>
     Submit,
+    /// <summary>DL_DISCONNECT_request from the station's layer 3 once the exchange is complete (<see cref="ExplorerOptions.Release"/>).</summary>
+    Release,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -104,6 +106,8 @@ public sealed class Stepper
             throw new ArgumentException("the v2.0 stub peer is for the connect-phase seeds only (--seed disconnected or awaiting-v22)", nameof(options));
         if (_o.Peer != PeerKind.Tables && (_o.FramesAb > 0 || _o.FramesBa > 0))
             throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
+        if (_o.Release != ReleaseBy.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the orderly release is for the table-driven peer only (the v2.0 stub has no data phase to complete)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
             throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
         foreach (var (state, page) in tables.States)
@@ -192,11 +196,23 @@ public sealed class Stepper
 
     /// <summary>
     /// Both Connected, nothing in flight or queued, V(s) = V(a) on both, all
-    /// submitted data delivered, no owed internal events.
+    /// submitted data delivered, no owed internal events. With
+    /// <see cref="ExplorerOptions.Release"/>, the link must also have been
+    /// released: both Disconnected after a layer 3 issued its
+    /// DL_DISCONNECT_request, nothing in flight or queued, all data delivered.
     /// </summary>
     public bool IsQuiescent(SystemState s)
     {
         ArgumentNullException.ThrowIfNull(s);
+        if (_o.Release != ReleaseBy.None)
+        {
+            return (s.ReleasedA || s.ReleasedB)
+                && s.A.State == "Disconnected" && s.B.State == "Disconnected"
+                && s.ToA.Count == 0 && s.ToB.Count == 0
+                && s.A.QueueEntries.Count == 0 && s.B.QueueEntries.Count == 0
+                && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
+                && !s.SeizeOwedA && !s.SeizeOwedB;
+        }
         // With the v2.0 stub as B, "B at rest" is simply "the stub is
         // connected" (link established with modulo 8; it has no queue,
         // variables or timers).
@@ -220,6 +236,13 @@ public sealed class Stepper
         FlowControlAt.Both => true,
         FlowControlAt.A => station == Station.A,
         FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
+    private bool Releases(Station station) => _o.Release switch
+    {
+        ReleaseBy.Both => true,
+        ReleaseBy.A => station == Station.A,
         _ => false,
     };
 
@@ -288,11 +311,18 @@ public sealed class Stepper
                 submitEnabled[(int)station] = true;
                 moves.Add(new Move(MoveKind.Submit, station));
             }
+
+            // Orderly release: layer 3 disconnects an established link once
+            // everything either side submitted has been delivered.
+            if (ReleaseReady(s, station))
+                moves.Add(new Move(MoveKind.Release, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
         // flight has been delivered or lost and no internal work is pending
-        // (a layer 3 holding data for a link that is up counts as pending).
+        // (a layer 3 holding data for a link that is up counts as pending; a
+        // pending release does not, like flow control: it is a layer-3
+        // decision, not work in flight).
         var quiet = s.ToA.Count == 0 && s.ToB.Count == 0 && !s.SeizeOwedA && !s.SeizeOwedB && !popEnabled[0] && !popEnabled[1]
             && !submitEnabled[0] && !submitEnabled[1];
         if (quiet)
@@ -309,6 +339,10 @@ public sealed class Stepper
 
     private bool SubmitReady(SystemState s, Station station) =>
         _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
+
+    private bool ReleaseReady(SystemState s, Station station) =>
+        Releases(station) && !s.Released(station) && IsDataState(s.Machine(station).State)
+        && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
 
     private bool DropAllowed(Frame head, Station into)
     {
@@ -436,6 +470,14 @@ public sealed class Stepper
                 var next = station == Station.A
                     ? outcome.Next with { OfferedA = s.OfferedA + 1 }
                     : outcome.Next with { OfferedB = s.OfferedB + 1 };
+                return outcome with { Next = next };
+            }
+            case MoveKind.Release:
+            {
+                var outcome = Inject(s, station, new EventInput("DL_DISCONNECT_request"), "DL_DISCONNECT_request (layer 3 releases the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
+                var next = station == Station.A
+                    ? outcome.Next with { ReleasedA = true }
+                    : outcome.Next with { ReleasedB = true };
                 return outcome with { Next = next };
             }
             case MoveKind.T1Expiry:

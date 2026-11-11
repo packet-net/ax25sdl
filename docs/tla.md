@@ -48,7 +48,7 @@ Truly independent: the exploration engine (TLC's breadth-first search, state has
 
 ## How TLC reproduces the explorer
 
-The harness follows `Stepper.cs` move for move: the same seeds (connected, disconnected, awaiting-v22), the same enabled moves in the same order (per station: deliver, drop, duplicate, reorder, pop, seize-confirm, flow-on/off, submit; then T1 at A, at B; the submit move exists only with `DataAfterConfirm`, the harness constant mirroring `ExplorerOptions.DataAfterConfirm`, where each layer 3 submits its data one frame per move once its station has emitted `DL_CONNECT_confirm` or `DL_CONNECT_indication`), the same quiescent-timeout rule for T1, the same "a pop is a move only when it changes something", the same event routing and catch-alls, the same stub peer rules. Because both searches are breadth-first over the same moves in the same order, with one TLC worker they meet the same first violation: the cross-check compares not just the verdict but the length and the transition fired at every step.
+The harness follows `Stepper.cs` move for move: the same seeds (connected, disconnected, awaiting-v22), the same enabled moves in the same order (per station: deliver, drop, duplicate, reorder, pop, seize-confirm, flow-on/off, submit, release; then T1 at A, at B; the submit move exists only with `DataAfterConfirm`, the harness constant mirroring `ExplorerOptions.DataAfterConfirm`, where each layer 3 submits its data one frame per move once its station has emitted `DL_CONNECT_confirm` or `DL_CONNECT_indication`; the release move exists only for the stations in `ReleaseAt`, mirroring `ExplorerOptions.Release`, where layer 3 issues `DL_DISCONNECT_request` once, from Connected or TimerRecovery, once everything both sides submitted is delivered, and `Quiescent` then requires both stations Disconnected after a release), the same quiescent-timeout rule for T1, the same "a pop is a move only when it changes something", the same event routing and catch-alls, the same stub peer rules. Because both searches are breadth-first over the same moves in the same order, with one TLC worker they meet the same first violation: the cross-check compares not just the verdict but the length and the transition fired at every step.
 
 Three places needed a different formulation in TLA+:
 
@@ -111,10 +111,20 @@ Every row of the explorer's calibration suite (`CalibrationTests.cs`), plus its 
 | v22-peer-ua | #45/#48 control | current | clean, 3 states | clean, 3 states (9.7 s) | yes |
 | h1 | H1 | current | Deadlock, 19 steps | Deadlock, 19 steps (6.7 s) | yes |
 | h1-tr-quiescent | H1 control | current | clean, 806 states | clean, 806 states (7.6 s) | yes |
+| d114-cold-dup-ua | #114/#50 | current | Deadlock, 7 steps | Deadlock, 7 steps (14.3 s) | yes |
+| d114-cold-dup-ua-mod128 | #114/#50 | current | Deadlock, 6 steps | Deadlock, 6 steps (4.5 s) | yes |
+| d44-48-cold-faults | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (4.7 s) | yes |
+| d45-cold-n2 | #44 masks #45 | current | Deadlock, 5 steps | Deadlock, 5 steps (4.0 s) | yes |
+| v20-frmr-dup | #44/#45 control | current | clean, 59 states | clean, 59 states (5.6 s) | yes |
+| h1-k1 | #91 (H1) | current | Deadlock, 15 steps | Deadlock, 15 steps (11.7 s) | yes |
+| h1-k2-ab3 | #91 (H1) | current | Deadlock, 17 steps | Deadlock, 17 steps (9.7 s) | yes |
+| release-a | release control | current | clean, 44 states | clean, 44 states (4.5 s) | yes |
+| release-both-cold | release | current | clean, 829 states | clean, 829 states (5.0 s) | yes |
+| release-a-tr | release, #91 rescued | current | clean, 2890 states | clean, 2890 states (13.5 s) | yes |
 | seeded-ack | seeded (AckCoherence) | seeded ack-broken | AckCoherence at A, 4 steps | AckCoherence at A, 4 steps (1.9 s) | yes |
 | seeded-livelock | seeded (Quiescence) | seeded livelock | Quiescence, 0 steps | Quiescence, lasso of 14 states (3.7 s) | yes |
 
-Times are TLC's own (all phases of the row); the whole suite (35 rows, with the coverage reruns) takes about 70 s wall time at `--parallel 6`. Run on 23 October 2026, after rebasing onto ax25sdl#94 (ax25spec pin 3027400). The four cold-connect-then-data rows (`cold-*`, `d54-*`) were added on 11 November 2026 (ax25sdl#102, ax25spec pin 7940267); the whole suite, now 40 rows, was rerun then one row at a time and every earlier row gave the same explorer verdict as above, with TLC agreeing on all 40. Reading the rows against `docs/explorer.md`'s calibration table:
+Times are TLC's own (all phases of the row); the whole suite (35 rows, with the coverage reruns) takes about 70 s wall time at `--parallel 6`. Run on 23 October 2026, after rebasing onto ax25sdl#94 (ax25spec pin 3027400). The four cold-connect-then-data rows (`cold-*`, `d54-*`) were added on 11 November 2026 (ax25sdl#102, ax25spec pin 7940267); the whole suite, now 40 rows, was rerun then one row at a time and every earlier row gave the same explorer verdict as above, with TLC agreeing on all 40. The ten coverage batch 1 rows (`d114-*` to `release-*`) were added on 11 November 2026 (ax25spec pin b44b897); the whole suite, now 50 rows, was rerun at `--parallel 4` and every earlier row gave the same verdict, length or state count as before, with TLC agreeing on all 50 (the times in the new rows are from that run). Reading the rows against `docs/explorer.md`'s calibration table:
 
 - **Fires where the explorer fires:** #40 on the pre-40 fixture (both SREJ settings, and the phantom retransmission with the REJ = V(s) exemption), #42 (and its runaway behind reject coherence, and the depth-bound witness), #47 (all three variants), #9, #13 at k = 7, #44/#48 from a cold connect, #43 (both symptoms), #45 (from figc4.6 and masked by #44 from a cold connect, both through the timer-free check), #48 (stub and table-driven peer, figc4.6 and figc4.2), and the H1 deadlock.
 - **Clean where the explorer is clean:** #40 on the current tables (the fixed side of the only pre/post pair), #13 at k = 4, the #43 scenario behind both flow checks, the lenient #45 runs, every connect-phase control, and H1 with TimerRecovery counted as quiescent.
@@ -122,21 +132,24 @@ Times are TLC's own (all phases of the row); the whole suite (35 rows, with the 
 - **Liveness rows:** TLC's lasso for `d45-v22-timer-free` is FRMR, `t14_frmr_received` (which resends SABME), FRMR, `t06_all_other_primitives__from_lower_layer`, then stuck: the explorer's four-step #45 signature.
 - **Seeded rows:** `seeded-ack` and `seeded-livelock` run on the deliberately broken fixtures and exist only to show that acknowledgement coherence and quiescence can fire at all; nothing in the real tables makes them fire.
 - **Cold connect, then data** (`DataAfterConfirm`): `cold-v20-data` and `cold-v22-data` come up and drain with no T1 expiry in both tools (the SABME one through figc4.2, the #44 route), and `d54-cold-v22-wrap` is the #54 deadlock once A's sequence numbers pass the modulo-8 wrap, with `d54-cold-v20-wrap` as its clean control.
+- **Coverage batch 1** (ax25spec#116 Phase 2): `d114-cold-dup-ua` and `d114-cold-dup-ua-mod128` are #114 (a duplicated UA resets an up link) with #50 (the reset discards the responder's queue); `d44-48-cold-faults` and `d45-cold-n2` are the #44/#48 and #44-masks-#45 signatures over wider graphs; `h1-k1` and `h1-k2-ab3` are #91 (H1) at other windows; the three `release-*` rows exercise the orderly release and are clean in both tools. A deadlock row explores its whole graph before reporting, so it fires every row reachable in it, but only its shortest deadlock is compared.
 - **Not in the table:** #41 (outside the explorer's model too: numeric timers), and the interpreter-level H3 note, which the explorer pins as a unit test rather than an exploration.
 
 **Do the comparisons have teeth? Partly, and the coverage says where not.** Three kinds of evidence:
 
-- *Coverage.* Across the 33 rows on the current tables, the searches fire only part of the tables. TlaCheck reports it at the end of every run (11 November 2026, with the cold-connect-then-data rows):
+- *Coverage.* Across the 43 rows on the current tables, the searches fire only part of the tables. TlaCheck reports it at the end of every run (11 November 2026, with coverage batch 1):
 
 ```
-Arm coverage over the current tables, across the 33 scenario(s) run on them: 69 of 278 rows fired (25%).
-  transitions: TLC 51 of 246, explorer 51 of 246 (the same set)
-  subroutine paths: TLC 18 of 32 (the explorer does not report paths)
+Arm coverage over the current tables, across the 43 scenario(s) run on them: 116 of 278 rows fired (42%).
+  transitions: TLC 97 of 246, explorer 97 of 246 (the same set)
+  subroutine paths: TLC 19 of 32 (the explorer does not report paths)
 ```
+
+  Coverage batch 1 took this from 69 rows (51 transitions, 18 paths) to 116 (97 transitions, 19 paths): 29 rows (28 transitions and the `Establish_Data_Link` SABME path) from new scenarios over the existing moves (connect-phase duplicates and crossings, figc4.2 giving up, the #91 I-frame arms) and 18 transitions that only the orderly release reaches (the Awaiting Release page, DISC in the data phase, UA and DISC at a disconnected station).
 
   The four cold-connect-then-data rows add six of those (the same suite without them fires 63): `Connected/t02_dl_data_request` (data submitted on a live link, which the seeds never did as a move), `AwaitingConnection/t09_dl_data_request_no`, `AwaitingConnection/t04_ua_received_yes_no_no`, `Connected/t15_sabme_received_yes`, `Connected/t21_rr_received_no_no` and the `N_r_Error_Recovery` path, the last four through the #54 re-establishment.
 
-  The two tools fire exactly the same set of transitions, and on every clean row the same set row by row. The remaining 75% of rows (195 transitions, 14 subroutine paths) are never reached by any scenario, so neither tool says anything about them: a reviewer deleted two arms (`Connected/t21_rr_received_no_no`, `TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes`) and swapped a guard between the two `t19_rnr_received_yes_yes_*` arms, and neither tool noticed, because at the time no scenario reached them. `Connected/t21_rr_received_no_no` is now fired by `d54-cold-v22-wrap` (the N(r) error on B's wrapped acknowledgement), so deleting it would now change that row; the other two are still in TlaCheck's never-fired list. Most of the unfired rows are inputs the explorer never injects (layer-3 primitives other than data and flow control, UI frames, the error events, DISC and DM in the data phase, T3) and the busy and peer-busy columns behind #43. Closing that gap is its own piece of verification work, not part of this change.
+  The two tools fire exactly the same set of transitions, and on every clean row the same set row by row. The remaining 58% of rows (149 transitions, 13 subroutine paths) are never reached by any scenario, so neither tool says anything about them: a reviewer deleted two arms (`Connected/t21_rr_received_no_no`, `TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes`) and swapped a guard between the two `t19_rnr_received_yes_yes_*` arms, and neither tool noticed, because at the time no scenario reached them. `Connected/t21_rr_received_no_no` is now fired by `d54-cold-v22-wrap` (the N(r) error on B's wrapped acknowledgement), so deleting it would now change that row; the other two are still in TlaCheck's never-fired list. Most of the unfired rows are inputs the explorer never injects (layer-3 primitives other than data, flow control and the release, UI frames, the error events, T3) and the busy and peer-busy columns behind #43. Closing that gap is the rest of ax25spec#116 Phase 2, in batches.
 - *Seeded table defects.* Acknowledgement coherence and quiescence fire on no real defect, so a reviewer could set either to TRUE and nothing failed. The two seeded rows now fail in that case; this was checked by setting both to TRUE and running them (`seeded-ack` became a TLC deadlock, `seeded-livelock` clean, both reported as disagreements).
 - *A seeded semantic slip.* Making the semantics' `V(r) := V(r) - 1` a no-op (silently "fixing" #47 in TLA+ only) was reported by `d47-rc-off` as a disagreement at step 16 of the transition sequence; `d47-k2` and `d13-k4` still agreed. Verdicts and state counts alone would not have caught it. One mutation is a spot check.
 
@@ -152,7 +165,7 @@ Not yet run: the flow-control grid (`--grid-flow`) and the v2.0 stub-peer grid.
 
 ## Not covered yet
 
-- 75% of the table rows: see the coverage above.
+- 58% of the table rows: see the coverage above.
 - The Management Data Link (C5) and the other Annex C machines: the emitter renders only machine `data_link`, and the harness drives only Data Link stations.
 - Anything the explorer's envelope leaves out (docs/explorer.md): numeric timers, T3, data arriving after recovery has begun, premature T1, and most of the modulo 128 data phase. `cold-v22-data` and `d54-cold-v22-wrap` run A at modulo 128 in the data phase (fault-free, at most 9 frames, A seeded at modulo 128 by hand, B left at modulo 8 by the tables); a link where both stations run modulo 128, SREJ at modulo 128, windows above 7 and faults at modulo 128 are not covered. The TLA+ model shares the envelope, by design, so that the two can be compared; widening it is the next step for both.
 - Liveness under strong (per-move) fairness, which would make TLC's liveness verdict exact rather than sound in one direction, is out of reach of TLC at these sizes.

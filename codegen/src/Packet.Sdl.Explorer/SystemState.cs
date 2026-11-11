@@ -67,6 +67,11 @@ public sealed record SystemState
 
     public int OfferedB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.Release"/>: station A's layer 3 has issued its DL_DISCONNECT_request.</summary>
+    public bool ReleasedA { get; init; }
+
+    public bool ReleasedB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -79,6 +84,8 @@ public sealed record SystemState
     public bool LinkUp(Station s) => s == Station.A ? LinkUpA : LinkUpB;
 
     public int Offered(Station s) => s == Station.A ? OfferedA : OfferedB;
+
+    public bool Released(Station s) => s == Station.A ? ReleasedA : ReleasedB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -110,7 +117,8 @@ public sealed record SystemState
           .Append("|d").Append(Inv(DeliveredAtA)).Append(',').Append(Inv(DeliveredAtB))
           .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB))
           .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
-          .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB));
+          .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB))
+          .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }
