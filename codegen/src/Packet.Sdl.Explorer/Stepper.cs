@@ -25,6 +25,8 @@ public enum MoveKind
     FlowOff,
     /// <summary>DL_FLOW_ON_request from the station's layer 3, lifting an earlier FlowOff.</summary>
     FlowOn,
+    /// <summary>DL_DATA_request for the station's next frame, once the link is up (<see cref="ExplorerOptions.DataAfterConfirm"/>).</summary>
+    Submit,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -92,7 +94,9 @@ public sealed class Stepper
         _o = options ?? throw new ArgumentNullException(nameof(options));
         _tables = tables ?? throw new ArgumentNullException(nameof(tables));
         if (_o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
-        if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0)
+        if (_o.DataAfterConfirm && _o.Seed != SeedKind.Disconnected)
+            throw new ArgumentException("data after the connect confirm is for the Disconnected seed only (the other seeds never report a connect to layer 3)", nameof(options));
+        if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0 && !_o.DataAfterConfirm)
             throw new ArgumentException("the Disconnected seed supports A-to-B data only (B has no DL_DATA_request arm while Disconnected)", nameof(options));
         if (_o.Seed == SeedKind.AwaitingV22Connection && (_o.FramesAb > 0 || _o.FramesBa > 0))
             throw new ArgumentException("the AwaitingV22Connection seed is a connect-phase seed: no data (figc4.6 discards DL_DATA_request while layer 3 initiated)", nameof(options));
@@ -123,6 +127,9 @@ public sealed class Stepper
     /// per frame) so the queues start full; the Disconnected seed additionally
     /// has A issue DL_CONNECT_request first (so its SABM/SABME is in flight and
     /// its data is submitted behind the connection attempt, where figc4.2 drops it while layer 3 initiated: ax25spec#161).
+    /// With <see cref="ExplorerOptions.DataAfterConfirm"/> nothing is submitted
+    /// here: each station's layer 3 submits its data by Submit moves once its
+    /// link is up.
     /// </summary>
     public SystemState Seed()
     {
@@ -149,6 +156,9 @@ public sealed class Stepper
             a.SetTimer("t1", TimerStatus.Running);
             state = state with { A = a, ToB = new[] { new Frame("SABME", Command: true, Pf: true, Nr: null, Ns: null, Data: null) } };
         }
+
+        if (_o.DataAfterConfirm)
+            return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0 };
 
         foreach (var label in _submittedA)
             state = Require(Inject(state, Station.A, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
@@ -222,6 +232,7 @@ public sealed class Stepper
         ArgumentNullException.ThrowIfNull(s);
         var moves = new List<Move>();
         var popEnabled = new bool[2];
+        var submitEnabled = new bool[2];
 
         foreach (var station in new[] { Station.A, Station.B })
         {
@@ -269,11 +280,20 @@ public sealed class Stepper
                     moves.Add(new Move(MoveKind.FlowOff, station));
                 }
             }
+
+            // Layer 3 submits its next frame once its link is up.
+            if (SubmitReady(s, station))
+            {
+                submitEnabled[(int)station] = true;
+                moves.Add(new Move(MoveKind.Submit, station));
+            }
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
-        // flight has been delivered or lost and no internal work is pending.
-        var quiet = s.ToA.Count == 0 && s.ToB.Count == 0 && !s.SeizeOwedA && !s.SeizeOwedB && !popEnabled[0] && !popEnabled[1];
+        // flight has been delivered or lost and no internal work is pending
+        // (a layer 3 holding data for a link that is up counts as pending).
+        var quiet = s.ToA.Count == 0 && s.ToB.Count == 0 && !s.SeizeOwedA && !s.SeizeOwedB && !popEnabled[0] && !popEnabled[1]
+            && !submitEnabled[0] && !submitEnabled[1];
         if (quiet)
         {
             foreach (var station in new[] { Station.A, Station.B })
@@ -285,6 +305,9 @@ public sealed class Stepper
 
         return moves;
     }
+
+    private bool SubmitReady(SystemState s, Station station) =>
+        _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
 
     private bool DropAllowed(Frame head, Station into)
     {
@@ -405,6 +428,15 @@ public sealed class Stepper
                 var ev = SeizeConfirmEvent(s.Machine(station)) ?? "LM_SEIZE_confirm";
                 return Inject(s, station, new EventInput(ev), "LM_SEIZE_confirm (link multiplexer grants the channel)", incoming, s.Budget, clearOwed: true, number);
             }
+            case MoveKind.Submit:
+            {
+                var label = Submitted(station)[s.Offered(station)];
+                var outcome = Inject(s, station, new EventInput("DL_DATA_request", Data: label), "DL_DATA_request (layer 3, link up)", incoming, s.Budget, clearOwed: false, number);
+                var next = station == Station.A
+                    ? outcome.Next with { OfferedA = s.OfferedA + 1 }
+                    : outcome.Next with { OfferedB = s.OfferedB + 1 };
+                return outcome with { Next = next };
+            }
             case MoveKind.T1Expiry:
                 return Inject(s, station, new EventInput("T1_expiry"), "T1 expiry (quiescent timeout: nothing in flight)", incoming, s.Budget, clearOwed: false, number);
             default:
@@ -504,6 +536,7 @@ public sealed class Stepper
         var owed = s.SeizeOwed(station) && !clearOwed;
         var delivered = s.DeliveredAt(station);
         var acked = s.Acked(station);
+        var linkUp = s.LinkUp(station);
         var effectsText = new List<string>();
 
         if (result is not null)
@@ -542,6 +575,9 @@ public sealed class Stepper
                         }
                         break;
                     }
+                    case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" } when _o.DataAfterConfirm:
+                        linkUp = true;
+                        break;
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
                         break;
@@ -608,6 +644,8 @@ public sealed class Stepper
             FlowOffB = station == Station.B ? flowOff : s.FlowOffB,
             FlowRoundsA = station == Station.A ? flowRounds : s.FlowRoundsA,
             FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
+            LinkUpA = station == Station.A ? linkUp : s.LinkUpA,
+            LinkUpB = station == Station.B ? linkUp : s.LinkUpB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,

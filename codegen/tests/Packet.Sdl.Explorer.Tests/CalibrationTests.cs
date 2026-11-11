@@ -302,6 +302,67 @@ public class CalibrationTests(ITestOutputHelper output)
         result.CounterexampleLength.Should().Be(2);
     }
 
+    // ─── Cold connect, then data (layer 3 waits for the link) ─────────
+
+    private static ExplorerOptions ColdThenData(bool mod128) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = mod128, DataAfterConfirm = true, Budget = 0,
+    };
+
+    [Fact]
+    public void Cold_V20_Connect_Then_Data_Both_Ways_Drains_Without_A_Timeout()
+    {
+        // The well-behaved layer 3: A submits only after DL_CONNECT_confirm,
+        // B only after DL_CONNECT_indication. SABM, UA, then two frames A to
+        // B and one B to A, all delivered, no T1 expiry needed.
+        var result = Run(ColdThenData(mod128: false) with { FramesAb = 2, FramesBa = 1, Invariants = Invariants.Default | Invariants.SelectiveProgress });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.FiredTransitions.Should().Contain(["Disconnected/t13_sabm_received_yes", "AwaitingConnection/t04_ua_received_yes_yes", "Connected/t02_dl_data_request"]);
+        result.StatesExplored.Should().Be(210);
+    }
+
+    [Fact]
+    public void Cold_V22_Connect_Then_Data_Comes_Up_Through_Figc42_And_Drains()
+    {
+        // A at modulo 128 sends SABME. #44 routes it to AwaitingConnection
+        // (figc4.2), not AwaitingV22Connection; B accepts SABME. The link
+        // comes up and a short exchange drains: the same 210 states as the
+        // v2.0 connect, because nothing here depends on the modulus.
+        var result = Run(ColdThenData(mod128: true) with { FramesAb = 2, FramesBa = 1, Invariants = Invariants.Default | Invariants.SelectiveProgress });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.FiredTransitions.Should().Contain(["Disconnected/t14_sabme_received_yes", "AwaitingConnection/t04_ua_received_yes_yes"]);
+        result.FiredTransitions.Should().NotContain(t => t.StartsWith("AwaitingV22Connection/", StringComparison.Ordinal), "#44: a cold SABME never reaches figc4.6");
+        result.StatesExplored.Should().Be(210);
+    }
+
+    [Fact]
+    public void Defect54_Cold_V22_Connect_Breaks_When_A_Passes_Seven_Because_B_Stays_At_Modulo_8()
+    {
+        // figc4.1's SABME arm says "Set Version 2.2" as a processing box,
+        // not a call of the Set_Version_2_2 subroutine (ax25spec#54), so B
+        // takes the v2.2 flag but keeps modulo 8 while A runs at 128. With
+        // k = 1 and nine frames, B acknowledges a7 with N(r) = 0; A expects
+        // 8, takes it as an N(r) error (DL-ERROR J), re-establishes, and the
+        // re-establishment discards a8: deadlock with 8 of 9 delivered.
+        var result = Run(ColdThenData(mod128: true) with { FramesAb = 9, K = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^3].Transition.Should().Be("t21_rr_received_no_no", "A's N(r) check fails on B's wrapped N(r)");
+        result.Trace[^3].Effects.Should().Contain(e => e.Contains("DL-ERROR Indication (J)", StringComparison.Ordinal));
+        result.Trace[^1].SummaryA.Should().StartWith("Connected vs=0 va=0 vr=0").And.Contain("q=[]");
+        result.CounterexampleLength.Should().Be(45);
+
+        // The same nine frames over a v2.0 connect: both at modulo 8, clean.
+        Run(ColdThenData(mod128: false) with { FramesAb = 9, K = 1 }).Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    [Fact]
+    public void Data_After_Confirm_Is_For_The_Disconnected_Seed_Only()
+    {
+        var act = () => new Stepper(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, DataAfterConfirm = true }, Fixtures.Tables(Fixtures.CurrentDir));
+        act.Should().Throw<ArgumentException>();
+    }
+
     // ─── #43: DL-FLOW-OFF acts on the wrong branch ────────────────────
 
     private static ExplorerOptions Scenario43 => new()

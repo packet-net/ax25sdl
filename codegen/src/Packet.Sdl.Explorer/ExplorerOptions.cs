@@ -144,6 +144,17 @@ public sealed record ExplorerOptions
     public bool Modulo128A { get; init; }
 
     /// <summary>
+    /// Disconnected seed only: each station's layer 3 holds its data until
+    /// its data link has reported the link up (DL_CONNECT_confirm at A,
+    /// DL_CONNECT_indication at B), as a well-behaved layer 3 would, then
+    /// submits it one DL_DATA_request per move. Off by default: the seed
+    /// submits A's data straight after DL_CONNECT_request, where figc4.2
+    /// drops it while layer 3 initiated (ax25spec#161). With this on, B may
+    /// submit data too.
+    /// </summary>
+    public bool DataAfterConfirm { get; init; }
+
+    /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase
     /// seeds only (Disconnected or AwaitingV22Connection) and carry no data
     /// phase, so both frame counts must be 0; the scenario ends at "link
