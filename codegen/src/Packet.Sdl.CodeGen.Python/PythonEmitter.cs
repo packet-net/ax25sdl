@@ -33,7 +33,7 @@ public static class PythonEmitter
 
     public static Emission EmitStatePage(ResolvedPage page)
     {
-        var stem = PageStem(page.SourcePath);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var constName = ScreamingSnake(page.Machine) + "_" + ScreamingSnake(SnakeFromState(page.State));
         var fileName = stem + ".g.py";
 
@@ -97,7 +97,7 @@ public static class PythonEmitter
     /// </summary>
     public static Emission EmitStatePageTests(ResolvedPage page)
     {
-        var stem = PageStem(page.SourcePath);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var constName = ScreamingSnake(page.Machine) + "_" + ScreamingSnake(SnakeFromState(page.State));
         var fileName = stem + "_g_test.py";
 
@@ -163,7 +163,7 @@ public static class PythonEmitter
     {
         var stem = PageStem(page.SourcePath);
         var constName = ScreamingSnake(page.Machine) + "_" + ScreamingSnake(stem);
-        var fileName = stem + ".g.py";
+        var fileName = AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.py";
 
         bool hasActions = page.Subroutines.Any(s => s.Paths.Any(p => p.Actions.Count > 0));
         bool hasRefs = page.Subroutines.Any(s =>
@@ -242,12 +242,12 @@ public static class PythonEmitter
         var entries = new List<(string Stem, string ConstName)>();
         foreach (var p in orderedPages)
         {
-            entries.Add((PageStem(p.SourcePath),
+            entries.Add((AnnexC.OutputStem(p.Machine, p.SourcePath),
                 ScreamingSnake(p.Machine) + "_" + ScreamingSnake(SnakeFromState(p.State))));
         }
         foreach (var p in orderedSubPages)
         {
-            entries.Add((PageStem(p.SourcePath),
+            entries.Add((AnnexC.OutputStem(p.Machine, p.SourcePath),
                 ScreamingSnake(p.Machine) + "_" + ScreamingSnake(PageStem(p.SourcePath))));
         }
 

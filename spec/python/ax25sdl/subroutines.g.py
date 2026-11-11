@@ -46,17 +46,7 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
             name="UI_Check",
             paths=(
                 SubroutinePath(
-                    id="t01_ui_check_no",
-                    guard="not command",
-                    actions=(
-                        ActionStep(verb="DL-ERROR Indication (Q)", kind=ActionKind.SIGNAL_UPPER),
-                    ),
-                    notes="",
-                    references=(),
-                    loops=(),
-                ),
-                SubroutinePath(
-                    id="t02_ui_check_yes_yes",
+                    id="t01_ui_check_yes_yes",
                     guard="command and info_field_length_le_N1_and_content_is_octet_aligned",
                     actions=(
                         ActionStep(verb="DL_UNIT_DATA_indication", kind=ActionKind.SIGNAL_UPPER),
@@ -66,10 +56,20 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t03_ui_check_yes_no",
+                    id="t02_ui_check_yes_no",
                     guard="command and not info_field_length_le_N1_and_content_is_octet_aligned",
                     actions=(
                         ActionStep(verb="DL-ERROR Indication (K)", kind=ActionKind.SIGNAL_UPPER),
+                    ),
+                    notes="",
+                    references=(),
+                    loops=(),
+                ),
+                SubroutinePath(
+                    id="t03_ui_check_no",
+                    guard="not command",
+                    actions=(
+                        ActionStep(verb="DL-ERROR Indication (Q)", kind=ActionKind.SIGNAL_UPPER),
                     ),
                     notes="",
                     references=(),
@@ -94,19 +94,19 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t02_select_t1_no_no",
-                    guard="not RC_eq_0 and not T1_expired",
-                    actions=(),
+                    id="t02_select_t1_no_yes",
+                    guard="not RC_eq_0 and T1_expired",
+                    actions=(
+                        ActionStep(verb="Next T1 := (RC*0.25)+SRT*2", kind=ActionKind.PROCESSING),
+                    ),
                     notes="",
                     references=(),
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t03_select_t1_no_yes",
-                    guard="not RC_eq_0 and T1_expired",
-                    actions=(
-                        ActionStep(verb="Next T1 := (RC*0.25)+SRT*2", kind=ActionKind.PROCESSING),
-                    ),
+                    id="t03_select_t1_no_no",
+                    guard="not RC_eq_0 and not T1_expired",
+                    actions=(),
                     notes="",
                     references=(),
                     loops=(),
@@ -152,19 +152,19 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t02_check_need_for_response_no_no",
-                    guard="not command_and_P_eq_1 and not response_and_F_eq_1",
-                    actions=(),
+                    id="t02_check_need_for_response_no_yes",
+                    guard="not command_and_P_eq_1 and response_and_F_eq_1",
+                    actions=(
+                        ActionStep(verb="DL-ERROR Indication (A)", kind=ActionKind.SIGNAL_UPPER),
+                    ),
                     notes="",
                     references=(),
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t03_check_need_for_response_no_yes",
-                    guard="not command_and_P_eq_1 and response_and_F_eq_1",
-                    actions=(
-                        ActionStep(verb="DL-ERROR Indication (A)", kind=ActionKind.SIGNAL_UPPER),
-                    ),
+                    id="t03_check_need_for_response_no_no",
+                    guard="not command_and_P_eq_1 and not response_and_F_eq_1",
+                    actions=(),
                     notes="",
                     references=(),
                     loops=(),
@@ -177,13 +177,13 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
             name="Establish_Extended_Data_Link",
             paths=(
                 SubroutinePath(
-                    id="t01_establish_extended_data_link_no",
-                    guard="not mod_128",
+                    id="t01_establish_extended_data_link_yes",
+                    guard="mod_128",
                     actions=(
                         ActionStep(verb="Clear Exception Conditions", kind=ActionKind.PROCESSING),
                         ActionStep(verb="RC := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="SABM", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="SABME", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Stop T3", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),
@@ -192,13 +192,13 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t02_establish_extended_data_link_yes",
-                    guard="mod_128",
+                    id="t02_establish_extended_data_link_no",
+                    guard="not mod_128",
                     actions=(
                         ActionStep(verb="Clear Exception Conditions", kind=ActionKind.PROCESSING),
                         ActionStep(verb="RC := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="SABME", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="SABM", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Stop T3", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),
@@ -214,13 +214,13 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
             name="Establish_Data_Link",
             paths=(
                 SubroutinePath(
-                    id="t01_establish_data_link_no",
-                    guard="not mod_128",
+                    id="t01_establish_data_link_yes",
+                    guard="mod_128",
                     actions=(
                         ActionStep(verb="Clear Exception Conditions", kind=ActionKind.PROCESSING),
                         ActionStep(verb="RC := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="SABM", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="SABME", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Stop T3", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),
@@ -229,13 +229,13 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t02_establish_data_link_yes",
-                    guard="mod_128",
+                    id="t02_establish_data_link_no",
+                    guard="not mod_128",
                     actions=(
                         ActionStep(verb="Clear Exception Conditions", kind=ActionKind.PROCESSING),
                         ActionStep(verb="RC := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="SABME", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="SABM", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Stop T3", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),
@@ -377,12 +377,12 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
             name="Transmit_Enquiry",
             paths=(
                 SubroutinePath(
-                    id="t01_transmit_enquiry_no",
-                    guard="not own_receiver_busy",
+                    id="t01_transmit_enquiry_yes",
+                    guard="own_receiver_busy",
                     actions=(
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="N(r) := V(r)", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="RR Command", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="RNR Command", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Clear Acknowledge Pending", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),
@@ -391,12 +391,12 @@ DATA_LINK_SUBROUTINES = SubroutinesPage(
                     loops=(),
                 ),
                 SubroutinePath(
-                    id="t02_transmit_enquiry_yes",
-                    guard="own_receiver_busy",
+                    id="t02_transmit_enquiry_no",
+                    guard="not own_receiver_busy",
                     actions=(
                         ActionStep(verb="P := 1", kind=ActionKind.PROCESSING),
                         ActionStep(verb="N(r) := V(r)", kind=ActionKind.PROCESSING),
-                        ActionStep(verb="RNR Command", kind=ActionKind.SIGNAL_LOWER),
+                        ActionStep(verb="RR Command", kind=ActionKind.SIGNAL_LOWER),
                         ActionStep(verb="Clear Acknowledge Pending", kind=ActionKind.PROCESSING),
                         ActionStep(verb="Start T1", kind=ActionKind.PROCESSING),
                     ),

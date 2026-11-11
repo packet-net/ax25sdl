@@ -181,22 +181,6 @@
       "loops": []
     },
     {
-      "id": "t11_ui_received_no",
-      "from": "Disconnected",
-      "on": "UI_received",
-      "guard": "not P_eq_1",
-      "actions": [
-        {
-          "verb": "UI Check",
-          "kind": "subroutine"
-        }
-      ],
-      "next": "Disconnected",
-      "notes": "",
-      "references": [],
-      "loops": []
-    },
-    {
       "id": "t11_ui_received_yes",
       "from": "Disconnected",
       "on": "UI_received",
@@ -221,18 +205,14 @@
       "loops": []
     },
     {
-      "id": "t12_disc_received",
+      "id": "t11_ui_received_no",
       "from": "Disconnected",
-      "on": "DISC_received",
-      "guard": "",
+      "on": "UI_received",
+      "guard": "not P_eq_1",
       "actions": [
         {
-          "verb": "F := P",
-          "kind": "processing"
-        },
-        {
-          "verb": "DM",
-          "kind": "signal_lower"
+          "verb": "UI Check",
+          "kind": "subroutine"
         }
       ],
       "next": "Disconnected",
@@ -241,10 +221,10 @@
       "loops": []
     },
     {
-      "id": "t13_sabm_received_no",
+      "id": "t12_disc_received",
       "from": "Disconnected",
-      "on": "SABM_received",
-      "guard": "not able_to_establish",
+      "on": "DISC_received",
+      "guard": "",
       "actions": [
         {
           "verb": "F := P",
@@ -321,9 +301,9 @@
       "loops": []
     },
     {
-      "id": "t14_sabme_received_no",
+      "id": "t13_sabm_received_no",
       "from": "Disconnected",
-      "on": "SABME_received",
+      "on": "SABM_received",
       "guard": "not able_to_establish",
       "actions": [
         {
@@ -396,6 +376,26 @@
         }
       ],
       "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t14_sabme_received_no",
+      "from": "Disconnected",
+      "on": "SABME_received",
+      "guard": "not able_to_establish",
+      "actions": [
+        {
+          "verb": "F := P",
+          "kind": "processing"
+        },
+        {
+          "verb": "DM",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Disconnected",
       "notes": "",
       "references": [],
       "loops": []

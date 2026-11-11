@@ -297,6 +297,37 @@ func TestDataLinkAwaitingV22Connection_t09_u_or_s_frame_length_error(t *testing.
 	}
 }
 
+func TestDataLinkAwaitingV22Connection_t10_ui_received_yes(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkAwaitingV22Connection.Transitions {
+		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t10_ui_received_yes" {
+			tx = &DataLinkAwaitingV22Connection.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t10_ui_received_yes not found")
+	}
+	if tx.On != "UI_received" {
+		t.Errorf("On = %q, want UI_received", tx.On)
+	}
+	if tx.Next != "AwaitingV22Connection" {
+		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
+	}
+	if tx.Guard != "P_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "P_eq_1")
+	}
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "UI Check" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "UI Check")
+	}
+	if tx.Actions[0].Kind != Subroutine {
+		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
+	}
+}
+
 func TestDataLinkAwaitingV22Connection_t10_ui_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkAwaitingV22Connection.Transitions {
@@ -331,62 +362,6 @@ func TestDataLinkAwaitingV22Connection_t10_ui_received_no(t *testing.T) {
 	}
 	if tx.Actions[1].Kind != SignalLower {
 		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
-	}
-}
-
-func TestDataLinkAwaitingV22Connection_t10_ui_received_yes(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkAwaitingV22Connection.Transitions {
-		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t10_ui_received_yes" {
-			tx = &DataLinkAwaitingV22Connection.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t10_ui_received_yes not found")
-	}
-	if tx.On != "UI_received" {
-		t.Errorf("On = %q, want UI_received", tx.On)
-	}
-	if tx.Next != "AwaitingV22Connection" {
-		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
-	}
-	if tx.Guard != "P_eq_1" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "P_eq_1")
-	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "UI Check" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "UI Check")
-	}
-	if tx.Actions[0].Kind != Subroutine {
-		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
-	}
-}
-
-func TestDataLinkAwaitingV22Connection_t11_dm_received_no(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkAwaitingV22Connection.Transitions {
-		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t11_dm_received_no" {
-			tx = &DataLinkAwaitingV22Connection.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t11_dm_received_no not found")
-	}
-	if tx.On != "DM_received" {
-		t.Errorf("On = %q, want DM_received", tx.On)
-	}
-	if tx.Next != "AwaitingConnection" {
-		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
-	}
-	if tx.Guard != "not F_eq_1" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not F_eq_1")
-	}
-	if got := len(tx.Actions); got != 0 {
-		t.Fatalf("len(Actions) = %d, want 0", got)
 	}
 }
 
@@ -433,34 +408,28 @@ func TestDataLinkAwaitingV22Connection_t11_dm_received_yes(t *testing.T) {
 	}
 }
 
-func TestDataLinkAwaitingV22Connection_t12_ua_received_no(t *testing.T) {
+func TestDataLinkAwaitingV22Connection_t11_dm_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkAwaitingV22Connection.Transitions {
-		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t12_ua_received_no" {
+		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t11_dm_received_no" {
 			tx = &DataLinkAwaitingV22Connection.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t12_ua_received_no not found")
+		t.Fatalf("transition t11_dm_received_no not found")
 	}
-	if tx.On != "UA_received" {
-		t.Errorf("On = %q, want UA_received", tx.On)
+	if tx.On != "DM_received" {
+		t.Errorf("On = %q, want DM_received", tx.On)
 	}
-	if tx.Next != "AwaitingV22Connection" {
-		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
+	if tx.Next != "AwaitingConnection" {
+		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
 	}
 	if tx.Guard != "not F_eq_1" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "not F_eq_1")
 	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "DL_ERROR_indication_D" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "DL_ERROR_indication_D")
-	}
-	if tx.Actions[0].Kind != SignalUpper {
-		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
+	if got := len(tx.Actions); got != 0 {
+		t.Fatalf("len(Actions) = %d, want 0", got)
 	}
 }
 
@@ -534,6 +503,73 @@ func TestDataLinkAwaitingV22Connection_t12_ua_received_yes_yes(t *testing.T) {
 	}
 	if tx.Actions[7].Kind != InternalOut {
 		t.Errorf("Actions[7].Kind = %v, want InternalOut", tx.Actions[7].Kind)
+	}
+}
+
+func TestDataLinkAwaitingV22Connection_t12_ua_received_yes_no_yes(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkAwaitingV22Connection.Transitions {
+		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t12_ua_received_yes_no_yes" {
+			tx = &DataLinkAwaitingV22Connection.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t12_ua_received_yes_no_yes not found")
+	}
+	if tx.On != "UA_received" {
+		t.Errorf("On = %q, want UA_received", tx.On)
+	}
+	if tx.Next != "Connected" {
+		t.Errorf("Next = %q, want Connected", tx.Next)
+	}
+	if tx.Guard != "F_eq_1 and not layer_3_initiated and vs_eq_va" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "F_eq_1 and not layer_3_initiated and vs_eq_va")
+	}
+	if got := len(tx.Actions); got != 7 {
+		t.Fatalf("len(Actions) = %d, want 7", got)
+	}
+	if tx.Actions[0].Verb != "Stop T1" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Stop T1")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "Start T3" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Start T3")
+	}
+	if tx.Actions[1].Kind != Processing {
+		t.Errorf("Actions[1].Kind = %v, want Processing", tx.Actions[1].Kind)
+	}
+	if tx.Actions[2].Verb != "V(s) := 0" {
+		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "V(s) := 0")
+	}
+	if tx.Actions[2].Kind != Processing {
+		t.Errorf("Actions[2].Kind = %v, want Processing", tx.Actions[2].Kind)
+	}
+	if tx.Actions[3].Verb != "V(a) := 0" {
+		t.Errorf("Actions[3].Verb = %q, want %q", tx.Actions[3].Verb, "V(a) := 0")
+	}
+	if tx.Actions[3].Kind != Processing {
+		t.Errorf("Actions[3].Kind = %v, want Processing", tx.Actions[3].Kind)
+	}
+	if tx.Actions[4].Verb != "V(r) := 0" {
+		t.Errorf("Actions[4].Verb = %q, want %q", tx.Actions[4].Verb, "V(r) := 0")
+	}
+	if tx.Actions[4].Kind != Processing {
+		t.Errorf("Actions[4].Kind = %v, want Processing", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "Select_T1_Value" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Select_T1_Value")
+	}
+	if tx.Actions[5].Kind != Subroutine {
+		t.Errorf("Actions[5].Kind = %v, want Subroutine", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "MDL-NEGOTIATE Request" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "MDL-NEGOTIATE Request")
+	}
+	if tx.Actions[6].Kind != InternalOut {
+		t.Errorf("Actions[6].Kind = %v, want InternalOut", tx.Actions[6].Kind)
 	}
 }
 
@@ -628,70 +664,34 @@ func TestDataLinkAwaitingV22Connection_t12_ua_received_yes_no_no(t *testing.T) {
 	}
 }
 
-func TestDataLinkAwaitingV22Connection_t12_ua_received_yes_no_yes(t *testing.T) {
+func TestDataLinkAwaitingV22Connection_t12_ua_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkAwaitingV22Connection.Transitions {
-		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t12_ua_received_yes_no_yes" {
+		if DataLinkAwaitingV22Connection.Transitions[i].ID == "t12_ua_received_no" {
 			tx = &DataLinkAwaitingV22Connection.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t12_ua_received_yes_no_yes not found")
+		t.Fatalf("transition t12_ua_received_no not found")
 	}
 	if tx.On != "UA_received" {
 		t.Errorf("On = %q, want UA_received", tx.On)
 	}
-	if tx.Next != "Connected" {
-		t.Errorf("Next = %q, want Connected", tx.Next)
+	if tx.Next != "AwaitingV22Connection" {
+		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
 	}
-	if tx.Guard != "F_eq_1 and not layer_3_initiated and vs_eq_va" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "F_eq_1 and not layer_3_initiated and vs_eq_va")
+	if tx.Guard != "not F_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not F_eq_1")
 	}
-	if got := len(tx.Actions); got != 7 {
-		t.Fatalf("len(Actions) = %d, want 7", got)
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
 	}
-	if tx.Actions[0].Verb != "Stop T1" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "Stop T1")
+	if tx.Actions[0].Verb != "DL_ERROR_indication_D" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "DL_ERROR_indication_D")
 	}
-	if tx.Actions[0].Kind != Processing {
-		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
-	}
-	if tx.Actions[1].Verb != "Start T3" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "Start T3")
-	}
-	if tx.Actions[1].Kind != Processing {
-		t.Errorf("Actions[1].Kind = %v, want Processing", tx.Actions[1].Kind)
-	}
-	if tx.Actions[2].Verb != "V(s) := 0" {
-		t.Errorf("Actions[2].Verb = %q, want %q", tx.Actions[2].Verb, "V(s) := 0")
-	}
-	if tx.Actions[2].Kind != Processing {
-		t.Errorf("Actions[2].Kind = %v, want Processing", tx.Actions[2].Kind)
-	}
-	if tx.Actions[3].Verb != "V(a) := 0" {
-		t.Errorf("Actions[3].Verb = %q, want %q", tx.Actions[3].Verb, "V(a) := 0")
-	}
-	if tx.Actions[3].Kind != Processing {
-		t.Errorf("Actions[3].Kind = %v, want Processing", tx.Actions[3].Kind)
-	}
-	if tx.Actions[4].Verb != "V(r) := 0" {
-		t.Errorf("Actions[4].Verb = %q, want %q", tx.Actions[4].Verb, "V(r) := 0")
-	}
-	if tx.Actions[4].Kind != Processing {
-		t.Errorf("Actions[4].Kind = %v, want Processing", tx.Actions[4].Kind)
-	}
-	if tx.Actions[5].Verb != "Select_T1_Value" {
-		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Select_T1_Value")
-	}
-	if tx.Actions[5].Kind != Subroutine {
-		t.Errorf("Actions[5].Kind = %v, want Subroutine", tx.Actions[5].Kind)
-	}
-	if tx.Actions[6].Verb != "MDL-NEGOTIATE Request" {
-		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "MDL-NEGOTIATE Request")
-	}
-	if tx.Actions[6].Kind != InternalOut {
-		t.Errorf("Actions[6].Kind = %v, want InternalOut", tx.Actions[6].Kind)
+	if tx.Actions[0].Kind != SignalUpper {
+		t.Errorf("Actions[0].Kind = %v, want SignalUpper", tx.Actions[0].Kind)
 	}
 }
 

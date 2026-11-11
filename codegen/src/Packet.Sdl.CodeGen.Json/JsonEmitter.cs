@@ -50,7 +50,7 @@ public static class JsonEmitter
 
     public static Emission EmitStatePage(ResolvedPage page)
     {
-        var stem = Stem(page.SourcePath);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.json";
 
         var node = new JsonObject
@@ -68,7 +68,7 @@ public static class JsonEmitter
 
     public static Emission EmitSubroutinePage(ResolvedSubroutinesPage page)
     {
-        var stem = Stem(page.SourcePath);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var fileName = stem + ".g.json";
 
         var node = new JsonObject
@@ -94,7 +94,7 @@ public static class JsonEmitter
 
         foreach (var p in pages)
         {
-            var stem = Stem(p.SourcePath);
+            var stem = AnnexC.OutputStem(p.Machine, p.SourcePath);
             var file = stem + ".g.json";
             combined.Add((file, new JsonObject
             {
@@ -107,7 +107,7 @@ public static class JsonEmitter
         }
         foreach (var p in subPages)
         {
-            var stem = Stem(p.SourcePath);
+            var stem = AnnexC.OutputStem(p.Machine, p.SourcePath);
             var file = stem + ".g.json";
             combined.Add((file, new JsonObject
             {
@@ -577,14 +577,6 @@ public static class JsonEmitter
         ResolvedActionKind.InternalOut => "internal_out",
         _ => throw new InvalidOperationException($"unknown action kind '{kind}'"),
     };
-
-    /// <summary>
-    /// Strip the <c>.sdl</c> infix from a <c>*.sdl.yaml</c> path's bare
-    /// stem so <c>data-link/connected.sdl.yaml</c> → <c>connected</c>.
-    /// </summary>
-    private static string Stem(string sourcePath) =>
-        Path.GetFileNameWithoutExtension(sourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
 
     /// <summary>
     /// Serialise <paramref name="node"/> with our shared

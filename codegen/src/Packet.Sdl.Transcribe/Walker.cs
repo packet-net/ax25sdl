@@ -11,7 +11,7 @@ public static class Walker
 
     public static SdlPage Walk(GraphmlGraph graph, string graphmlFilename)
     {
-        var (machine, state) = MachineAndStateFromFilename(graphmlFilename);
+        var (machine, state, figure) = MachineStateAndFigureFromFilename(graphmlFilename);
 
         var entry = FindEntryStateNode(graph, state);
 
@@ -29,8 +29,8 @@ public static class Walker
             State = state,
             Source = new PageSource
             {
-                Spec = "ax.25.2.2.4_Oct_25",
-                Figure = FigureForState(state),
+                Spec = Packet.Sdl.IR.AnnexC.Spec,
+                Figure = figure,
             },
         };
 
@@ -275,46 +275,21 @@ public static class Walker
     }
 
     /// <summary>
-    /// Maps a state name to its figc4.x figure designator. AX.25 v2.2 §C
-    /// lays out one state per figure. If the tool encounters a state name
-    /// not in this map (e.g. a future state machine), the source.figure
-    /// field falls back to a placeholder — that's a soft default; the
-    /// loader needs *something* but doesn't act on the value.
+    /// Resolves a graphml filename to its machine id, state and figure id
+    /// through the Annex C table (<see cref="Packet.Sdl.IR.AnnexC"/>):
+    /// "DataLink_Disconnected.graphml" gives ("data_link", "Disconnected",
+    /// "figc4.1"); "LinkMux_Idle.graphml" gives ("link_mux", "Idle",
+    /// "figc3.1"). The figure is looked up per machine and page, so a state
+    /// name two machines share (Ready, Receiving) gets the right figure. An
+    /// unknown prefix or state, or a subroutines page, throws.
     /// </summary>
-    private static string FigureForState(string state) => state switch
+    private static (string Machine, string State, string Figure) MachineStateAndFigureFromFilename(string filename)
     {
-        "Disconnected"          => "figc4.1",
-        "AwaitingConnection"    => "figc4.2",
-        "AwaitingRelease"       => "figc4.3",
-        "Connected"             => "figc4.4",
-        "TimerRecovery"         => "figc4.5",
-        "AwaitingV22Connection" => "figc4.6",
-        _ => "figc4.x",
-    };
-
-    private static (string Machine, string State) MachineAndStateFromFilename(string filename)
-    {
-        // "DataLink_Disconnected.graphml" → ("data_link", "Disconnected")
-        var bare = Path.GetFileNameWithoutExtension(filename);
-        var underscoreAt = bare.IndexOf('_');
-        if (underscoreAt < 0)
+        var (machine, page) = Packet.Sdl.IR.AnnexC.ResolveGraphmlFilename(filename);
+        if (page.IsSubroutines)
             throw new InvalidDataException(
-                $"graphml filename '{filename}' doesn't follow the <Machine>_<State>.graphml convention.");
-        var machinePascal = bare[..underscoreAt];                 // "DataLink"
-        var statePascal = bare[(underscoreAt + 1)..];             // "Disconnected"
-        return (PascalCaseToSnakeCase(machinePascal), statePascal);
-    }
-
-    private static string PascalCaseToSnakeCase(string pascal)
-    {
-        // "DataLink" → "data_link"
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < pascal.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(pascal[i])) sb.Append('_');
-            sb.Append(char.ToLowerInvariant(pascal[i]));
-        }
-        return sb.ToString();
+                $"graphml filename '{filename}' names the {machine.Title} subroutines page, but the graphml has no Subroutine start node.");
+        return (machine.Id, page.Key, page.Figure);
     }
 
     /// <summary>
@@ -425,10 +400,10 @@ public static class Walker
             // cycle — fail loudly rather than silently drop it.
             var decisionId = ContextualDecisionId(triggerPrefix, current.Label);
             RecordDecision(current, decisionId, decisionsSeen);
-            var resolvedBranchLabels = ResolveBranchLabels(current, outEdges);
-            for (int i = 0; i < outEdges.Count; i++)
+            var (orderedEdges, resolvedBranchLabels) = OrderBranches(outEdges, ResolveBranchLabels(current, outEdges));
+            for (int i = 0; i < orderedEdges.Count; i++)
             {
-                var edge = outEdges[i];
+                var edge = orderedEdges[i];
                 if (visitedInThisWalk.Contains(edge.Target))
                     throw new InvalidDataException(
                         $"{Path.GetFileName(graph.SourcePath)}: decision {current.Id} ('{current.Label}') edge {edge.Id} " +
@@ -501,7 +476,12 @@ public static class Walker
             yield break;
         }
 
-        // Multi-line node = one path step per line.
+        // Multi-line node = one path step per line, in order. A figure box
+        // that lists several statements one per line ("V(s) <- 0" over
+        // "V(a) <- 0") becomes that many actions, so a graphml label must
+        // only contain a hard line break where the figure starts a new
+        // statement. A long single statement is typed on one line and left
+        // for yEd to wrap. docs/sdl-transcription-runbook.md, "Labels".
         var lines = node.Label
             .Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries)
             .Select(EventResolver.NormaliseActionLabel)
@@ -678,6 +658,32 @@ public static class Walker
     /// caller throws on any blank label, so unlabelled edges surface at
     /// transcribe time rather than at runtime.
     /// </summary>
+    /// <summary>
+    /// Puts a decision's out-edges in a fixed order, so the paths (and the
+    /// transition order and subroutine path ids numbered from them) don't
+    /// depend on the order the edges happen to be stored in the graphml, or
+    /// on how the page is laid out: Yes first, then No, then any other label
+    /// (such as Undefined). Edges with the same rank keep their file order.
+    /// Shared with SubroutinesWalker.
+    /// </summary>
+    internal static (List<GraphmlEdge> Edges, List<string> Labels) OrderBranches(
+        List<GraphmlEdge> outEdges, List<string> labels)
+    {
+        var ordered = outEdges.Zip(labels)
+            .Select((pair, index) => (Edge: pair.First, Label: pair.Second, Index: index))
+            .OrderBy(p => BranchRank(p.Label))
+            .ThenBy(p => p.Index)
+            .ToList();
+        return (ordered.Select(p => p.Edge).ToList(), ordered.Select(p => p.Label).ToList());
+    }
+
+    private static int BranchRank(string? label) => NormaliseBranchLabel(label ?? "") switch
+    {
+        "Yes" => 0,
+        "No" => 1,
+        _ => 2,
+    };
+
     private static List<string> ResolveBranchLabels(GraphmlNode decision, List<GraphmlEdge> outEdges)
         => outEdges.Select(e => e.Label).ToList();
 

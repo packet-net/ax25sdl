@@ -159,26 +159,6 @@
       "loops": []
     },
     {
-      "id": "t10_ui_received_no",
-      "from": "AwaitingV22Connection",
-      "on": "UI_received",
-      "guard": "not P_eq_1",
-      "actions": [
-        {
-          "verb": "UI Check",
-          "kind": "subroutine"
-        },
-        {
-          "verb": "DM (F = 1)",
-          "kind": "signal_lower"
-        }
-      ],
-      "next": "AwaitingV22Connection",
-      "notes": "",
-      "references": [],
-      "loops": []
-    },
-    {
       "id": "t10_ui_received_yes",
       "from": "AwaitingV22Connection",
       "on": "UI_received",
@@ -195,12 +175,21 @@
       "loops": []
     },
     {
-      "id": "t11_dm_received_no",
+      "id": "t10_ui_received_no",
       "from": "AwaitingV22Connection",
-      "on": "DM_received",
-      "guard": "not F_eq_1",
-      "actions": [],
-      "next": "AwaitingConnection",
+      "on": "UI_received",
+      "guard": "not P_eq_1",
+      "actions": [
+        {
+          "verb": "UI Check",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "DM (F = 1)",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "AwaitingV22Connection",
       "notes": "",
       "references": [],
       "loops": []
@@ -230,17 +219,12 @@
       "loops": []
     },
     {
-      "id": "t12_ua_received_no",
+      "id": "t11_dm_received_no",
       "from": "AwaitingV22Connection",
-      "on": "UA_received",
+      "on": "DM_received",
       "guard": "not F_eq_1",
-      "actions": [
-        {
-          "verb": "DL_ERROR_indication_D",
-          "kind": "signal_upper"
-        }
-      ],
-      "next": "AwaitingV22Connection",
+      "actions": [],
+      "next": "AwaitingConnection",
       "notes": "",
       "references": [],
       "loops": []
@@ -255,6 +239,46 @@
           "verb": "DL_CONNECT_confirm",
           "kind": "signal_upper"
         },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "Select_T1_Value",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "MDL-NEGOTIATE Request",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t12_ua_received_yes_no_yes",
+      "from": "AwaitingV22Connection",
+      "on": "UA_received",
+      "guard": "F_eq_1 and not layer_3_initiated and vs_eq_va",
+      "actions": [
         {
           "verb": "Stop T1",
           "kind": "processing"
@@ -346,41 +370,17 @@
       "loops": []
     },
     {
-      "id": "t12_ua_received_yes_no_yes",
+      "id": "t12_ua_received_no",
       "from": "AwaitingV22Connection",
       "on": "UA_received",
-      "guard": "F_eq_1 and not layer_3_initiated and vs_eq_va",
+      "guard": "not F_eq_1",
       "actions": [
         {
-          "verb": "Stop T1",
-          "kind": "processing"
-        },
-        {
-          "verb": "Start T3",
-          "kind": "processing"
-        },
-        {
-          "verb": "V(s) := 0",
-          "kind": "processing"
-        },
-        {
-          "verb": "V(a) := 0",
-          "kind": "processing"
-        },
-        {
-          "verb": "V(r) := 0",
-          "kind": "processing"
-        },
-        {
-          "verb": "Select_T1_Value",
-          "kind": "subroutine"
-        },
-        {
-          "verb": "MDL-NEGOTIATE Request",
-          "kind": "internal_out"
+          "verb": "DL_ERROR_indication_D",
+          "kind": "signal_upper"
         }
       ],
-      "next": "Connected",
+      "next": "AwaitingV22Connection",
       "notes": "",
       "references": [],
       "loops": []

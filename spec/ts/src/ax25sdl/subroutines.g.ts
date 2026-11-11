@@ -38,17 +38,7 @@ export const DataLinkSubroutines: SubroutinesPage = {
       name: "UI_Check",
       paths: [
         {
-          id: "t01_ui_check_no",
-          guard: [{ atom: "command", negate: true }],
-          actions: [
-            { verb: "DL-ERROR Indication (Q)", kind: "signal_upper" },
-          ],
-          notes: "",
-          references: [],
-          loops: [],
-        },
-        {
-          id: "t02_ui_check_yes_yes",
+          id: "t01_ui_check_yes_yes",
           guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: false }],
           actions: [
             { verb: "DL_UNIT_DATA_indication", kind: "signal_upper" },
@@ -58,10 +48,20 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t03_ui_check_yes_no",
+          id: "t02_ui_check_yes_no",
           guard: [{ atom: "command", negate: false }, { atom: "info_field_length_le_N1_and_content_is_octet_aligned", negate: true }],
           actions: [
             { verb: "DL-ERROR Indication (K)", kind: "signal_upper" },
+          ],
+          notes: "",
+          references: [],
+          loops: [],
+        },
+        {
+          id: "t03_ui_check_no",
+          guard: [{ atom: "command", negate: true }],
+          actions: [
+            { verb: "DL-ERROR Indication (Q)", kind: "signal_upper" },
           ],
           notes: "",
           references: [],
@@ -86,19 +86,19 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t02_select_t1_no_no",
-          guard: [{ atom: "RC_eq_0", negate: true }, { atom: "T1_expired", negate: true }],
-          actions: [],
+          id: "t02_select_t1_no_yes",
+          guard: [{ atom: "RC_eq_0", negate: true }, { atom: "T1_expired", negate: false }],
+          actions: [
+            { verb: "Next T1 := (RC*0.25)+SRT*2", kind: "processing" },
+          ],
           notes: "",
           references: [],
           loops: [],
         },
         {
-          id: "t03_select_t1_no_yes",
-          guard: [{ atom: "RC_eq_0", negate: true }, { atom: "T1_expired", negate: false }],
-          actions: [
-            { verb: "Next T1 := (RC*0.25)+SRT*2", kind: "processing" },
-          ],
+          id: "t03_select_t1_no_no",
+          guard: [{ atom: "RC_eq_0", negate: true }, { atom: "T1_expired", negate: true }],
+          actions: [],
           notes: "",
           references: [],
           loops: [],
@@ -144,19 +144,19 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t02_check_need_for_response_no_no",
-          guard: [{ atom: "command_and_P_eq_1", negate: true }, { atom: "response_and_F_eq_1", negate: true }],
-          actions: [],
+          id: "t02_check_need_for_response_no_yes",
+          guard: [{ atom: "command_and_P_eq_1", negate: true }, { atom: "response_and_F_eq_1", negate: false }],
+          actions: [
+            { verb: "DL-ERROR Indication (A)", kind: "signal_upper" },
+          ],
           notes: "",
           references: [],
           loops: [],
         },
         {
-          id: "t03_check_need_for_response_no_yes",
-          guard: [{ atom: "command_and_P_eq_1", negate: true }, { atom: "response_and_F_eq_1", negate: false }],
-          actions: [
-            { verb: "DL-ERROR Indication (A)", kind: "signal_upper" },
-          ],
+          id: "t03_check_need_for_response_no_no",
+          guard: [{ atom: "command_and_P_eq_1", negate: true }, { atom: "response_and_F_eq_1", negate: true }],
+          actions: [],
           notes: "",
           references: [],
           loops: [],
@@ -169,13 +169,13 @@ export const DataLinkSubroutines: SubroutinesPage = {
       name: "Establish_Extended_Data_Link",
       paths: [
         {
-          id: "t01_establish_extended_data_link_no",
-          guard: [{ atom: "mod_128", negate: true }],
+          id: "t01_establish_extended_data_link_yes",
+          guard: [{ atom: "mod_128", negate: false }],
           actions: [
             { verb: "Clear Exception Conditions", kind: "processing" },
             { verb: "RC := 1", kind: "processing" },
             { verb: "P := 1", kind: "processing" },
-            { verb: "SABM", kind: "signal_lower" },
+            { verb: "SABME", kind: "signal_lower" },
             { verb: "Stop T3", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],
@@ -184,13 +184,13 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t02_establish_extended_data_link_yes",
-          guard: [{ atom: "mod_128", negate: false }],
+          id: "t02_establish_extended_data_link_no",
+          guard: [{ atom: "mod_128", negate: true }],
           actions: [
             { verb: "Clear Exception Conditions", kind: "processing" },
             { verb: "RC := 1", kind: "processing" },
             { verb: "P := 1", kind: "processing" },
-            { verb: "SABME", kind: "signal_lower" },
+            { verb: "SABM", kind: "signal_lower" },
             { verb: "Stop T3", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],
@@ -206,13 +206,13 @@ export const DataLinkSubroutines: SubroutinesPage = {
       name: "Establish_Data_Link",
       paths: [
         {
-          id: "t01_establish_data_link_no",
-          guard: [{ atom: "mod_128", negate: true }],
+          id: "t01_establish_data_link_yes",
+          guard: [{ atom: "mod_128", negate: false }],
           actions: [
             { verb: "Clear Exception Conditions", kind: "processing" },
             { verb: "RC := 1", kind: "processing" },
             { verb: "P := 1", kind: "processing" },
-            { verb: "SABM", kind: "signal_lower" },
+            { verb: "SABME", kind: "signal_lower" },
             { verb: "Stop T3", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],
@@ -221,13 +221,13 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t02_establish_data_link_yes",
-          guard: [{ atom: "mod_128", negate: false }],
+          id: "t02_establish_data_link_no",
+          guard: [{ atom: "mod_128", negate: true }],
           actions: [
             { verb: "Clear Exception Conditions", kind: "processing" },
             { verb: "RC := 1", kind: "processing" },
             { verb: "P := 1", kind: "processing" },
-            { verb: "SABME", kind: "signal_lower" },
+            { verb: "SABM", kind: "signal_lower" },
             { verb: "Stop T3", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],
@@ -369,12 +369,12 @@ export const DataLinkSubroutines: SubroutinesPage = {
       name: "Transmit_Enquiry",
       paths: [
         {
-          id: "t01_transmit_enquiry_no",
-          guard: [{ atom: "own_receiver_busy", negate: true }],
+          id: "t01_transmit_enquiry_yes",
+          guard: [{ atom: "own_receiver_busy", negate: false }],
           actions: [
             { verb: "P := 1", kind: "processing" },
             { verb: "N(r) := V(r)", kind: "processing" },
-            { verb: "RR Command", kind: "signal_lower" },
+            { verb: "RNR Command", kind: "signal_lower" },
             { verb: "Clear Acknowledge Pending", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],
@@ -383,12 +383,12 @@ export const DataLinkSubroutines: SubroutinesPage = {
           loops: [],
         },
         {
-          id: "t02_transmit_enquiry_yes",
-          guard: [{ atom: "own_receiver_busy", negate: false }],
+          id: "t02_transmit_enquiry_no",
+          guard: [{ atom: "own_receiver_busy", negate: true }],
           actions: [
             { verb: "P := 1", kind: "processing" },
             { verb: "N(r) := V(r)", kind: "processing" },
-            { verb: "RNR Command", kind: "signal_lower" },
+            { verb: "RR Command", kind: "signal_lower" },
             { verb: "Clear Acknowledge Pending", kind: "processing" },
             { verb: "Start T1", kind: "processing" },
           ],

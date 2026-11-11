@@ -76,22 +76,6 @@
       "loops": []
     },
     {
-      "id": "t04_ua_received_no",
-      "from": "AwaitingConnection",
-      "on": "UA_received",
-      "guard": "not F_eq_1",
-      "actions": [
-        {
-          "verb": "DL_ERROR_indication_D",
-          "kind": "signal_upper"
-        }
-      ],
-      "next": "AwaitingConnection",
-      "notes": "",
-      "references": [],
-      "loops": []
-    },
-    {
       "id": "t04_ua_received_yes_yes",
       "from": "AwaitingConnection",
       "on": "UA_received",
@@ -215,6 +199,22 @@
         }
       ],
       "next": "Connected",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_ua_received_no",
+      "from": "AwaitingConnection",
+      "on": "UA_received",
+      "guard": "not F_eq_1",
+      "actions": [
+        {
+          "verb": "DL_ERROR_indication_D",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "AwaitingConnection",
       "notes": "",
       "references": [],
       "loops": []

@@ -15,14 +15,14 @@ public static class SubroutinesWalker
 
     public static SubroutinePage Walk(GraphmlGraph graph, string graphmlFilename)
     {
-        var machine = MachineFromFilename(graphmlFilename);
+        var (machine, figure) = MachineAndFigureFromFilename(graphmlFilename);
         var page = new SubroutinePage
         {
             Machine = machine,
             Source = new PageSource
             {
-                Spec = "ax.25.2.2.4_Oct_25",
-                Figure = "figc4.7",
+                Spec = Packet.Sdl.IR.AnnexC.Spec,
+                Figure = figure,
             },
         };
 
@@ -43,7 +43,12 @@ public static class SubroutinesWalker
             var decisionsSeen = new Dictionary<string, Decision>();
             int pathIndex = 0;
             var startEdges = graph.OutgoingByNodeId[start.Id];
-            if (startEdges.Count == 0) continue;  // empty subroutine (probably authoring stub)
+            // A start node with no edge, or a path that can't be walked
+            // (typically a missing edge), is a hard error: skipping the
+            // subroutine would silently drop it from the page.
+            if (startEdges.Count == 0)
+                throw new InvalidDataException(
+                    $"subroutine '{name}' (start node {start.Id}) has no outgoing edge.");
 
             try
             {
@@ -58,11 +63,7 @@ public static class SubroutinesWalker
             }
             catch (InvalidDataException ex)
             {
-                // One subroutine's walk failed (typically a missing edge in the
-                // graphml). Emit a warning, skip this subroutine, continue with
-                // the others. Better than failing the entire page.
-                Console.Error.WriteLine($"::warning::subroutine '{name}' (starting at {start.Id}): {ex.Message}");
-                continue;
+                throw new InvalidDataException($"subroutine '{name}' (start node {start.Id}): {ex.Message}", ex);
             }
 
             sub.Decisions.AddRange(decisionsSeen.Values);
@@ -72,26 +73,19 @@ public static class SubroutinesWalker
         return page;
     }
 
-    private static string MachineFromFilename(string filename)
+    /// <summary>
+    /// "DataLink_Subroutines.graphml" gives ("data_link", "figc4.7");
+    /// "ManagementDataLink_T1NegotiationSubroutines.graphml" gives
+    /// ("management_data_link", "figc5.8"). Looked up in the Annex C table;
+    /// an unknown prefix or page, or a state page, throws.
+    /// </summary>
+    private static (string Machine, string Figure) MachineAndFigureFromFilename(string filename)
     {
-        // "DataLink_Subroutines.graphml" → "data_link"
-        var bare = Path.GetFileNameWithoutExtension(filename);
-        var underscoreAt = bare.IndexOf('_');
-        if (underscoreAt < 0)
+        var (machine, page) = Packet.Sdl.IR.AnnexC.ResolveGraphmlFilename(filename);
+        if (!page.IsSubroutines)
             throw new InvalidDataException(
-                $"subroutines filename '{filename}' must be <Machine>_Subroutines.graphml.");
-        return PascalCaseToSnakeCase(bare[..underscoreAt]);
-    }
-
-    private static string PascalCaseToSnakeCase(string pascal)
-    {
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < pascal.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(pascal[i])) sb.Append('_');
-            sb.Append(char.ToLowerInvariant(pascal[i]));
-        }
-        return sb.ToString();
+                $"graphml filename '{filename}' names the {machine.Title} {page.Key} state, but the graphml is drawn as a subroutines page.");
+        return (machine.Id, page.Figure);
     }
 
     /// <summary>
@@ -174,10 +168,10 @@ public static class SubroutinesWalker
         {
             var decisionId = Walker.ContextualDecisionIdPublic(triggerPrefix, current.Label);
             Walker.RecordDecisionPublic(current, decisionId, decisionsSeen);
-            var resolvedLabels = ResolveBranchLabels(outEdges);
-            for (int i = 0; i < outEdges.Count; i++)
+            var (orderedEdges, resolvedLabels) = Walker.OrderBranches(outEdges, ResolveBranchLabels(outEdges));
+            for (int i = 0; i < orderedEdges.Count; i++)
             {
-                var edge = outEdges[i];
+                var edge = orderedEdges[i];
                 if (visited.Contains(edge.Target))
                     throw new InvalidDataException(
                         $"{Path.GetFileName(graph.SourcePath)}: decision {current.Id} ('{current.Label}') edge {edge.Id} " +
@@ -216,6 +210,8 @@ public static class SubroutinesWalker
         if (node.ShapeClass == "Test or decision") yield break;
         var kind = EventResolver.ShapeClassToActionKind(node.ShapeClass);
         if (kind is null) yield break;
+        // One action per line of the label, as on state pages (see
+        // Walker.NodeToPathSteps).
         var lines = node.Label
             .Split(["\r\n", "\n", "\r"], StringSplitOptions.RemoveEmptyEntries)
             .Select(EventResolver.NormaliseActionLabel)

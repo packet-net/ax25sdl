@@ -87,23 +87,6 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t04_ua_received_no",
-            from: "AwaitingConnection",
-            on: Ax25Event::UAReceived,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::FEq1,
-                negate: true,
-            }],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::DLERRORIndicationD,
-                kind: ActionKind::SignalUpper,
-            }],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t04_ua_received_yes_yes",
             from: "AwaitingConnection",
             on: Ax25Event::UAReceived,
@@ -262,6 +245,23 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
                 },
             ],
             next: "Connected",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t04_ua_received_no",
+            from: "AwaitingConnection",
+            on: Ax25Event::UAReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::FEq1,
+                negate: true,
+            }],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::DLERRORIndicationD,
+                kind: ActionKind::SignalUpper,
+            }],
+            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -654,27 +654,6 @@ mod tests {
     }
 
     #[test]
-    fn t04_ua_received_no() {
-        let tx = DATA_LINK_AWAITING_CONNECTION
-            .transitions
-            .iter()
-            .find(|x| x.id == "t04_ua_received_no")
-            .expect("transition t04_ua_received_no not found");
-        assert_eq!(tx.on, Ax25Event::UAReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::FEq1,
-                negate: true
-            },]
-        );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationD);
-        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
-    }
-
-    #[test]
     fn t04_ua_received_yes_yes() {
         let tx = DATA_LINK_AWAITING_CONNECTION
             .transitions
@@ -801,6 +780,27 @@ mod tests {
         assert_eq!(tx.actions[8].kind, ActionKind::Processing);
         assert_eq!(tx.actions[9].verb, Ax25ActionVerb::SelectT1Value);
         assert_eq!(tx.actions[9].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
+    fn t04_ua_received_no() {
+        let tx = DATA_LINK_AWAITING_CONNECTION
+            .transitions
+            .iter()
+            .find(|x| x.id == "t04_ua_received_no")
+            .expect("transition t04_ua_received_no not found");
+        assert_eq!(tx.on, Ax25Event::UAReceived);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::FEq1,
+                negate: true
+            },]
+        );
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationD);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
     }
 
     #[test]

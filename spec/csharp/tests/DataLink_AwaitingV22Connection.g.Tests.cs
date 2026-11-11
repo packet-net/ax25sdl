@@ -116,19 +116,6 @@ public class DataLink_AwaitingV22Connection_GeneratedTests
         t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
     }
 
-    [Fact] public void t10_ui_received_no()
-    {
-        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t10_ui_received_no");
-        t.On.Should().Be(Ax25Event.UIReceived);
-        t.Next.Should().Be("AwaitingV22Connection");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) });
-        t.Actions.Count.Should().Be(2);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.UICheck);
-        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
-        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.DMFEq1);
-        t.Actions[1].Kind.Should().Be(ActionKind.SignalLower);
-    }
-
     [Fact] public void t10_ui_received_yes()
     {
         var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t10_ui_received_yes");
@@ -140,13 +127,17 @@ public class DataLink_AwaitingV22Connection_GeneratedTests
         t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
     }
 
-    [Fact] public void t11_dm_received_no()
+    [Fact] public void t10_ui_received_no()
     {
-        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t11_dm_received_no");
-        t.On.Should().Be(Ax25Event.DMReceived);
-        t.Next.Should().Be("AwaitingConnection");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, true) });
-        t.Actions.Count.Should().Be(0);
+        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t10_ui_received_no");
+        t.On.Should().Be(Ax25Event.UIReceived);
+        t.Next.Should().Be("AwaitingV22Connection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) });
+        t.Actions.Count.Should().Be(2);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.UICheck);
+        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.DMFEq1);
+        t.Actions[1].Kind.Should().Be(ActionKind.SignalLower);
     }
 
     [Fact] public void t11_dm_received_yes()
@@ -164,15 +155,13 @@ public class DataLink_AwaitingV22Connection_GeneratedTests
         t.Actions[2].Kind.Should().Be(ActionKind.Processing);
     }
 
-    [Fact] public void t12_ua_received_no()
+    [Fact] public void t11_dm_received_no()
     {
-        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t12_ua_received_no");
-        t.On.Should().Be(Ax25Event.UAReceived);
-        t.Next.Should().Be("AwaitingV22Connection");
+        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t11_dm_received_no");
+        t.On.Should().Be(Ax25Event.DMReceived);
+        t.Next.Should().Be("AwaitingConnection");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, true) });
-        t.Actions.Count.Should().Be(1);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationD);
-        t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
+        t.Actions.Count.Should().Be(0);
     }
 
     [Fact] public void t12_ua_received_yes_yes()
@@ -198,6 +187,29 @@ public class DataLink_AwaitingV22Connection_GeneratedTests
         t.Actions[6].Kind.Should().Be(ActionKind.Subroutine);
         t.Actions[7].Verb.Should().Be(Ax25ActionVerb.MDLNEGOTIATERequest);
         t.Actions[7].Kind.Should().Be(ActionKind.InternalOut);
+    }
+
+    [Fact] public void t12_ua_received_yes_no_yes()
+    {
+        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t12_ua_received_yes_no_yes");
+        t.On.Should().Be(Ax25Event.UAReceived);
+        t.Next.Should().Be("Connected");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, false), new GuardTerm(Ax25Guard.Layer3Initiated, true), new GuardTerm(Ax25Guard.VsEqVa, false) });
+        t.Actions.Count.Should().Be(7);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.StopT1);
+        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.StartT3);
+        t.Actions[1].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[2].Verb.Should().Be(Ax25ActionVerb.VSAssign0);
+        t.Actions[2].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[3].Verb.Should().Be(Ax25ActionVerb.VAAssign0);
+        t.Actions[3].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[4].Verb.Should().Be(Ax25ActionVerb.VRAssign0);
+        t.Actions[4].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.SelectT1Value);
+        t.Actions[5].Kind.Should().Be(ActionKind.Subroutine);
+        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.MDLNEGOTIATERequest);
+        t.Actions[6].Kind.Should().Be(ActionKind.InternalOut);
     }
 
     [Fact] public void t12_ua_received_yes_no_no()
@@ -231,27 +243,15 @@ public class DataLink_AwaitingV22Connection_GeneratedTests
         t.Actions[10].Kind.Should().Be(ActionKind.InternalOut);
     }
 
-    [Fact] public void t12_ua_received_yes_no_yes()
+    [Fact] public void t12_ua_received_no()
     {
-        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t12_ua_received_yes_no_yes");
+        var t = DataLink_AwaitingV22Connection.Transitions.Single(x => x.Id == "t12_ua_received_no");
         t.On.Should().Be(Ax25Event.UAReceived);
-        t.Next.Should().Be("Connected");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, false), new GuardTerm(Ax25Guard.Layer3Initiated, true), new GuardTerm(Ax25Guard.VsEqVa, false) });
-        t.Actions.Count.Should().Be(7);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.StopT1);
-        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.StartT3);
-        t.Actions[1].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[2].Verb.Should().Be(Ax25ActionVerb.VSAssign0);
-        t.Actions[2].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[3].Verb.Should().Be(Ax25ActionVerb.VAAssign0);
-        t.Actions[3].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[4].Verb.Should().Be(Ax25ActionVerb.VRAssign0);
-        t.Actions[4].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.SelectT1Value);
-        t.Actions[5].Kind.Should().Be(ActionKind.Subroutine);
-        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.MDLNEGOTIATERequest);
-        t.Actions[6].Kind.Should().Be(ActionKind.InternalOut);
+        t.Next.Should().Be("AwaitingV22Connection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.FEq1, true) });
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationD);
+        t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
     }
 
     [Fact] public void t13_t1_expiry_yes()

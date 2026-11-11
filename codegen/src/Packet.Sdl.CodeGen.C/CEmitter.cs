@@ -38,8 +38,7 @@ public static class CEmitter
 
     public static Emission EmitStatePage(ResolvedPage page)
     {
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var symbol = page.Machine + "_" + Snake(page.State);
         var fileName = stem + ".g.c";
 
@@ -102,8 +101,7 @@ public static class CEmitter
     /// </summary>
     public static Emission EmitStatePageTests(ResolvedPage page)
     {
-        var stem = Path.GetFileNameWithoutExtension(page.SourcePath)
-            .Replace(".sdl", string.Empty, StringComparison.Ordinal);
+        var stem = AnnexC.OutputStem(page.Machine, page.SourcePath);
         var symbol = page.Machine + "_" + Snake(page.State);
         var fileName = stem + ".g.test.c";
 
@@ -186,7 +184,7 @@ public static class CEmitter
         var fileStem = Path.GetFileNameWithoutExtension(page.SourcePath)
             .Replace(".sdl", string.Empty, StringComparison.Ordinal);
         var symbol = page.Machine + "_" + Snake(fileStem);
-        var fileName = fileStem + ".g.c";
+        var fileName = AnnexC.OutputStem(page.Machine, page.SourcePath) + ".g.c";
 
         var sb = new StringBuilder();
         EmitHeader(sb, page.SourcePath);

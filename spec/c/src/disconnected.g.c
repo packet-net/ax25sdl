@@ -53,25 +53,19 @@ static const ActionStep data_link_disconnected_t10_ua_received_actions[] = {
     {.verb = "DL_ERROR_indication_C_D", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
-static const ActionStep data_link_disconnected_t11_ui_received_no_actions[] = {
-    {.verb = "UI Check", .kind = AX25SDL_KIND_SUBROUTINE},
-};
-
 static const ActionStep data_link_disconnected_t11_ui_received_yes_actions[] = {
     {.verb = "UI Check", .kind = AX25SDL_KIND_SUBROUTINE},
     {.verb = "F := 1", .kind = AX25SDL_KIND_PROCESSING},
     {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
+static const ActionStep data_link_disconnected_t11_ui_received_no_actions[] = {
+    {.verb = "UI Check", .kind = AX25SDL_KIND_SUBROUTINE},
+};
+
 static const ActionStep data_link_disconnected_t12_disc_received_actions[] = {
     {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
     {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
-};
-
-static const ActionStep data_link_disconnected_t13_sabm_received_no_actions[] =
-    {
-        {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
-        {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const ActionStep data_link_disconnected_t13_sabm_received_yes_actions[] =
@@ -90,7 +84,7 @@ static const ActionStep data_link_disconnected_t13_sabm_received_yes_actions[] =
         {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
 };
 
-static const ActionStep data_link_disconnected_t14_sabme_received_no_actions[] =
+static const ActionStep data_link_disconnected_t13_sabm_received_no_actions[] =
     {
         {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
@@ -110,6 +104,12 @@ static const ActionStep
         {.verb = "T1V := 2 * SRT", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "Start T3", .kind = AX25SDL_KIND_PROCESSING},
         {.verb = "RC := 0", .kind = AX25SDL_KIND_PROCESSING},
+};
+
+static const ActionStep data_link_disconnected_t14_sabme_received_no_actions[] =
+    {
+        {.verb = "F := P", .kind = AX25SDL_KIND_PROCESSING},
+        {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
 static const TransitionSpec data_link_disconnected_transitions[] = {
@@ -256,20 +256,6 @@ static const TransitionSpec data_link_disconnected_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t11_ui_received_no",
-        .from = "Disconnected",
-        .on = "UI_received",
-        .guard = "not P_eq_1",
-        .actions = data_link_disconnected_t11_ui_received_no_actions,
-        .actions_len = 1,
-        .next = "Disconnected",
-        .notes = "",
-        .references = NULL,
-        .references_len = 0,
-        .loops = NULL,
-        .loops_len = 0,
-    },
-    {
         .id = "t11_ui_received_yes",
         .from = "Disconnected",
         .on = "UI_received",
@@ -284,12 +270,12 @@ static const TransitionSpec data_link_disconnected_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t12_disc_received",
+        .id = "t11_ui_received_no",
         .from = "Disconnected",
-        .on = "DISC_received",
-        .guard = "",
-        .actions = data_link_disconnected_t12_disc_received_actions,
-        .actions_len = 2,
+        .on = "UI_received",
+        .guard = "not P_eq_1",
+        .actions = data_link_disconnected_t11_ui_received_no_actions,
+        .actions_len = 1,
         .next = "Disconnected",
         .notes = "",
         .references = NULL,
@@ -298,11 +284,11 @@ static const TransitionSpec data_link_disconnected_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t13_sabm_received_no",
+        .id = "t12_disc_received",
         .from = "Disconnected",
-        .on = "SABM_received",
-        .guard = "not able_to_establish",
-        .actions = data_link_disconnected_t13_sabm_received_no_actions,
+        .on = "DISC_received",
+        .guard = "",
+        .actions = data_link_disconnected_t12_disc_received_actions,
         .actions_len = 2,
         .next = "Disconnected",
         .notes = "",
@@ -326,11 +312,11 @@ static const TransitionSpec data_link_disconnected_transitions[] = {
         .loops_len = 0,
     },
     {
-        .id = "t14_sabme_received_no",
+        .id = "t13_sabm_received_no",
         .from = "Disconnected",
-        .on = "SABME_received",
+        .on = "SABM_received",
         .guard = "not able_to_establish",
-        .actions = data_link_disconnected_t14_sabme_received_no_actions,
+        .actions = data_link_disconnected_t13_sabm_received_no_actions,
         .actions_len = 2,
         .next = "Disconnected",
         .notes = "",
@@ -347,6 +333,20 @@ static const TransitionSpec data_link_disconnected_transitions[] = {
         .actions = data_link_disconnected_t14_sabme_received_yes_actions,
         .actions_len = 12,
         .next = "Connected",
+        .notes = "",
+        .references = NULL,
+        .references_len = 0,
+        .loops = NULL,
+        .loops_len = 0,
+    },
+    {
+        .id = "t14_sabme_received_no",
+        .from = "Disconnected",
+        .on = "SABME_received",
+        .guard = "not able_to_establish",
+        .actions = data_link_disconnected_t14_sabme_received_no_actions,
+        .actions_len = 2,
+        .next = "Disconnected",
         .notes = "",
         .references = NULL,
         .references_len = 0,

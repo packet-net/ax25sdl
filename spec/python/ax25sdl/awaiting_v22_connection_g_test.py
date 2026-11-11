@@ -143,22 +143,6 @@ def test_t09_u_or_s_frame_length_error() -> None:
     assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
 
 
-def test_t10_ui_received_no() -> None:
-    t = next(
-        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t10_ui_received_no"),
-        None,
-    )
-    assert t is not None, "transition t10_ui_received_no not found"
-    assert t.on == "UI_received"
-    assert t.next == "AwaitingV22Connection"
-    assert t.guard == "not P_eq_1"
-    assert len(t.actions) == 2
-    assert t.actions[0].verb == "UI Check"
-    assert t.actions[0].kind == ActionKind.SUBROUTINE
-    assert t.actions[1].verb == "DM (F = 1)"
-    assert t.actions[1].kind == ActionKind.SIGNAL_LOWER
-
-
 def test_t10_ui_received_yes() -> None:
     t = next(
         (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t10_ui_received_yes"),
@@ -173,16 +157,20 @@ def test_t10_ui_received_yes() -> None:
     assert t.actions[0].kind == ActionKind.SUBROUTINE
 
 
-def test_t11_dm_received_no() -> None:
+def test_t10_ui_received_no() -> None:
     t = next(
-        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t11_dm_received_no"),
+        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t10_ui_received_no"),
         None,
     )
-    assert t is not None, "transition t11_dm_received_no not found"
-    assert t.on == "DM_received"
-    assert t.next == "AwaitingConnection"
-    assert t.guard == "not F_eq_1"
-    assert len(t.actions) == 0
+    assert t is not None, "transition t10_ui_received_no not found"
+    assert t.on == "UI_received"
+    assert t.next == "AwaitingV22Connection"
+    assert t.guard == "not P_eq_1"
+    assert len(t.actions) == 2
+    assert t.actions[0].verb == "UI Check"
+    assert t.actions[0].kind == ActionKind.SUBROUTINE
+    assert t.actions[1].verb == "DM (F = 1)"
+    assert t.actions[1].kind == ActionKind.SIGNAL_LOWER
 
 
 def test_t11_dm_received_yes() -> None:
@@ -203,18 +191,16 @@ def test_t11_dm_received_yes() -> None:
     assert t.actions[2].kind == ActionKind.PROCESSING
 
 
-def test_t12_ua_received_no() -> None:
+def test_t11_dm_received_no() -> None:
     t = next(
-        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t12_ua_received_no"),
+        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t11_dm_received_no"),
         None,
     )
-    assert t is not None, "transition t12_ua_received_no not found"
-    assert t.on == "UA_received"
-    assert t.next == "AwaitingV22Connection"
+    assert t is not None, "transition t11_dm_received_no not found"
+    assert t.on == "DM_received"
+    assert t.next == "AwaitingConnection"
     assert t.guard == "not F_eq_1"
-    assert len(t.actions) == 1
-    assert t.actions[0].verb == "DL_ERROR_indication_D"
-    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
+    assert len(t.actions) == 0
 
 
 def test_t12_ua_received_yes_yes() -> None:
@@ -243,6 +229,32 @@ def test_t12_ua_received_yes_yes() -> None:
     assert t.actions[6].kind == ActionKind.SUBROUTINE
     assert t.actions[7].verb == "MDL-NEGOTIATE Request"
     assert t.actions[7].kind == ActionKind.INTERNAL_OUT
+
+
+def test_t12_ua_received_yes_no_yes() -> None:
+    t = next(
+        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t12_ua_received_yes_no_yes"),
+        None,
+    )
+    assert t is not None, "transition t12_ua_received_yes_no_yes not found"
+    assert t.on == "UA_received"
+    assert t.next == "Connected"
+    assert t.guard == "F_eq_1 and not layer_3_initiated and vs_eq_va"
+    assert len(t.actions) == 7
+    assert t.actions[0].verb == "Stop T1"
+    assert t.actions[0].kind == ActionKind.PROCESSING
+    assert t.actions[1].verb == "Start T3"
+    assert t.actions[1].kind == ActionKind.PROCESSING
+    assert t.actions[2].verb == "V(s) := 0"
+    assert t.actions[2].kind == ActionKind.PROCESSING
+    assert t.actions[3].verb == "V(a) := 0"
+    assert t.actions[3].kind == ActionKind.PROCESSING
+    assert t.actions[4].verb == "V(r) := 0"
+    assert t.actions[4].kind == ActionKind.PROCESSING
+    assert t.actions[5].verb == "Select_T1_Value"
+    assert t.actions[5].kind == ActionKind.SUBROUTINE
+    assert t.actions[6].verb == "MDL-NEGOTIATE Request"
+    assert t.actions[6].kind == ActionKind.INTERNAL_OUT
 
 
 def test_t12_ua_received_yes_no_no() -> None:
@@ -279,30 +291,18 @@ def test_t12_ua_received_yes_no_no() -> None:
     assert t.actions[10].kind == ActionKind.INTERNAL_OUT
 
 
-def test_t12_ua_received_yes_no_yes() -> None:
+def test_t12_ua_received_no() -> None:
     t = next(
-        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t12_ua_received_yes_no_yes"),
+        (x for x in DATA_LINK_AWAITING_V_22_CONNECTION.transitions if x.id == "t12_ua_received_no"),
         None,
     )
-    assert t is not None, "transition t12_ua_received_yes_no_yes not found"
+    assert t is not None, "transition t12_ua_received_no not found"
     assert t.on == "UA_received"
-    assert t.next == "Connected"
-    assert t.guard == "F_eq_1 and not layer_3_initiated and vs_eq_va"
-    assert len(t.actions) == 7
-    assert t.actions[0].verb == "Stop T1"
-    assert t.actions[0].kind == ActionKind.PROCESSING
-    assert t.actions[1].verb == "Start T3"
-    assert t.actions[1].kind == ActionKind.PROCESSING
-    assert t.actions[2].verb == "V(s) := 0"
-    assert t.actions[2].kind == ActionKind.PROCESSING
-    assert t.actions[3].verb == "V(a) := 0"
-    assert t.actions[3].kind == ActionKind.PROCESSING
-    assert t.actions[4].verb == "V(r) := 0"
-    assert t.actions[4].kind == ActionKind.PROCESSING
-    assert t.actions[5].verb == "Select_T1_Value"
-    assert t.actions[5].kind == ActionKind.SUBROUTINE
-    assert t.actions[6].verb == "MDL-NEGOTIATE Request"
-    assert t.actions[6].kind == ActionKind.INTERNAL_OUT
+    assert t.next == "AwaitingV22Connection"
+    assert t.guard == "not F_eq_1"
+    assert len(t.actions) == 1
+    assert t.actions[0].verb == "DL_ERROR_indication_D"
+    assert t.actions[0].kind == ActionKind.SIGNAL_UPPER
 
 
 def test_t13_t1_expiry_yes() -> None:

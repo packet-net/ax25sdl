@@ -107,25 +107,6 @@ static int test_t03_dm_received_no(void) {
   return 0;
 }
 
-static int test_t04_ua_received_no(void) {
-  const TransitionSpec *t = NULL;
-  for (size_t i = 0; i < data_link_awaiting_connection.transitions_len; i++) {
-    if (strcmp(data_link_awaiting_connection.transitions[i].id,
-               "t04_ua_received_no") == 0) {
-      t = &data_link_awaiting_connection.transitions[i];
-      break;
-    }
-  }
-  ASSERT(t != NULL, "t04_ua_received_no not found");
-  ASSERT_STREQ(t->on, "UA_received", "on");
-  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
-  ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
-  ASSERT(t->actions_len == 1, "actions count");
-  ASSERT_STREQ(t->actions[0].verb, "DL_ERROR_indication_D", "actions[0].verb");
-  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
-  return 0;
-}
-
 static int test_t04_ua_received_yes_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_awaiting_connection.transitions_len; i++) {
@@ -222,6 +203,25 @@ static int test_t04_ua_received_yes_no_no(void) {
   ASSERT(t->actions[8].kind == AX25SDL_KIND_PROCESSING, "actions[8].kind");
   ASSERT_STREQ(t->actions[9].verb, "Select_T1_Value", "actions[9].verb");
   ASSERT(t->actions[9].kind == AX25SDL_KIND_SUBROUTINE, "actions[9].kind");
+  return 0;
+}
+
+static int test_t04_ua_received_no(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < data_link_awaiting_connection.transitions_len; i++) {
+    if (strcmp(data_link_awaiting_connection.transitions[i].id,
+               "t04_ua_received_no") == 0) {
+      t = &data_link_awaiting_connection.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t04_ua_received_no not found");
+  ASSERT_STREQ(t->on, "UA_received", "on");
+  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
+  ASSERT_STREQ(t->guard, "not F_eq_1", "guard");
+  ASSERT(t->actions_len == 1, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "DL_ERROR_indication_D", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[0].kind");
   return 0;
 }
 
@@ -562,10 +562,10 @@ int main(void) {
   rc |= test_t02_disc_received();
   rc |= test_t03_dm_received_yes();
   rc |= test_t03_dm_received_no();
-  rc |= test_t04_ua_received_no();
   rc |= test_t04_ua_received_yes_yes();
   rc |= test_t04_ua_received_yes_no_yes();
   rc |= test_t04_ua_received_yes_no_no();
+  rc |= test_t04_ua_received_no();
   rc |= test_t05_t1_expiry_yes();
   rc |= test_t05_t1_expiry_no();
   rc |= test_t06_all_other_primitives__from_lower_layer();

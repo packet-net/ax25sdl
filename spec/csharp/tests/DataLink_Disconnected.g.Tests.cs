@@ -122,17 +122,6 @@ public class DataLink_Disconnected_GeneratedTests
         t.Actions[0].Kind.Should().Be(ActionKind.SignalUpper);
     }
 
-    [Fact] public void t11_ui_received_no()
-    {
-        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t11_ui_received_no");
-        t.On.Should().Be(Ax25Event.UIReceived);
-        t.Next.Should().Be("Disconnected");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) });
-        t.Actions.Count.Should().Be(1);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.UICheck);
-        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
-    }
-
     [Fact] public void t11_ui_received_yes()
     {
         var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t11_ui_received_yes");
@@ -148,24 +137,22 @@ public class DataLink_Disconnected_GeneratedTests
         t.Actions[2].Kind.Should().Be(ActionKind.SignalLower);
     }
 
+    [Fact] public void t11_ui_received_no()
+    {
+        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t11_ui_received_no");
+        t.On.Should().Be(Ax25Event.UIReceived);
+        t.Next.Should().Be("Disconnected");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.PEq1, true) });
+        t.Actions.Count.Should().Be(1);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.UICheck);
+        t.Actions[0].Kind.Should().Be(ActionKind.Subroutine);
+    }
+
     [Fact] public void t12_disc_received()
     {
         var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t12_disc_received");
         t.On.Should().Be(Ax25Event.DISCReceived);
         t.Next.Should().Be("Disconnected");
-        t.Actions.Count.Should().Be(2);
-        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.FAssignP);
-        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
-        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.DM);
-        t.Actions[1].Kind.Should().Be(ActionKind.SignalLower);
-    }
-
-    [Fact] public void t13_sabm_received_no()
-    {
-        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t13_sabm_received_no");
-        t.On.Should().Be(Ax25Event.SABMReceived);
-        t.Next.Should().Be("Disconnected");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.AbleToEstablish, true) });
         t.Actions.Count.Should().Be(2);
         t.Actions[0].Verb.Should().Be(Ax25ActionVerb.FAssignP);
         t.Actions[0].Kind.Should().Be(ActionKind.Processing);
@@ -206,10 +193,10 @@ public class DataLink_Disconnected_GeneratedTests
         t.Actions[11].Kind.Should().Be(ActionKind.Processing);
     }
 
-    [Fact] public void t14_sabme_received_no()
+    [Fact] public void t13_sabm_received_no()
     {
-        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t14_sabme_received_no");
-        t.On.Should().Be(Ax25Event.SABMEReceived);
+        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t13_sabm_received_no");
+        t.On.Should().Be(Ax25Event.SABMReceived);
         t.Next.Should().Be("Disconnected");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.AbleToEstablish, true) });
         t.Actions.Count.Should().Be(2);
@@ -250,6 +237,19 @@ public class DataLink_Disconnected_GeneratedTests
         t.Actions[10].Kind.Should().Be(ActionKind.Processing);
         t.Actions[11].Verb.Should().Be(Ax25ActionVerb.RCAssign0);
         t.Actions[11].Kind.Should().Be(ActionKind.Processing);
+    }
+
+    [Fact] public void t14_sabme_received_no()
+    {
+        var t = DataLink_Disconnected.Transitions.Single(x => x.Id == "t14_sabme_received_no");
+        t.On.Should().Be(Ax25Event.SABMEReceived);
+        t.Next.Should().Be("Disconnected");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.AbleToEstablish, true) });
+        t.Actions.Count.Should().Be(2);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.FAssignP);
+        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.DM);
+        t.Actions[1].Kind.Should().Be(ActionKind.SignalLower);
     }
 
 }

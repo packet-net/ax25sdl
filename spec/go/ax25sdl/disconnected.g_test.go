@@ -315,37 +315,6 @@ func TestDataLinkDisconnected_t10_ua_received(t *testing.T) {
 	}
 }
 
-func TestDataLinkDisconnected_t11_ui_received_no(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkDisconnected.Transitions {
-		if DataLinkDisconnected.Transitions[i].ID == "t11_ui_received_no" {
-			tx = &DataLinkDisconnected.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t11_ui_received_no not found")
-	}
-	if tx.On != "UI_received" {
-		t.Errorf("On = %q, want UI_received", tx.On)
-	}
-	if tx.Next != "Disconnected" {
-		t.Errorf("Next = %q, want Disconnected", tx.Next)
-	}
-	if tx.Guard != "not P_eq_1" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not P_eq_1")
-	}
-	if got := len(tx.Actions); got != 1 {
-		t.Fatalf("len(Actions) = %d, want 1", got)
-	}
-	if tx.Actions[0].Verb != "UI Check" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "UI Check")
-	}
-	if tx.Actions[0].Kind != Subroutine {
-		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
-	}
-}
-
 func TestDataLinkDisconnected_t11_ui_received_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkDisconnected.Transitions {
@@ -389,6 +358,37 @@ func TestDataLinkDisconnected_t11_ui_received_yes(t *testing.T) {
 	}
 }
 
+func TestDataLinkDisconnected_t11_ui_received_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkDisconnected.Transitions {
+		if DataLinkDisconnected.Transitions[i].ID == "t11_ui_received_no" {
+			tx = &DataLinkDisconnected.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t11_ui_received_no not found")
+	}
+	if tx.On != "UI_received" {
+		t.Errorf("On = %q, want UI_received", tx.On)
+	}
+	if tx.Next != "Disconnected" {
+		t.Errorf("Next = %q, want Disconnected", tx.Next)
+	}
+	if tx.Guard != "not P_eq_1" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not P_eq_1")
+	}
+	if got := len(tx.Actions); got != 1 {
+		t.Fatalf("len(Actions) = %d, want 1", got)
+	}
+	if tx.Actions[0].Verb != "UI Check" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "UI Check")
+	}
+	if tx.Actions[0].Kind != Subroutine {
+		t.Errorf("Actions[0].Kind = %v, want Subroutine", tx.Actions[0].Kind)
+	}
+}
+
 func TestDataLinkDisconnected_t12_disc_received(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkDisconnected.Transitions {
@@ -405,43 +405,6 @@ func TestDataLinkDisconnected_t12_disc_received(t *testing.T) {
 	}
 	if tx.Next != "Disconnected" {
 		t.Errorf("Next = %q, want Disconnected", tx.Next)
-	}
-	if got := len(tx.Actions); got != 2 {
-		t.Fatalf("len(Actions) = %d, want 2", got)
-	}
-	if tx.Actions[0].Verb != "F := P" {
-		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "F := P")
-	}
-	if tx.Actions[0].Kind != Processing {
-		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
-	}
-	if tx.Actions[1].Verb != "DM" {
-		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "DM")
-	}
-	if tx.Actions[1].Kind != SignalLower {
-		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
-	}
-}
-
-func TestDataLinkDisconnected_t13_sabm_received_no(t *testing.T) {
-	var tx *TransitionSpec
-	for i := range DataLinkDisconnected.Transitions {
-		if DataLinkDisconnected.Transitions[i].ID == "t13_sabm_received_no" {
-			tx = &DataLinkDisconnected.Transitions[i]
-			break
-		}
-	}
-	if tx == nil {
-		t.Fatalf("transition t13_sabm_received_no not found")
-	}
-	if tx.On != "SABM_received" {
-		t.Errorf("On = %q, want SABM_received", tx.On)
-	}
-	if tx.Next != "Disconnected" {
-		t.Errorf("Next = %q, want Disconnected", tx.Next)
-	}
-	if tx.Guard != "not able_to_establish" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not able_to_establish")
 	}
 	if got := len(tx.Actions); got != 2 {
 		t.Fatalf("len(Actions) = %d, want 2", got)
@@ -557,19 +520,19 @@ func TestDataLinkDisconnected_t13_sabm_received_yes(t *testing.T) {
 	}
 }
 
-func TestDataLinkDisconnected_t14_sabme_received_no(t *testing.T) {
+func TestDataLinkDisconnected_t13_sabm_received_no(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkDisconnected.Transitions {
-		if DataLinkDisconnected.Transitions[i].ID == "t14_sabme_received_no" {
+		if DataLinkDisconnected.Transitions[i].ID == "t13_sabm_received_no" {
 			tx = &DataLinkDisconnected.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t14_sabme_received_no not found")
+		t.Fatalf("transition t13_sabm_received_no not found")
 	}
-	if tx.On != "SABME_received" {
-		t.Errorf("On = %q, want SABME_received", tx.On)
+	if tx.On != "SABM_received" {
+		t.Errorf("On = %q, want SABM_received", tx.On)
 	}
 	if tx.Next != "Disconnected" {
 		t.Errorf("Next = %q, want Disconnected", tx.Next)
@@ -688,5 +651,42 @@ func TestDataLinkDisconnected_t14_sabme_received_yes(t *testing.T) {
 	}
 	if tx.Actions[11].Kind != Processing {
 		t.Errorf("Actions[11].Kind = %v, want Processing", tx.Actions[11].Kind)
+	}
+}
+
+func TestDataLinkDisconnected_t14_sabme_received_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkDisconnected.Transitions {
+		if DataLinkDisconnected.Transitions[i].ID == "t14_sabme_received_no" {
+			tx = &DataLinkDisconnected.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t14_sabme_received_no not found")
+	}
+	if tx.On != "SABME_received" {
+		t.Errorf("On = %q, want SABME_received", tx.On)
+	}
+	if tx.Next != "Disconnected" {
+		t.Errorf("Next = %q, want Disconnected", tx.Next)
+	}
+	if tx.Guard != "not able_to_establish" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not able_to_establish")
+	}
+	if got := len(tx.Actions); got != 2 {
+		t.Fatalf("len(Actions) = %d, want 2", got)
+	}
+	if tx.Actions[0].Verb != "F := P" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "F := P")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "DM" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "DM")
+	}
+	if tx.Actions[1].Kind != SignalLower {
+		t.Errorf("Actions[1].Kind = %v, want SignalLower", tx.Actions[1].Kind)
 	}
 }

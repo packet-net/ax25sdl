@@ -40,19 +40,7 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
             name: "UI_Check",
             paths: &[
                 SubroutinePath {
-                    id: "t01_ui_check_no",
-                    guard: &[
-                        GuardTerm { atom: Ax25Guard::Command, negate: true },
-                    ],
-                    actions: &[
-                        ActionStep { verb: Ax25ActionVerb::DLERRORIndicationQ, kind: ActionKind::SignalUpper },
-                    ],
-                    notes: "",
-                    references: &[],
-                    loops: &[],
-                },
-                SubroutinePath {
-                    id: "t02_ui_check_yes_yes",
+                    id: "t01_ui_check_yes_yes",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::Command, negate: false },
                         GuardTerm { atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned, negate: false },
@@ -65,13 +53,25 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     loops: &[],
                 },
                 SubroutinePath {
-                    id: "t03_ui_check_yes_no",
+                    id: "t02_ui_check_yes_no",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::Command, negate: false },
                         GuardTerm { atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned, negate: true },
                     ],
                     actions: &[
                         ActionStep { verb: Ax25ActionVerb::DLERRORIndicationK, kind: ActionKind::SignalUpper },
+                    ],
+                    notes: "",
+                    references: &[],
+                    loops: &[],
+                },
+                SubroutinePath {
+                    id: "t03_ui_check_no",
+                    guard: &[
+                        GuardTerm { atom: Ax25Guard::Command, negate: true },
+                    ],
+                    actions: &[
+                        ActionStep { verb: Ax25ActionVerb::DLERRORIndicationQ, kind: ActionKind::SignalUpper },
                     ],
                     notes: "",
                     references: &[],
@@ -98,18 +98,7 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     loops: &[],
                 },
                 SubroutinePath {
-                    id: "t02_select_t1_no_no",
-                    guard: &[
-                        GuardTerm { atom: Ax25Guard::RCEq0, negate: true },
-                        GuardTerm { atom: Ax25Guard::T1Expired, negate: true },
-                    ],
-                    actions: &[],
-                    notes: "",
-                    references: &[],
-                    loops: &[],
-                },
-                SubroutinePath {
-                    id: "t03_select_t1_no_yes",
+                    id: "t02_select_t1_no_yes",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::RCEq0, negate: true },
                         GuardTerm { atom: Ax25Guard::T1Expired, negate: false },
@@ -117,6 +106,17 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     actions: &[
                         ActionStep { verb: Ax25ActionVerb::NextT1AssignRCTimes025PlusSRTTimes2, kind: ActionKind::Processing },
                     ],
+                    notes: "",
+                    references: &[],
+                    loops: &[],
+                },
+                SubroutinePath {
+                    id: "t03_select_t1_no_no",
+                    guard: &[
+                        GuardTerm { atom: Ax25Guard::RCEq0, negate: true },
+                        GuardTerm { atom: Ax25Guard::T1Expired, negate: true },
+                    ],
+                    actions: &[],
                     notes: "",
                     references: &[],
                     loops: &[],
@@ -164,18 +164,7 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     loops: &[],
                 },
                 SubroutinePath {
-                    id: "t02_check_need_for_response_no_no",
-                    guard: &[
-                        GuardTerm { atom: Ax25Guard::CommandAndPEq1, negate: true },
-                        GuardTerm { atom: Ax25Guard::ResponseAndFEq1, negate: true },
-                    ],
-                    actions: &[],
-                    notes: "",
-                    references: &[],
-                    loops: &[],
-                },
-                SubroutinePath {
-                    id: "t03_check_need_for_response_no_yes",
+                    id: "t02_check_need_for_response_no_yes",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::CommandAndPEq1, negate: true },
                         GuardTerm { atom: Ax25Guard::ResponseAndFEq1, negate: false },
@@ -183,6 +172,17 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     actions: &[
                         ActionStep { verb: Ax25ActionVerb::DLERRORIndicationA, kind: ActionKind::SignalUpper },
                     ],
+                    notes: "",
+                    references: &[],
+                    loops: &[],
+                },
+                SubroutinePath {
+                    id: "t03_check_need_for_response_no_no",
+                    guard: &[
+                        GuardTerm { atom: Ax25Guard::CommandAndPEq1, negate: true },
+                        GuardTerm { atom: Ax25Guard::ResponseAndFEq1, negate: true },
+                    ],
+                    actions: &[],
                     notes: "",
                     references: &[],
                     loops: &[],
@@ -195,24 +195,7 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
             name: "Establish_Extended_Data_Link",
             paths: &[
                 SubroutinePath {
-                    id: "t01_establish_extended_data_link_no",
-                    guard: &[
-                        GuardTerm { atom: Ax25Guard::Mod128, negate: true },
-                    ],
-                    actions: &[
-                        ActionStep { verb: Ax25ActionVerb::ClearExceptionConditions, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::SABM, kind: ActionKind::SignalLower },
-                        ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
-                    ],
-                    notes: "",
-                    references: &[],
-                    loops: &[],
-                },
-                SubroutinePath {
-                    id: "t02_establish_extended_data_link_yes",
+                    id: "t01_establish_extended_data_link_yes",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::Mod128, negate: false },
                     ],
@@ -221,6 +204,23 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                         ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::SABME, kind: ActionKind::SignalLower },
+                        ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
+                    ],
+                    notes: "",
+                    references: &[],
+                    loops: &[],
+                },
+                SubroutinePath {
+                    id: "t02_establish_extended_data_link_no",
+                    guard: &[
+                        GuardTerm { atom: Ax25Guard::Mod128, negate: true },
+                    ],
+                    actions: &[
+                        ActionStep { verb: Ax25ActionVerb::ClearExceptionConditions, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::SABM, kind: ActionKind::SignalLower },
                         ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
                     ],
@@ -236,24 +236,7 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
             name: "Establish_Data_Link",
             paths: &[
                 SubroutinePath {
-                    id: "t01_establish_data_link_no",
-                    guard: &[
-                        GuardTerm { atom: Ax25Guard::Mod128, negate: true },
-                    ],
-                    actions: &[
-                        ActionStep { verb: Ax25ActionVerb::ClearExceptionConditions, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::SABM, kind: ActionKind::SignalLower },
-                        ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
-                    ],
-                    notes: "",
-                    references: &[],
-                    loops: &[],
-                },
-                SubroutinePath {
-                    id: "t02_establish_data_link_yes",
+                    id: "t01_establish_data_link_yes",
                     guard: &[
                         GuardTerm { atom: Ax25Guard::Mod128, negate: false },
                     ],
@@ -262,6 +245,23 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                         ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::SABME, kind: ActionKind::SignalLower },
+                        ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
+                    ],
+                    notes: "",
+                    references: &[],
+                    loops: &[],
+                },
+                SubroutinePath {
+                    id: "t02_establish_data_link_no",
+                    guard: &[
+                        GuardTerm { atom: Ax25Guard::Mod128, negate: true },
+                    ],
+                    actions: &[
+                        ActionStep { verb: Ax25ActionVerb::ClearExceptionConditions, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::RCAssign1, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
+                        ActionStep { verb: Ax25ActionVerb::SABM, kind: ActionKind::SignalLower },
                         ActionStep { verb: Ax25ActionVerb::StopT3, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
                     ],
@@ -420,14 +420,14 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
             name: "Transmit_Enquiry",
             paths: &[
                 SubroutinePath {
-                    id: "t01_transmit_enquiry_no",
+                    id: "t01_transmit_enquiry_yes",
                     guard: &[
-                        GuardTerm { atom: Ax25Guard::OwnReceiverBusy, negate: true },
+                        GuardTerm { atom: Ax25Guard::OwnReceiverBusy, negate: false },
                     ],
                     actions: &[
                         ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::NRAssignVR, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::RRCommand, kind: ActionKind::SignalLower },
+                        ActionStep { verb: Ax25ActionVerb::RNRCommand, kind: ActionKind::SignalLower },
                         ActionStep { verb: Ax25ActionVerb::ClearAcknowledgePending, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
                     ],
@@ -436,14 +436,14 @@ pub static DATA_LINK_SUBROUTINES: SubroutinesPage = SubroutinesPage {
                     loops: &[],
                 },
                 SubroutinePath {
-                    id: "t02_transmit_enquiry_yes",
+                    id: "t02_transmit_enquiry_no",
                     guard: &[
-                        GuardTerm { atom: Ax25Guard::OwnReceiverBusy, negate: false },
+                        GuardTerm { atom: Ax25Guard::OwnReceiverBusy, negate: true },
                     ],
                     actions: &[
                         ActionStep { verb: Ax25ActionVerb::PAssign1, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::NRAssignVR, kind: ActionKind::Processing },
-                        ActionStep { verb: Ax25ActionVerb::RNRCommand, kind: ActionKind::SignalLower },
+                        ActionStep { verb: Ax25ActionVerb::RRCommand, kind: ActionKind::SignalLower },
                         ActionStep { verb: Ax25ActionVerb::ClearAcknowledgePending, kind: ActionKind::Processing },
                         ActionStep { verb: Ax25ActionVerb::StartT1, kind: ActionKind::Processing },
                     ],

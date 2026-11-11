@@ -36,17 +36,7 @@ var DataLinkSubroutines = SubroutinesPage{
 			Name: "UI_Check",
 			Paths: []SubroutinePath{
 				{
-					ID:    "t01_ui_check_no",
-					Guard: "not command",
-					Actions: []ActionStep{
-						{Verb: "DL-ERROR Indication (Q)", Kind: SignalUpper},
-					},
-					Notes:      "",
-					References: []ImplementationReference{},
-					Loops:      []LoopRange{},
-				},
-				{
-					ID:    "t02_ui_check_yes_yes",
+					ID:    "t01_ui_check_yes_yes",
 					Guard: "command and info_field_length_le_N1_and_content_is_octet_aligned",
 					Actions: []ActionStep{
 						{Verb: "DL_UNIT_DATA_indication", Kind: SignalUpper},
@@ -56,10 +46,20 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t03_ui_check_yes_no",
+					ID:    "t02_ui_check_yes_no",
 					Guard: "command and not info_field_length_le_N1_and_content_is_octet_aligned",
 					Actions: []ActionStep{
 						{Verb: "DL-ERROR Indication (K)", Kind: SignalUpper},
+					},
+					Notes:      "",
+					References: []ImplementationReference{},
+					Loops:      []LoopRange{},
+				},
+				{
+					ID:    "t03_ui_check_no",
+					Guard: "not command",
+					Actions: []ActionStep{
+						{Verb: "DL-ERROR Indication (Q)", Kind: SignalUpper},
 					},
 					Notes:      "",
 					References: []ImplementationReference{},
@@ -84,19 +84,19 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:         "t02_select_t1_no_no",
-					Guard:      "not RC_eq_0 and not T1_expired",
-					Actions:    []ActionStep{},
+					ID:    "t02_select_t1_no_yes",
+					Guard: "not RC_eq_0 and T1_expired",
+					Actions: []ActionStep{
+						{Verb: "Next T1 := (RC*0.25)+SRT*2", Kind: Processing},
+					},
 					Notes:      "",
 					References: []ImplementationReference{},
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t03_select_t1_no_yes",
-					Guard: "not RC_eq_0 and T1_expired",
-					Actions: []ActionStep{
-						{Verb: "Next T1 := (RC*0.25)+SRT*2", Kind: Processing},
-					},
+					ID:         "t03_select_t1_no_no",
+					Guard:      "not RC_eq_0 and not T1_expired",
+					Actions:    []ActionStep{},
 					Notes:      "",
 					References: []ImplementationReference{},
 					Loops:      []LoopRange{},
@@ -142,19 +142,19 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:         "t02_check_need_for_response_no_no",
-					Guard:      "not command_and_P_eq_1 and not response_and_F_eq_1",
-					Actions:    []ActionStep{},
+					ID:    "t02_check_need_for_response_no_yes",
+					Guard: "not command_and_P_eq_1 and response_and_F_eq_1",
+					Actions: []ActionStep{
+						{Verb: "DL-ERROR Indication (A)", Kind: SignalUpper},
+					},
 					Notes:      "",
 					References: []ImplementationReference{},
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t03_check_need_for_response_no_yes",
-					Guard: "not command_and_P_eq_1 and response_and_F_eq_1",
-					Actions: []ActionStep{
-						{Verb: "DL-ERROR Indication (A)", Kind: SignalUpper},
-					},
+					ID:         "t03_check_need_for_response_no_no",
+					Guard:      "not command_and_P_eq_1 and not response_and_F_eq_1",
+					Actions:    []ActionStep{},
 					Notes:      "",
 					References: []ImplementationReference{},
 					Loops:      []LoopRange{},
@@ -167,13 +167,13 @@ var DataLinkSubroutines = SubroutinesPage{
 			Name: "Establish_Extended_Data_Link",
 			Paths: []SubroutinePath{
 				{
-					ID:    "t01_establish_extended_data_link_no",
-					Guard: "not mod_128",
+					ID:    "t01_establish_extended_data_link_yes",
+					Guard: "mod_128",
 					Actions: []ActionStep{
 						{Verb: "Clear Exception Conditions", Kind: Processing},
 						{Verb: "RC := 1", Kind: Processing},
 						{Verb: "P := 1", Kind: Processing},
-						{Verb: "SABM", Kind: SignalLower},
+						{Verb: "SABME", Kind: SignalLower},
 						{Verb: "Stop T3", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},
@@ -182,13 +182,13 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t02_establish_extended_data_link_yes",
-					Guard: "mod_128",
+					ID:    "t02_establish_extended_data_link_no",
+					Guard: "not mod_128",
 					Actions: []ActionStep{
 						{Verb: "Clear Exception Conditions", Kind: Processing},
 						{Verb: "RC := 1", Kind: Processing},
 						{Verb: "P := 1", Kind: Processing},
-						{Verb: "SABME", Kind: SignalLower},
+						{Verb: "SABM", Kind: SignalLower},
 						{Verb: "Stop T3", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},
@@ -204,13 +204,13 @@ var DataLinkSubroutines = SubroutinesPage{
 			Name: "Establish_Data_Link",
 			Paths: []SubroutinePath{
 				{
-					ID:    "t01_establish_data_link_no",
-					Guard: "not mod_128",
+					ID:    "t01_establish_data_link_yes",
+					Guard: "mod_128",
 					Actions: []ActionStep{
 						{Verb: "Clear Exception Conditions", Kind: Processing},
 						{Verb: "RC := 1", Kind: Processing},
 						{Verb: "P := 1", Kind: Processing},
-						{Verb: "SABM", Kind: SignalLower},
+						{Verb: "SABME", Kind: SignalLower},
 						{Verb: "Stop T3", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},
@@ -219,13 +219,13 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t02_establish_data_link_yes",
-					Guard: "mod_128",
+					ID:    "t02_establish_data_link_no",
+					Guard: "not mod_128",
 					Actions: []ActionStep{
 						{Verb: "Clear Exception Conditions", Kind: Processing},
 						{Verb: "RC := 1", Kind: Processing},
 						{Verb: "P := 1", Kind: Processing},
-						{Verb: "SABME", Kind: SignalLower},
+						{Verb: "SABM", Kind: SignalLower},
 						{Verb: "Stop T3", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},
@@ -367,12 +367,12 @@ var DataLinkSubroutines = SubroutinesPage{
 			Name: "Transmit_Enquiry",
 			Paths: []SubroutinePath{
 				{
-					ID:    "t01_transmit_enquiry_no",
-					Guard: "not own_receiver_busy",
+					ID:    "t01_transmit_enquiry_yes",
+					Guard: "own_receiver_busy",
 					Actions: []ActionStep{
 						{Verb: "P := 1", Kind: Processing},
 						{Verb: "N(r) := V(r)", Kind: Processing},
-						{Verb: "RR Command", Kind: SignalLower},
+						{Verb: "RNR Command", Kind: SignalLower},
 						{Verb: "Clear Acknowledge Pending", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},
@@ -381,12 +381,12 @@ var DataLinkSubroutines = SubroutinesPage{
 					Loops:      []LoopRange{},
 				},
 				{
-					ID:    "t02_transmit_enquiry_yes",
-					Guard: "own_receiver_busy",
+					ID:    "t02_transmit_enquiry_no",
+					Guard: "not own_receiver_busy",
 					Actions: []ActionStep{
 						{Verb: "P := 1", Kind: Processing},
 						{Verb: "N(r) := V(r)", Kind: Processing},
-						{Verb: "RNR Command", Kind: SignalLower},
+						{Verb: "RR Command", Kind: SignalLower},
 						{Verb: "Clear Acknowledge Pending", Kind: Processing},
 						{Verb: "Start T1", Kind: Processing},
 					},

@@ -19,7 +19,33 @@ public static class Program
             return 1;
         }
 
-        var warnings = 0;
+        // Hard errors before anything is written: two graphmls that would
+        // write one yaml (the second would silently replace the first), and a
+        // graphml filed under another machine's directory.
+        var errors = 0;
+        var outputs = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var input in inputs)
+        {
+            var outPath = Path.GetFullPath(ResolveOutputPath(input, opt));
+            if (outputs.TryGetValue(outPath, out var other))
+            {
+                Console.Error.WriteLine($"::error::{input} and {other} would both write {outPath}.");
+                errors++;
+            }
+            else
+            {
+                outputs[outPath] = input;
+            }
+
+            var misfiled = MisfiledMachineDirectory(input);
+            if (misfiled is not null)
+            {
+                Console.Error.WriteLine($"::error::{input}: {misfiled}");
+                errors++;
+            }
+        }
+        if (errors > 0) return 1;
+
         foreach (var input in inputs)
         {
             try
@@ -50,16 +76,53 @@ public static class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"::warning::{input}: {ex.Message}");
-                warnings++;
+                // The page was not written. That is an error, never a warning:
+                // CI must not pass with a page (or a subroutine) missing.
+                Console.Error.WriteLine($"::error::{input}: {ex.Message}");
+                errors++;
             }
         }
 
-        if (warnings > 0)
+        // A whole sdl/ directory was regenerated: any *.sdl.yaml left in the
+        // output directory that no graphml produced is an orphan (its graphml
+        // was deleted or renamed), and is an error.
+        if (Directory.Exists(opt.Input) && Directory.Exists(opt.OutputDir))
         {
-            Console.Error.WriteLine($"completed with {warnings} warning(s).");
+            foreach (var yaml in Directory.EnumerateFiles(opt.OutputDir, "*.sdl.yaml").Order(StringComparer.Ordinal))
+            {
+                if (outputs.ContainsKey(Path.GetFullPath(yaml))) continue;
+                Console.Error.WriteLine($"::error::{yaml} has no graphml in {opt.Input}. Delete it, or restore its graphml.");
+                errors++;
+            }
         }
-        return warnings == 0 ? 0 : 2;
+
+        if (errors > 0)
+        {
+            Console.Error.WriteLine($"failed with {errors} error(s).");
+            return 1;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// A graphml in <c>.../&lt;machine-dir&gt;/sdl/</c> must belong to that
+    /// machine: <c>LinkMux_Idle.graphml</c> under <c>simplex-physical/sdl/</c>
+    /// is misfiled. Returns the problem, or null when the file is where it
+    /// belongs, its prefix is unknown (the walker reports that), or it is not
+    /// under an <c>sdl/</c> directory at all.
+    /// </summary>
+    public static string? MisfiledMachineDirectory(string graphmlPath)
+    {
+        var full = Path.GetFullPath(graphmlPath);
+        var sdlDir = Path.GetDirectoryName(full);
+        if (sdlDir is null || Path.GetFileName(sdlDir) != "sdl") return null;
+        var machineDir = Path.GetFileName(Path.GetDirectoryName(sdlDir));
+        var bare = Path.GetFileNameWithoutExtension(full);
+        var underscore = bare.IndexOf('_');
+        if (underscore < 0) return null;
+        var machine = Packet.Sdl.IR.AnnexC.MachineByPrefix(bare[..underscore]);
+        if (machine is null || machine.Directory == machineDir) return null;
+        return $"a {machine.Title} page must be under {machine.Directory}/sdl/, not {machineDir}/sdl/.";
     }
 
     private static IEnumerable<string> ResolveInputs(Options opt)

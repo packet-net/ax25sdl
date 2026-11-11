@@ -101,6 +101,55 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
+            id: "t03_i_frame_pops_off_queue_no_no_yes",
+            from: "Connected",
+            on: Ax25Event::IFramePopsOffQueue,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::PeerReceiverBusy,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VsEqVaPlusK,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::T1Running,
+                    negate: false,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::NSAssignVS,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRAssignVR,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::PAssign0,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ICommand,
+                    kind: ActionKind::SignalLower,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::VSAssignVSPlus1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearAcknowledgePending,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "Connected",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
             id: "t03_i_frame_pops_off_queue_no_no_no",
             from: "Connected",
             on: Ax25Event::IFramePopsOffQueue,
@@ -158,55 +207,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t03_i_frame_pops_off_queue_no_no_yes",
-            from: "Connected",
-            on: Ax25Event::IFramePopsOffQueue,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::PeerReceiverBusy,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VsEqVaPlusK,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::T1Running,
-                    negate: false,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::NSAssignVS,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRAssignVR,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::PAssign0,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ICommand,
-                    kind: ActionKind::SignalLower,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::VSAssignVSPlus1,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearAcknowledgePending,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "Connected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t04_dl_unit_data_request",
             from: "Connected",
             on: Ax25Event::DLUNITDATARequest,
@@ -251,20 +251,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             id: "t05_dl_flow_off_request_no",
             from: "Connected",
             on: Ax25Event::DLFLOWOFFRequest,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::OwnReceiverBusy,
-                negate: true,
-            }],
-            actions: &[],
-            next: "Connected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t06_dl_flow_on_request_no",
-            from: "Connected",
-            on: Ax25Event::DLFLOWONRequest,
             guard: &[GuardTerm {
                 atom: Ax25Guard::OwnReceiverBusy,
                 negate: true,
@@ -350,28 +336,15 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t07_dl_connect_request_no",
+            id: "t06_dl_flow_on_request_no",
             from: "Connected",
-            on: Ax25Event::DLCONNECTRequest,
+            on: Ax25Event::DLFLOWONRequest,
             guard: &[GuardTerm {
-                atom: Ax25Guard::Version22,
+                atom: Ax25Guard::OwnReceiverBusy,
                 negate: true,
             }],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::DiscardIFrameQueue,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::EstablishDataLink,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::SetLayer3Initiated,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "AwaitingConnection",
+            actions: &[],
+            next: "Connected",
             notes: "",
             references: &[],
             loops: &[],
@@ -404,29 +377,14 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t08_all_other_primitives__from_upper_layer",
+            id: "t07_dl_connect_request_no",
             from: "Connected",
-            on: Ax25Event::AllOtherPrimitivesFromUpperLayer,
-            guard: &[],
-            actions: &[],
-            next: "Connected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t09_control_field_error_no",
-            from: "Connected",
-            on: Ax25Event::ControlFieldError,
+            on: Ax25Event::DLCONNECTRequest,
             guard: &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: true,
             }],
             actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationL,
-                    kind: ActionKind::SignalUpper,
-                },
                 ActionStep {
                     verb: Ax25ActionVerb::DiscardIFrameQueue,
                     kind: ActionKind::Processing,
@@ -441,6 +399,17 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
             ],
             next: "AwaitingConnection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t08_all_other_primitives__from_upper_layer",
+            from: "Connected",
+            on: Ax25Event::AllOtherPrimitivesFromUpperLayer,
+            guard: &[],
+            actions: &[],
+            next: "Connected",
             notes: "",
             references: &[],
             loops: &[],
@@ -477,16 +446,16 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t10_info_not_permitted_in_frame_no",
+            id: "t09_control_field_error_no",
             from: "Connected",
-            on: Ax25Event::InfoNotPermittedInFrame,
+            on: Ax25Event::ControlFieldError,
             guard: &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: true,
             }],
             actions: &[
                 ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationM,
+                    verb: Ax25ActionVerb::DLERRORIndicationL,
                     kind: ActionKind::SignalUpper,
                 },
                 ActionStep {
@@ -539,16 +508,16 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t11_u_or_s_frame_length_error_no",
+            id: "t10_info_not_permitted_in_frame_no",
             from: "Connected",
-            on: Ax25Event::UOrSFrameLengthError,
+            on: Ax25Event::InfoNotPermittedInFrame,
             guard: &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: true,
             }],
             actions: &[
                 ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationN,
+                    verb: Ax25ActionVerb::DLERRORIndicationM,
                     kind: ActionKind::SignalUpper,
                 },
                 ActionStep {
@@ -596,6 +565,37 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
             ],
             next: "AwaitingV22Connection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t11_u_or_s_frame_length_error_no",
+            from: "Connected",
+            on: Ax25Event::UOrSFrameLengthError,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::Version22,
+                negate: true,
+            }],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::DLERRORIndicationN,
+                    kind: ActionKind::SignalUpper,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DiscardIFrameQueue,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::EstablishDataLink,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::SetLayer3Initiated,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -893,33 +893,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t16_frmr_received_no",
-            from: "Connected",
-            on: Ax25Event::FRMRReceived,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::Version22,
-                negate: true,
-            }],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationK,
-                    kind: ActionKind::SignalUpper,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::EstablishDataLink,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearLayer3Initiated,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t16_frmr_received_yes",
             from: "Connected",
             on: Ax25Event::FRMRReceived,
@@ -947,9 +920,9 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t17_ua_received_no",
+            id: "t16_frmr_received_no",
             from: "Connected",
-            on: Ax25Event::UAReceived,
+            on: Ax25Event::FRMRReceived,
             guard: &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: true,
@@ -996,6 +969,33 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
             ],
             next: "AwaitingV22Connection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t17_ua_received_no",
+            from: "Connected",
+            on: Ax25Event::UAReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::Version22,
+                negate: true,
+            }],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::DLERRORIndicationK,
+                    kind: ActionKind::SignalUpper,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::EstablishDataLink,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearLayer3Initiated,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -1136,39 +1136,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t21_rr_received_no_no",
-            from: "Connected",
-            on: Ax25Event::RRReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::CheckNeedForResponse,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRErrorRecovery,
-                    kind: ActionKind::Subroutine,
-                },
-            ],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
             id: "t21_rr_received_no_yes",
             from: "Connected",
             on: Ax25Event::RRReceived,
@@ -1202,6 +1169,39 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
+            id: "t21_rr_received_no_no",
+            from: "Connected",
+            on: Ax25Event::RRReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckNeedForResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRErrorRecovery,
+                    kind: ActionKind::Subroutine,
+                },
+            ],
+            next: "AwaitingConnection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
             id: "t22_rnr_received_yes",
             from: "Connected",
             on: Ax25Event::RNRReceived,
@@ -1224,39 +1224,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
             ],
             next: "Connected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t22_rnr_received_no_no",
-            from: "Connected",
-            on: Ax25Event::RNRReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::SetPeerReceiverBusy,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::CheckNeedForResponse,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRErrorRecovery,
-                    kind: ActionKind::Subroutine,
-                },
-            ],
-            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -1290,6 +1257,39 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
             ],
             next: "AwaitingV22Connection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t22_rnr_received_no_no",
+            from: "Connected",
+            on: Ax25Event::RNRReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::SetPeerReceiverBusy,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckNeedForResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRErrorRecovery,
+                    kind: ActionKind::Subroutine,
+                },
+            ],
+            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -1465,6 +1465,39 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
+            id: "t24_srej_received_no_yes",
+            from: "Connected",
+            on: Ax25Event::SREJReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: false,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckNeedForResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRErrorRecovery,
+                    kind: ActionKind::Subroutine,
+                },
+            ],
+            next: "AwaitingV22Connection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
             id: "t24_srej_received_no_no",
             from: "Connected",
             on: Ax25Event::SREJReceived,
@@ -1498,9 +1531,56 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t24_srej_received_no_yes",
+            id: "t25_rej_received_yes",
             from: "Connected",
-            on: Ax25Event::SREJReceived,
+            on: Ax25Event::REJReceived,
+            guard: &[GuardTerm {
+                atom: Ax25Guard::VaLeNrLeVs,
+                negate: false,
+            }],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckNeedForResponse,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::VAAssignNR,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::StartT1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::StopT3,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearAcknowledgePending,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::SelectT1Value,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::InvokeRetransmission,
+                    kind: ActionKind::Subroutine,
+                },
+            ],
+            next: "Connected",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t25_rej_received_no_yes",
+            from: "Connected",
+            on: Ax25Event::REJReceived,
             guard: &[
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
@@ -1564,78 +1644,55 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t25_rej_received_no_yes",
+            id: "t26_i_received_yes_yes_yes_yes_yes",
             from: "Connected",
-            on: Ax25Event::REJReceived,
+            on: Ax25Event::IReceived,
             guard: &[
                 GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true,
+                    atom: Ax25Guard::Command,
+                    negate: false,
                 },
                 GuardTerm {
-                    atom: Ax25Guard::Version22,
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
                     negate: false,
                 },
             ],
             actions: &[
                 ActionStep {
-                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::CheckNeedForResponse,
+                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
                     kind: ActionKind::Subroutine,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::NRErrorRecovery,
-                    kind: ActionKind::Subroutine,
-                },
-            ],
-            next: "AwaitingV22Connection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t25_rej_received_yes",
-            from: "Connected",
-            on: Ax25Event::REJReceived,
-            guard: &[GuardTerm {
-                atom: Ax25Guard::VaLeNrLeVs,
-                negate: false,
-            }],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearPeerReceiverBusy,
+                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
                     kind: ActionKind::Processing,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::CheckNeedForResponse,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::VAAssignNR,
+                    verb: Ax25ActionVerb::FAssign1,
                     kind: ActionKind::Processing,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::StartT1,
+                    verb: Ax25ActionVerb::NRAssignVR,
                     kind: ActionKind::Processing,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::StopT3,
-                    kind: ActionKind::Processing,
+                    verb: Ax25ActionVerb::RR,
+                    kind: ActionKind::SignalLower,
                 },
                 ActionStep {
                     verb: Ax25ActionVerb::ClearAcknowledgePending,
                     kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::SelectT1Value,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::InvokeRetransmission,
-                    kind: ActionKind::Subroutine,
                 },
             ],
             next: "Connected",
@@ -1644,81 +1701,7 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t26_i_received_yes_no_no",
-            from: "Connected",
-            on: Ax25Event::IReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationO,
-                    kind: ActionKind::SignalUpper,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::EstablishDataLink,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearLayer3Initiated,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "AwaitingConnection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t26_i_received_yes_no_yes",
-            from: "Connected",
-            on: Ax25Event::IReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: false,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::DLERRORIndicationO,
-                    kind: ActionKind::SignalUpper,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::EstablishDataLink,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearLayer3Initiated,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "AwaitingV22Connection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t26_i_received_yes_yes_no_no",
+            id: "t26_i_received_yes_yes_yes_yes_no",
             from: "Connected",
             on: Ax25Event::IReceived,
             guard: &[
@@ -1732,55 +1715,34 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true,
+                    negate: false,
                 },
                 GuardTerm {
-                    atom: Ax25Guard::Version22,
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
                     negate: true,
                 },
             ],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::NRErrorRecovery,
-                kind: ActionKind::Subroutine,
-            }],
-            next: "AwaitingConnection",
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "Connected",
             notes: "",
             references: &[],
             loops: &[],
         },
         TransitionSpec {
-            id: "t26_i_received_yes_yes_no_yes",
-            from: "Connected",
-            on: Ax25Event::IReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: false,
-                },
-            ],
-            actions: &[ActionStep {
-                verb: Ax25ActionVerb::NRErrorRecovery,
-                kind: ActionKind::Subroutine,
-            }],
-            next: "AwaitingV22Connection",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t26_i_received_yes_yes_yes_no_yes_no_no",
+            id: "t26_i_received_yes_yes_yes_no_yes_yes",
             from: "Connected",
             on: Ax25Event::IReceived,
             guard: &[
@@ -1806,11 +1768,7 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 GuardTerm {
                     atom: Ax25Guard::PEq1,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::AckPending,
-                    negate: true,
+                    negate: false,
                 },
             ],
             actions: &[
@@ -1847,11 +1805,19 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                     kind: ActionKind::Processing,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::LMSeizeRequest,
+                    verb: Ax25ActionVerb::FAssign1,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRAssignVR,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::RR,
                     kind: ActionKind::SignalLower,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::SetAcknowledgePending,
+                    verb: Ax25ActionVerb::ClearAcknowledgePending,
                     kind: ActionKind::Processing,
                 },
             ],
@@ -1950,7 +1916,7 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             }],
         },
         TransitionSpec {
-            id: "t26_i_received_yes_yes_yes_no_yes_yes",
+            id: "t26_i_received_yes_yes_yes_no_yes_no_no",
             from: "Connected",
             on: Ax25Event::IReceived,
             guard: &[
@@ -1976,7 +1942,11 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 GuardTerm {
                     atom: Ax25Guard::PEq1,
-                    negate: false,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::AckPending,
+                    negate: true,
                 },
             ],
             actions: &[
@@ -2013,19 +1983,11 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                     kind: ActionKind::Processing,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::FAssign1,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRAssignVR,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::RR,
+                    verb: Ax25ActionVerb::LMSeizeRequest,
                     kind: ActionKind::SignalLower,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::ClearAcknowledgePending,
+                    verb: Ax25ActionVerb::SetAcknowledgePending,
                     kind: ActionKind::Processing,
                 },
             ],
@@ -2156,79 +2118,6 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 ActionStep {
                     verb: Ax25ActionVerb::DiscardContentsOfIFrame,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "Connected",
-            notes: "",
-            references: &[],
-            loops: &[],
-        },
-        TransitionSpec {
-            id: "t26_i_received_yes_yes_yes_no_no_yes_no_no",
-            from: "Connected",
-            on: Ax25Event::IReceived,
-            guard: &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::NsEqVr,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VrLtNsLtVrPlusK,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::RejectException,
-                    negate: true,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::SREJEnabled,
-                    negate: true,
-                },
-            ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::SetRejectException,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::FAssignP,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRAssignVR,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::REJ,
-                    kind: ActionKind::SignalLower,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearAcknowledgePending,
                     kind: ActionKind::Processing,
                 },
             ],
@@ -2473,6 +2362,79 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
+            id: "t26_i_received_yes_yes_yes_no_no_yes_no_no",
+            from: "Connected",
+            on: Ax25Event::IReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::RejectException,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::SREJEnabled,
+                    negate: true,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::SetRejectException,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::FAssignP,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::NRAssignVR,
+                    kind: ActionKind::Processing,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::REJ,
+                    kind: ActionKind::SignalLower,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearAcknowledgePending,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "Connected",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
             id: "t26_i_received_yes_yes_yes_no_no_no_yes",
             from: "Connected",
             on: Ax25Event::IReceived,
@@ -2587,7 +2549,7 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
         TransitionSpec {
-            id: "t26_i_received_yes_yes_yes_yes_yes",
+            id: "t26_i_received_yes_yes_no_yes",
             from: "Connected",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2601,50 +2563,24 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false,
+                    negate: true,
                 },
                 GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: false,
-                },
-                GuardTerm {
-                    atom: Ax25Guard::PEq1,
+                    atom: Ax25Guard::Version22,
                     negate: false,
                 },
             ],
-            actions: &[
-                ActionStep {
-                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
-                    kind: ActionKind::Subroutine,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::FAssign1,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::NRAssignVR,
-                    kind: ActionKind::Processing,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::RR,
-                    kind: ActionKind::SignalLower,
-                },
-                ActionStep {
-                    verb: Ax25ActionVerb::ClearAcknowledgePending,
-                    kind: ActionKind::Processing,
-                },
-            ],
-            next: "Connected",
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::NRErrorRecovery,
+                kind: ActionKind::Subroutine,
+            }],
+            next: "AwaitingV22Connection",
             notes: "",
             references: &[],
             loops: &[],
         },
         TransitionSpec {
-            id: "t26_i_received_yes_yes_yes_yes_no",
+            id: "t26_i_received_yes_yes_no_no",
             from: "Connected",
             on: Ax25Event::IReceived,
             guard: &[
@@ -2658,28 +2594,92 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
                 },
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true,
+                },
+            ],
+            actions: &[ActionStep {
+                verb: Ax25ActionVerb::NRErrorRecovery,
+                kind: ActionKind::Subroutine,
+            }],
+            next: "AwaitingConnection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t26_i_received_yes_no_yes",
+            from: "Connected",
+            on: Ax25Event::IReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
                     negate: false,
                 },
                 GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: false,
+                },
+            ],
+            actions: &[
+                ActionStep {
+                    verb: Ax25ActionVerb::DLERRORIndicationO,
+                    kind: ActionKind::SignalUpper,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::EstablishDataLink,
+                    kind: ActionKind::Subroutine,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::ClearLayer3Initiated,
+                    kind: ActionKind::Processing,
+                },
+            ],
+            next: "AwaitingV22Connection",
+            notes: "",
+            references: &[],
+            loops: &[],
+        },
+        TransitionSpec {
+            id: "t26_i_received_yes_no_no",
+            from: "Connected",
+            on: Ax25Event::IReceived,
+            guard: &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
                     negate: false,
                 },
                 GuardTerm {
-                    atom: Ax25Guard::PEq1,
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: true,
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
                     negate: true,
                 },
             ],
             actions: &[
                 ActionStep {
-                    verb: Ax25ActionVerb::CheckIFrameAcknowledged,
+                    verb: Ax25ActionVerb::DLERRORIndicationO,
+                    kind: ActionKind::SignalUpper,
+                },
+                ActionStep {
+                    verb: Ax25ActionVerb::EstablishDataLink,
                     kind: ActionKind::Subroutine,
                 },
                 ActionStep {
-                    verb: Ax25ActionVerb::DiscardContentsOfIFrame,
+                    verb: Ax25ActionVerb::ClearLayer3Initiated,
                     kind: ActionKind::Processing,
                 },
             ],
-            next: "Connected",
+            next: "AwaitingConnection",
             notes: "",
             references: &[],
             loops: &[],
@@ -2812,6 +2812,47 @@ mod tests {
     }
 
     #[test]
+    fn t03_i_frame_pops_off_queue_no_no_yes() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t03_i_frame_pops_off_queue_no_no_yes")
+            .expect("transition t03_i_frame_pops_off_queue_no_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::IFramePopsOffQueue);
+        assert_eq!(tx.next, "Connected");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::PeerReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VsEqVaPlusK,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::T1Running,
+                    negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 6);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NSAssignVS);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::NRAssignVR);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::PAssign0);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::ICommand);
+        assert_eq!(tx.actions[3].kind, ActionKind::SignalLower);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::VSAssignVSPlus1);
+        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
+        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
+    }
+
+    #[test]
     fn t03_i_frame_pops_off_queue_no_no_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -2854,47 +2895,6 @@ mod tests {
         assert_eq!(tx.actions[6].kind, ActionKind::Processing);
         assert_eq!(tx.actions[7].verb, Ax25ActionVerb::StartT1);
         assert_eq!(tx.actions[7].kind, ActionKind::Processing);
-    }
-
-    #[test]
-    fn t03_i_frame_pops_off_queue_no_no_yes() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t03_i_frame_pops_off_queue_no_no_yes")
-            .expect("transition t03_i_frame_pops_off_queue_no_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::IFramePopsOffQueue);
-        assert_eq!(tx.next, "Connected");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::PeerReceiverBusy,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VsEqVaPlusK,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::T1Running,
-                    negate: false
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 6);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NSAssignVS);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::NRAssignVR);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::PAssign0);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::ICommand);
-        assert_eq!(tx.actions[3].kind, ActionKind::SignalLower);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::VSAssignVSPlus1);
-        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
-        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
     }
 
     #[test]
@@ -2944,25 +2944,6 @@ mod tests {
             .find(|x| x.id == "t05_dl_flow_off_request_no")
             .expect("transition t05_dl_flow_off_request_no not found");
         assert_eq!(tx.on, Ax25Event::DLFLOWOFFRequest);
-        assert_eq!(tx.next, "Connected");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::OwnReceiverBusy,
-                negate: true
-            },]
-        );
-        assert_eq!(tx.actions.len(), 0);
-    }
-
-    #[test]
-    fn t06_dl_flow_on_request_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t06_dl_flow_on_request_no")
-            .expect("transition t06_dl_flow_on_request_no not found");
-        assert_eq!(tx.on, Ax25Event::DLFLOWONRequest);
         assert_eq!(tx.next, "Connected");
         assert_eq!(
             tx.guard,
@@ -3041,28 +3022,22 @@ mod tests {
     }
 
     #[test]
-    fn t07_dl_connect_request_no() {
+    fn t06_dl_flow_on_request_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t07_dl_connect_request_no")
-            .expect("transition t07_dl_connect_request_no not found");
-        assert_eq!(tx.on, Ax25Event::DLCONNECTRequest);
-        assert_eq!(tx.next, "AwaitingConnection");
+            .find(|x| x.id == "t06_dl_flow_on_request_no")
+            .expect("transition t06_dl_flow_on_request_no not found");
+        assert_eq!(tx.on, Ax25Event::DLFLOWONRequest);
+        assert_eq!(tx.next, "Connected");
         assert_eq!(
             tx.guard,
             &[GuardTerm {
-                atom: Ax25Guard::Version22,
+                atom: Ax25Guard::OwnReceiverBusy,
                 negate: true
             },]
         );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DiscardIFrameQueue);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::SetLayer3Initiated);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions.len(), 0);
     }
 
     #[test]
@@ -3091,6 +3066,31 @@ mod tests {
     }
 
     #[test]
+    fn t07_dl_connect_request_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t07_dl_connect_request_no")
+            .expect("transition t07_dl_connect_request_no not found");
+        assert_eq!(tx.on, Ax25Event::DLCONNECTRequest);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::Version22,
+                negate: true
+            },]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DiscardIFrameQueue);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::SetLayer3Initiated);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+    }
+
+    #[test]
     fn t08_all_other_primitives__from_upper_layer() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -3100,33 +3100,6 @@ mod tests {
         assert_eq!(tx.on, Ax25Event::AllOtherPrimitivesFromUpperLayer);
         assert_eq!(tx.next, "Connected");
         assert_eq!(tx.actions.len(), 0);
-    }
-
-    #[test]
-    fn t09_control_field_error_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t09_control_field_error_no")
-            .expect("transition t09_control_field_error_no not found");
-        assert_eq!(tx.on, Ax25Event::ControlFieldError);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::Version22,
-                negate: true
-            },]
-        );
-        assert_eq!(tx.actions.len(), 4);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationL);
-        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardIFrameQueue);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::EstablishDataLink);
-        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::SetLayer3Initiated);
-        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
     }
 
     #[test]
@@ -3157,13 +3130,13 @@ mod tests {
     }
 
     #[test]
-    fn t10_info_not_permitted_in_frame_no() {
+    fn t09_control_field_error_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t10_info_not_permitted_in_frame_no")
-            .expect("transition t10_info_not_permitted_in_frame_no not found");
-        assert_eq!(tx.on, Ax25Event::InfoNotPermittedInFrame);
+            .find(|x| x.id == "t09_control_field_error_no")
+            .expect("transition t09_control_field_error_no not found");
+        assert_eq!(tx.on, Ax25Event::ControlFieldError);
         assert_eq!(tx.next, "AwaitingConnection");
         assert_eq!(
             tx.guard,
@@ -3173,7 +3146,7 @@ mod tests {
             },]
         );
         assert_eq!(tx.actions.len(), 4);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationM);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationL);
         assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
         assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardIFrameQueue);
         assert_eq!(tx.actions[1].kind, ActionKind::Processing);
@@ -3211,13 +3184,13 @@ mod tests {
     }
 
     #[test]
-    fn t11_u_or_s_frame_length_error_no() {
+    fn t10_info_not_permitted_in_frame_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t11_u_or_s_frame_length_error_no")
-            .expect("transition t11_u_or_s_frame_length_error_no not found");
-        assert_eq!(tx.on, Ax25Event::UOrSFrameLengthError);
+            .find(|x| x.id == "t10_info_not_permitted_in_frame_no")
+            .expect("transition t10_info_not_permitted_in_frame_no not found");
+        assert_eq!(tx.on, Ax25Event::InfoNotPermittedInFrame);
         assert_eq!(tx.next, "AwaitingConnection");
         assert_eq!(
             tx.guard,
@@ -3227,7 +3200,7 @@ mod tests {
             },]
         );
         assert_eq!(tx.actions.len(), 4);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationN);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationM);
         assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
         assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardIFrameQueue);
         assert_eq!(tx.actions[1].kind, ActionKind::Processing);
@@ -3251,6 +3224,33 @@ mod tests {
             &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: false
+            },]
+        );
+        assert_eq!(tx.actions.len(), 4);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationN);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardIFrameQueue);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::EstablishDataLink);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::SetLayer3Initiated);
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t11_u_or_s_frame_length_error_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t11_u_or_s_frame_length_error_no")
+            .expect("transition t11_u_or_s_frame_length_error_no not found");
+        assert_eq!(tx.on, Ax25Event::UOrSFrameLengthError);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::Version22,
+                negate: true
             },]
         );
         assert_eq!(tx.actions.len(), 4);
@@ -3469,31 +3469,6 @@ mod tests {
     }
 
     #[test]
-    fn t16_frmr_received_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t16_frmr_received_no")
-            .expect("transition t16_frmr_received_no not found");
-        assert_eq!(tx.on, Ax25Event::FRMRReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::Version22,
-                negate: true
-            },]
-        );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationK);
-        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-    }
-
-    #[test]
     fn t16_frmr_received_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -3519,13 +3494,13 @@ mod tests {
     }
 
     #[test]
-    fn t17_ua_received_no() {
+    fn t16_frmr_received_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t17_ua_received_no")
-            .expect("transition t17_ua_received_no not found");
-        assert_eq!(tx.on, Ax25Event::UAReceived);
+            .find(|x| x.id == "t16_frmr_received_no")
+            .expect("transition t16_frmr_received_no not found");
+        assert_eq!(tx.on, Ax25Event::FRMRReceived);
         assert_eq!(tx.next, "AwaitingConnection");
         assert_eq!(
             tx.guard,
@@ -3557,6 +3532,31 @@ mod tests {
             &[GuardTerm {
                 atom: Ax25Guard::Version22,
                 negate: false
+            },]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationK);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t17_ua_received_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t17_ua_received_no")
+            .expect("transition t17_ua_received_no not found");
+        assert_eq!(tx.on, Ax25Event::UAReceived);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::Version22,
+                negate: true
             },]
         );
         assert_eq!(tx.actions.len(), 3);
@@ -3684,37 +3684,6 @@ mod tests {
     }
 
     #[test]
-    fn t21_rr_received_no_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t21_rr_received_no_no")
-            .expect("transition t21_rr_received_no_no not found");
-        assert_eq!(tx.on, Ax25Event::RRReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
-        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
     fn t21_rr_received_no_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -3733,6 +3702,37 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::Version22,
                     negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
+    fn t21_rr_received_no_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t21_rr_received_no_no")
+            .expect("transition t21_rr_received_no_no not found");
+        assert_eq!(tx.on, Ax25Event::RRReceived);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true
                 },
             ]
         );
@@ -3771,37 +3771,6 @@ mod tests {
     }
 
     #[test]
-    fn t22_rnr_received_no_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t22_rnr_received_no_no")
-            .expect("transition t22_rnr_received_no_no not found");
-        assert_eq!(tx.on, Ax25Event::RNRReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::SetPeerReceiverBusy);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
-        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
     fn t22_rnr_received_no_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -3820,6 +3789,37 @@ mod tests {
                 GuardTerm {
                     atom: Ax25Guard::Version22,
                     negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::SetPeerReceiverBusy);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
+    fn t22_rnr_received_no_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t22_rnr_received_no_no")
+            .expect("transition t22_rnr_received_no_no not found");
+        assert_eq!(tx.on, Ax25Event::RNRReceived);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true
                 },
             ]
         );
@@ -3971,6 +3971,37 @@ mod tests {
     }
 
     #[test]
+    fn t24_srej_received_no_yes() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t24_srej_received_no_yes")
+            .expect("transition t24_srej_received_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::SREJReceived);
+        assert_eq!(tx.next, "AwaitingV22Connection");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
+        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
     fn t24_srej_received_no_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -4002,13 +4033,48 @@ mod tests {
     }
 
     #[test]
-    fn t24_srej_received_no_yes() {
+    fn t25_rej_received_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t24_srej_received_no_yes")
-            .expect("transition t24_srej_received_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::SREJReceived);
+            .find(|x| x.id == "t25_rej_received_yes")
+            .expect("transition t25_rej_received_yes not found");
+        assert_eq!(tx.on, Ax25Event::REJReceived);
+        assert_eq!(tx.next, "Connected");
+        assert_eq!(
+            tx.guard,
+            &[GuardTerm {
+                atom: Ax25Guard::VaLeNrLeVs,
+                negate: false
+            },]
+        );
+        assert_eq!(tx.actions.len(), 8);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
+        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::VAAssignNR);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::StartT1);
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::StopT3);
+        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
+        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::SelectT1Value);
+        assert_eq!(tx.actions[6].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::InvokeRetransmission);
+        assert_eq!(tx.actions[7].kind, ActionKind::Subroutine);
+    }
+
+    #[test]
+    fn t25_rej_received_no_yes() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t25_rej_received_no_yes")
+            .expect("transition t25_rej_received_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::REJReceived);
         assert_eq!(tx.next, "AwaitingV22Connection");
         assert_eq!(
             tx.guard,
@@ -4064,218 +4130,61 @@ mod tests {
     }
 
     #[test]
-    fn t25_rej_received_no_yes() {
+    fn t26_i_received_yes_yes_yes_yes_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t25_rej_received_no_yes")
-            .expect("transition t25_rej_received_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::REJReceived);
-        assert_eq!(tx.next, "AwaitingV22Connection");
+            .find(|x| x.id == "t26_i_received_yes_yes_yes_yes_yes")
+            .expect("transition t26_i_received_yes_yes_yes_yes_yes not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "Connected");
         assert_eq!(
             tx.guard,
             &[
                 GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true
+                    atom: Ax25Guard::Command,
+                    negate: false
                 },
                 GuardTerm {
-                    atom: Ax25Guard::Version22,
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
                     negate: false
                 },
             ]
         );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::NRErrorRecovery);
-        assert_eq!(tx.actions[2].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
-    fn t25_rej_received_yes() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t25_rej_received_yes")
-            .expect("transition t25_rej_received_yes not found");
-        assert_eq!(tx.on, Ax25Event::REJReceived);
-        assert_eq!(tx.next, "Connected");
-        assert_eq!(
-            tx.guard,
-            &[GuardTerm {
-                atom: Ax25Guard::VaLeNrLeVs,
-                negate: false
-            },]
-        );
-        assert_eq!(tx.actions.len(), 8);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::ClearPeerReceiverBusy);
-        assert_eq!(tx.actions[0].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::CheckNeedForResponse);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::VAAssignNR);
+        assert_eq!(tx.actions.len(), 6);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::FAssign1);
         assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::StartT1);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::NRAssignVR);
         assert_eq!(tx.actions[3].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::StopT3);
-        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::RR);
+        assert_eq!(tx.actions[4].kind, ActionKind::SignalLower);
         assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
         assert_eq!(tx.actions[5].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::SelectT1Value);
-        assert_eq!(tx.actions[6].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::InvokeRetransmission);
-        assert_eq!(tx.actions[7].kind, ActionKind::Subroutine);
     }
 
     #[test]
-    fn t26_i_received_yes_no_no() {
+    fn t26_i_received_yes_yes_yes_yes_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t26_i_received_yes_no_no")
-            .expect("transition t26_i_received_yes_no_no not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationO);
-        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-    }
-
-    #[test]
-    fn t26_i_received_yes_no_yes() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_no_yes")
-            .expect("transition t26_i_received_yes_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "AwaitingV22Connection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: false
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 3);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationO);
-        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
-        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-    }
-
-    #[test]
-    fn t26_i_received_yes_yes_no_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_no_no")
-            .expect("transition t26_i_received_yes_yes_no_no not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "AwaitingConnection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: true
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NRErrorRecovery);
-        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
-    fn t26_i_received_yes_yes_no_yes() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_no_yes")
-            .expect("transition t26_i_received_yes_yes_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "AwaitingV22Connection");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::Version22,
-                    negate: false
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 1);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NRErrorRecovery);
-        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-    }
-
-    #[test]
-    fn t26_i_received_yes_yes_yes_no_yes_no_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_yes_no_no")
-            .expect("transition t26_i_received_yes_yes_yes_no_yes_no_no not found");
+            .find(|x| x.id == "t26_i_received_yes_yes_yes_yes_no")
+            .expect("transition t26_i_received_yes_yes_yes_yes_no not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
         assert_eq!(tx.next, "Connected");
         assert_eq!(
@@ -4295,110 +4204,19 @@ mod tests {
                 },
                 GuardTerm {
                     atom: Ax25Guard::OwnReceiverBusy,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::NsEqVr,
                     negate: false
                 },
                 GuardTerm {
                     atom: Ax25Guard::PEq1,
                     negate: true
                 },
-                GuardTerm {
-                    atom: Ax25Guard::AckPending,
-                    negate: true
-                },
             ]
         );
-        assert_eq!(tx.actions.len(), 10);
+        assert_eq!(tx.actions.len(), 2);
         assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
         assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::VRAssignVRPlus1);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
         assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearRejectException);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(
-            tx.actions[3].verb,
-            Ax25ActionVerb::DecrementSrejectExceptionIf0
-        );
-        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::DLDATAIndication);
-        assert_eq!(tx.actions[4].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::RetrieveStoredVRIFrame);
-        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::DLDATAIndication);
-        assert_eq!(tx.actions[6].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::VRAssignVRPlus1);
-        assert_eq!(tx.actions[7].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[8].verb, Ax25ActionVerb::LMSeizeRequest);
-        assert_eq!(tx.actions[8].kind, ActionKind::SignalLower);
-        assert_eq!(tx.actions[9].verb, Ax25ActionVerb::SetAcknowledgePending);
-        assert_eq!(tx.actions[9].kind, ActionKind::Processing);
-    }
-
-    #[test]
-    fn t26_i_received_yes_yes_yes_no_yes_no_yes() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_yes_no_yes")
-            .expect("transition t26_i_received_yes_yes_yes_no_yes_no_yes not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "Connected");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::NsEqVr,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::PEq1,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::AckPending,
-                    negate: false
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 8);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
-        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::VRAssignVRPlus1);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearRejectException);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(
-            tx.actions[3].verb,
-            Ax25ActionVerb::DecrementSrejectExceptionIf0
-        );
-        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::DLDATAIndication);
-        assert_eq!(tx.actions[4].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::RetrieveStoredVRIFrame);
-        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::DLDATAIndication);
-        assert_eq!(tx.actions[6].kind, ActionKind::SignalUpper);
-        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::VRAssignVRPlus1);
-        assert_eq!(tx.actions[7].kind, ActionKind::Processing);
     }
 
     #[test]
@@ -4467,6 +4285,138 @@ mod tests {
         assert_eq!(tx.actions[10].kind, ActionKind::SignalLower);
         assert_eq!(tx.actions[11].verb, Ax25ActionVerb::ClearAcknowledgePending);
         assert_eq!(tx.actions[11].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t26_i_received_yes_yes_yes_no_yes_no_yes() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_yes_no_yes")
+            .expect("transition t26_i_received_yes_yes_yes_no_yes_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "Connected");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::AckPending,
+                    negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 8);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::VRAssignVRPlus1);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearRejectException);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(
+            tx.actions[3].verb,
+            Ax25ActionVerb::DecrementSrejectExceptionIf0
+        );
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::DLDATAIndication);
+        assert_eq!(tx.actions[4].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::RetrieveStoredVRIFrame);
+        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::DLDATAIndication);
+        assert_eq!(tx.actions[6].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::VRAssignVRPlus1);
+        assert_eq!(tx.actions[7].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t26_i_received_yes_yes_yes_no_yes_no_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_yes_no_no")
+            .expect("transition t26_i_received_yes_yes_yes_no_yes_no_no not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "Connected");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::PEq1,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::AckPending,
+                    negate: true
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 10);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::VRAssignVRPlus1);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearRejectException);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(
+            tx.actions[3].verb,
+            Ax25ActionVerb::DecrementSrejectExceptionIf0
+        );
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::DLDATAIndication);
+        assert_eq!(tx.actions[4].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::RetrieveStoredVRIFrame);
+        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::DLDATAIndication);
+        assert_eq!(tx.actions[6].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[7].verb, Ax25ActionVerb::VRAssignVRPlus1);
+        assert_eq!(tx.actions[7].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[8].verb, Ax25ActionVerb::LMSeizeRequest);
+        assert_eq!(tx.actions[8].kind, ActionKind::SignalLower);
+        assert_eq!(tx.actions[9].verb, Ax25ActionVerb::SetAcknowledgePending);
+        assert_eq!(tx.actions[9].kind, ActionKind::Processing);
     }
 
     #[test]
@@ -4581,69 +4531,6 @@ mod tests {
         assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
         assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
         assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-    }
-
-    #[test]
-    fn t26_i_received_yes_yes_yes_no_no_yes_no_no() {
-        let tx = DATA_LINK_CONNECTED
-            .transitions
-            .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_no_yes_no_no")
-            .expect("transition t26_i_received_yes_yes_yes_no_no_yes_no_no not found");
-        assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "Connected");
-        assert_eq!(
-            tx.guard,
-            &[
-                GuardTerm {
-                    atom: Ax25Guard::Command,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::NsEqVr,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::VrLtNsLtVrPlusK,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::RejectException,
-                    negate: true
-                },
-                GuardTerm {
-                    atom: Ax25Guard::SREJEnabled,
-                    negate: true
-                },
-            ]
-        );
-        assert_eq!(tx.actions.len(), 7);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
-        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::SetRejectException);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::FAssignP);
-        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::NRAssignVR);
-        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::REJ);
-        assert_eq!(tx.actions[5].kind, ActionKind::SignalLower);
-        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::ClearAcknowledgePending);
-        assert_eq!(tx.actions[6].kind, ActionKind::Processing);
     }
 
     #[test]
@@ -4860,6 +4747,69 @@ mod tests {
     }
 
     #[test]
+    fn t26_i_received_yes_yes_yes_no_no_yes_no_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t26_i_received_yes_yes_yes_no_no_yes_no_no")
+            .expect("transition t26_i_received_yes_yes_yes_no_no_yes_no_no not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "Connected");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VaLeNrLeVs,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::OwnReceiverBusy,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::NsEqVr,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::VrLtNsLtVrPlusK,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::RejectException,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::SREJEnabled,
+                    negate: true
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 7);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
+        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::SetRejectException);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::FAssignP);
+        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::NRAssignVR);
+        assert_eq!(tx.actions[4].kind, ActionKind::Processing);
+        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::REJ);
+        assert_eq!(tx.actions[5].kind, ActionKind::SignalLower);
+        assert_eq!(tx.actions[6].verb, Ax25ActionVerb::ClearAcknowledgePending);
+        assert_eq!(tx.actions[6].kind, ActionKind::Processing);
+    }
+
+    #[test]
     fn t26_i_received_yes_yes_yes_no_no_no_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
@@ -4966,14 +4916,14 @@ mod tests {
     }
 
     #[test]
-    fn t26_i_received_yes_yes_yes_yes_yes() {
+    fn t26_i_received_yes_yes_no_yes() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_yes_yes_yes")
-            .expect("transition t26_i_received_yes_yes_yes_yes_yes not found");
+            .find(|x| x.id == "t26_i_received_yes_yes_no_yes")
+            .expect("transition t26_i_received_yes_yes_no_yes not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "Connected");
+        assert_eq!(tx.next, "AwaitingV22Connection");
         assert_eq!(
             tx.guard,
             &[
@@ -4987,42 +4937,28 @@ mod tests {
                 },
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false
+                    negate: true
                 },
                 GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::PEq1,
+                    atom: Ax25Guard::Version22,
                     negate: false
                 },
             ]
         );
-        assert_eq!(tx.actions.len(), 6);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NRErrorRecovery);
         assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::FAssign1);
-        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[3].verb, Ax25ActionVerb::NRAssignVR);
-        assert_eq!(tx.actions[3].kind, ActionKind::Processing);
-        assert_eq!(tx.actions[4].verb, Ax25ActionVerb::RR);
-        assert_eq!(tx.actions[4].kind, ActionKind::SignalLower);
-        assert_eq!(tx.actions[5].verb, Ax25ActionVerb::ClearAcknowledgePending);
-        assert_eq!(tx.actions[5].kind, ActionKind::Processing);
     }
 
     #[test]
-    fn t26_i_received_yes_yes_yes_yes_no() {
+    fn t26_i_received_yes_yes_no_no() {
         let tx = DATA_LINK_CONNECTED
             .transitions
             .iter()
-            .find(|x| x.id == "t26_i_received_yes_yes_yes_yes_no")
-            .expect("transition t26_i_received_yes_yes_yes_yes_no not found");
+            .find(|x| x.id == "t26_i_received_yes_yes_no_no")
+            .expect("transition t26_i_received_yes_yes_no_no not found");
         assert_eq!(tx.on, Ax25Event::IReceived);
-        assert_eq!(tx.next, "Connected");
+        assert_eq!(tx.next, "AwaitingConnection");
         assert_eq!(
             tx.guard,
             &[
@@ -5036,23 +4972,87 @@ mod tests {
                 },
                 GuardTerm {
                     atom: Ax25Guard::VaLeNrLeVs,
-                    negate: false
+                    negate: true
                 },
                 GuardTerm {
-                    atom: Ax25Guard::OwnReceiverBusy,
-                    negate: false
-                },
-                GuardTerm {
-                    atom: Ax25Guard::PEq1,
+                    atom: Ax25Guard::Version22,
                     negate: true
                 },
             ]
         );
-        assert_eq!(tx.actions.len(), 2);
-        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::CheckIFrameAcknowledged);
+        assert_eq!(tx.actions.len(), 1);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::NRErrorRecovery);
         assert_eq!(tx.actions[0].kind, ActionKind::Subroutine);
-        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::DiscardContentsOfIFrame);
-        assert_eq!(tx.actions[1].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t26_i_received_yes_no_yes() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t26_i_received_yes_no_yes")
+            .expect("transition t26_i_received_yes_no_yes not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "AwaitingV22Connection");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: false
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationO);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
+    }
+
+    #[test]
+    fn t26_i_received_yes_no_no() {
+        let tx = DATA_LINK_CONNECTED
+            .transitions
+            .iter()
+            .find(|x| x.id == "t26_i_received_yes_no_no")
+            .expect("transition t26_i_received_yes_no_no not found");
+        assert_eq!(tx.on, Ax25Event::IReceived);
+        assert_eq!(tx.next, "AwaitingConnection");
+        assert_eq!(
+            tx.guard,
+            &[
+                GuardTerm {
+                    atom: Ax25Guard::Command,
+                    negate: false
+                },
+                GuardTerm {
+                    atom: Ax25Guard::InfoFieldLengthLeN1AndContentIsOctetAligned,
+                    negate: true
+                },
+                GuardTerm {
+                    atom: Ax25Guard::Version22,
+                    negate: true
+                },
+            ]
+        );
+        assert_eq!(tx.actions.len(), 3);
+        assert_eq!(tx.actions[0].verb, Ax25ActionVerb::DLERRORIndicationO);
+        assert_eq!(tx.actions[0].kind, ActionKind::SignalUpper);
+        assert_eq!(tx.actions[1].verb, Ax25ActionVerb::EstablishDataLink);
+        assert_eq!(tx.actions[1].kind, ActionKind::Subroutine);
+        assert_eq!(tx.actions[2].verb, Ax25ActionVerb::ClearLayer3Initiated);
+        assert_eq!(tx.actions[2].kind, ActionKind::Processing);
     }
 
     #[test]
