@@ -57,7 +57,7 @@ public sealed record SystemState
 
     public int FlowRoundsB { get; init; }
 
-    /// <summary>With <see cref="ExplorerOptions.DataAfterConfirm"/>: station A has reported the link up to its layer 3 (DL_CONNECT_confirm or DL_CONNECT_indication).</summary>
+    /// <summary>With <see cref="ExplorerOptions.DataAfterConfirm"/>: station A's layer 3 believes the link is up (set by DL_CONNECT_confirm or DL_CONNECT_indication, or from the seed with <see cref="ExplorerOptions.DataBeforeConfirm"/>; cleared by DL_DISCONNECT_indication or DL_DISCONNECT_confirm).</summary>
     public bool LinkUpA { get; init; }
 
     public bool LinkUpB { get; init; }
