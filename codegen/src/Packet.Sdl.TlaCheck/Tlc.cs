@@ -9,7 +9,7 @@ namespace Packet.Sdl.TlaCheck;
 
 /// <summary>
 /// One state of a TLC counterexample: the fields read from its <c>viol</c>
-/// and <c>last</c> variables (viol, violAt, violMsg, move, at, tid).
+/// and <c>last</c> variables (viol, violAt, violMsg, move, at, tid, lossy).
 /// </summary>
 public sealed record TlcStep(int Number, string Header, IReadOnlyDictionary<string, string> Fields)
 {
@@ -140,6 +140,7 @@ public sealed class Tlc
         });
         C("FlowAt", Set(flowAt));
         C("ReleaseAt", Set(releaseAt));
+        C("AcceptGiveUp", Bool(o.AcceptGiveUp));
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
         C("StepChecks", Set(stepChecks));
@@ -302,6 +303,7 @@ public sealed class Tlc
                 fields["move"] = Field(v, "move");
                 fields["at"] = Field(v, "at");
                 fields["tid"] = Field(v, "tid");
+                fields["lossy"] = Field(v, "lossy");
             }
             variable = null;
             value.Clear();

@@ -28,6 +28,7 @@ CONSTANTS
     Peer,              \* what plays B: "tables", "v20-frmr" or "v20-dm"
     FlowAt,            \* stations whose layer 3 issues DL_FLOW_OFF / DL_FLOW_ON, subset of {"A", "B"}
     ReleaseAt,         \* stations whose layer 3 releases the link once everything is delivered, subset of {"A", "B"}
+    AcceptGiveUp,      \* the give-up rule: an honest N2 give-up that has settled is quiescent (see GiveUpSettled)
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -57,7 +58,7 @@ KnownStates == {"Disconnected", "AwaitingConnection", "AwaitingV22Connection", "
 
 NoViol == [kind |-> "none", at |-> "", msg |-> ""]
 Viol(kind, s, msg) == [kind |-> kind, at |-> s, msg |-> msg]
-NoStep == [move |-> "", at |-> "", frame |-> NoFrm, tid |-> "", arms |-> {}, tick |-> 0]
+NoStep == [move |-> "", at |-> "", frame |-> NoFrm, tid |-> "", arms |-> {}, tick |-> 0, lossy |-> ""]
 
 N(num) == ToString(num)
 FrameText(f) ==
@@ -117,8 +118,9 @@ EmitterReject(s, m, f) ==
 
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
-\* order and flow-off), a seize request to the owed flag, and (with
-\* DataAfterConfirm) a connect confirm or indication to the link-up flag.
+\* order and flow-off), a seize request to the owed flag, and a connect
+\* confirm or indication to the link-up flag (with DataAfterConfirm) and to
+\* conn (progress, for the give-up rule).
 RECURSIVE Route(_, _, _, _, _, _)
 Route(s, m, fx, acc, flowOff, i) ==
     IF i > Len(fx) THEN acc
@@ -141,7 +143,8 @@ Route(s, m, fx, acc, flowOff, i) ==
                                                     \o (IF expected = "" THEN "everything was already delivered: duplicate or spurious delivery"
                                                         ELSE "'" \o expected \o "' is next: out-of-order, duplicate or gapped delivery"))
                                           ELSE vf]
-                ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"} /\ DataAfterConfirm THEN [acc EXCEPT !.up = TRUE]
+                ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"}
+                     THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN TRUE ELSE @, !.conn = TRUE]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
@@ -149,6 +152,14 @@ Route(s, m, fx, acc, flowOff, i) ==
 (***************************************************************************)
 (* One stimulus at one station (Stepper.Inject)                            *)
 (***************************************************************************)
+
+Max(x, y) == IF x >= y THEN x ELSE y
+
+\* Retry-loop attempts on a page, the losses an honest give-up there needs
+\* (Stepper.GiveUpThreshold): Establish_Data_Link starts RC at 1, so the
+\* connect loops give up after N2 transmissions; DL-DISCONNECT starts it at
+\* 0, and Connected's T1 expiry sets it to 1 only after a first loss.
+GiveUpThreshold(page) == IF page \in {"AwaitingConnection", "AwaitingV22Connection"} THEN N2 ELSE N2 + 1
 
 \* Dispatch e at station s of system S; newIn becomes s's incoming channel.
 \* Returns the next system state, the per-step violation and the transition.
@@ -164,11 +175,19 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         v1 == IF ran /\ c.err # "" THEN Viol("MachineError", s, "interpreter error at station " \o s \o ": " \o c.err) ELSE v0
         m == IF ran THEN Persist(c) ELSE pre
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
-                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], v |-> v1],
+                   [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE, v |-> v1],
                    S.off[s], 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
         acked == IF ok /\ ~reset THEN S.acked[s] + ((m.va - pre.va) % m.mod) ELSE S.acked[s]
+        \* The give-up rule (AcceptGiveUp): progress clears the station's loss
+        \* count; a T1 expiry into Disconnected is a give-up, honest (1) when
+        \* the losses since the last progress reach the page's retry-loop
+        \* attempts, else unjustified (2, sticky).
+        loss == IF AcceptGiveUp /\ ok /\ (r.conn \/ acked > S.acked[s]) THEN 0 ELSE S.loss[s]
+        gave == IF AcceptGiveUp /\ ok /\ e.ev = "T1_expiry" /\ m.st = "Disconnected"
+                THEN Max(S.gave[s], IF loss >= GiveUpThreshold(pre.st) THEN 1 ELSE 2)
+                ELSE S.gave[s]
         flowOffNow == ok /\ e.ev = "DL_FLOW_OFF_request"
         flowOnNow == ok /\ e.ev = "DL_FLOW_ON_request"
         v2 == IF r.v # NoViol THEN r.v
@@ -179,6 +198,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
               ELSE NoViol
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
                            !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up,
+                           !.loss[s] = loss, !.gave[s] = gave,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
          viol |-> v2,
@@ -237,6 +257,7 @@ S0 ==
      off |-> [s \in Stations |-> FALSE], rounds |-> [s \in Stations |-> 0],
      up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
      rel |-> [s \in Stations |-> FALSE],
+     loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -257,6 +278,30 @@ SeedState == [IF DataAfterConfirm THEN S1 ELSE Submit(Submit(S1, "A", 1), "B", 1
               EXCEPT !.budget = Budget, !.acked = [s \in Stations |-> 0]]
 
 (***************************************************************************)
+(* The give-up rule's settled state (Stepper.GiveUpSettled)                *)
+(***************************************************************************)
+
+AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery")
+
+\* The give-up rule's settled state, data aside (Stepper.GiveUpSettled): some
+\* station gave up honestly and none without justification, each table-driven
+\* station Disconnected or at rest as plain quiescence has it (the stub always
+\* is), nothing in flight, nothing owed.
+GiveUpSettled(S) ==
+    LET Settled(m) == m.st = "Disconnected" \/ (AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
+    IN  /\ (S.gave["A"] = 1 \/ S.gave["B"] = 1)
+        /\ S.gave["A"] # 2 /\ S.gave["B"] # 2
+        /\ Settled(S.m["A"]) /\ (StubB \/ Settled(S.m["B"]))
+        /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
+        /\ ~S.owed["A"] /\ ~S.owed["B"]
+
+AllDelivered(S) == S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
+
+\* A settled honest give-up that lost data (Stepper.IsGiveUpLoss): not rest, so
+\* a deadlock there is reported as the loss it is (see last.lossy).
+GiveUpLoss(S) == AcceptGiveUp /\ GiveUpSettled(S) /\ ~AllDelivered(S)
+
+(***************************************************************************)
 (* Moves (Stepper.EnabledMoves / Apply)                                    *)
 (***************************************************************************)
 
@@ -266,7 +311,10 @@ Take(r, move, s, f) ==
     \* tick flips on every move, so no move is ever a stuttering step: a move
     \* that changes nothing else (a self-loop) still counts as taken for the
     \* liveness fairness, and cannot discharge it by stuttering.
-    /\ last' = [move |-> move, at |-> s, frame |-> f, tid |-> r.tid, arms |-> r.arms, tick |-> 1 - last.tick]
+    \* lossy marks a settled honest give-up that lost data, so TlaCheck can
+    \* report a deadlock there as GiveUpLoss, as the explorer does.
+    /\ last' = [move |-> move, at |-> s, frame |-> f, tid |-> r.tid, arms |-> r.arms, tick |-> 1 - last.tick,
+                 lossy |-> IF GiveUpLoss(r.sys) THEN "yes" ELSE ""]
 
 TakeChannel(S2, move, s, f) == Take([sys |-> S2, viol |-> NoViol, tid |-> "", arms |-> {}], move, s, f)
 
@@ -329,7 +377,9 @@ Drop(s) ==
     /\ viol = NoViol
     /\ sys.ch[s] # <<>> /\ sys.budget > 0 /\ "drop" \in Faults
     /\ DropAllowed(Head(sys.ch[s]), s)
-    /\ TakeChannel([sys EXCEPT !.ch[s] = Tail(@), !.budget = @ - 1], "drop", s, Head(sys.ch[s]))
+    \* The give-up rule counts every drop as a loss for both stations.
+    /\ TakeChannel([sys EXCEPT !.ch[s] = Tail(@), !.budget = @ - 1,
+                               !.loss = IF AcceptGiveUp THEN [x \in Stations |-> @[x] + 1] ELSE @], "drop", s, Head(sys.ch[s]))
 
 Dup(s) ==
     /\ viol = NoViol
@@ -380,13 +430,11 @@ T1(s) ==
 (* Quiescence                                                              *)
 (***************************************************************************)
 
-AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery")
-
 \* Both stations at rest, nothing in flight or queued, everything sent
 \* acknowledged and everything submitted delivered, nothing owed. A v2.0
 \* stub is at rest once it is connected. With ReleaseAt, at rest means
 \* released: both Disconnected after a layer 3 issued its release.
-Quiescent ==
+PlainQuiescent ==
     LET a == sys.m["A"]
         b == sys.m["B"]
     IN  /\ IF ReleaseAt # {}
@@ -397,6 +445,13 @@ Quiescent ==
                 /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"]
         /\ sys.ch["A"] = <<>> /\ sys.ch["B"] = <<>>
         /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
+
+\* With AcceptGiveUp, a settled honest give-up with everything delivered is at
+\* rest too, and nothing is once a station has given up without justification.
+Quiescent ==
+    \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
+    \/ /\ ~(AcceptGiveUp /\ (sys.gave["A"] = 2 \/ sys.gave["B"] = 2))
+       /\ PlainQuiescent
 
 \* A quiescent state stutters, so TLC's deadlock check reports exactly the
 \* explorer's deadlocks: terminal states that are not quiescent.

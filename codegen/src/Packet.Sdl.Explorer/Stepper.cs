@@ -204,6 +204,13 @@ public sealed class Stepper
     public bool IsQuiescent(SystemState s)
     {
         ArgumentNullException.ThrowIfNull(s);
+        if (_o.AcceptGiveUp)
+        {
+            // The give-up rule: no rest counts after an unjustified give-up,
+            // and a settled honest give-up with everything delivered is rest.
+            if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
+            if (GiveUpSettled(s) && AllDelivered(s)) return true;
+        }
         if (_o.Release != ReleaseBy.None)
         {
             return (s.ReleasedA || s.ReleasedB)
@@ -226,6 +233,50 @@ public sealed class Stepper
             && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
             && !s.SeizeOwedA;
     }
+
+    private const int Honest = 1;
+    private const int Unjustified = 2;
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.AcceptGiveUp"/>: the state is a
+    /// settled honest give-up that lost data, so a deadlock there is reported
+    /// as <see cref="Invariants.GiveUpLoss"/> rather than as a plain deadlock.
+    /// </summary>
+    public bool IsGiveUpLoss(SystemState s)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        return _o.AcceptGiveUp && GiveUpSettled(s) && !AllDelivered(s);
+    }
+
+    private bool AllDelivered(SystemState s) =>
+        s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
+
+    /// <summary>
+    /// The give-up rule's settled state, data aside: some station gave up
+    /// honestly and none without justification, each table-driven station is
+    /// Disconnected or at rest as plain quiescence has it (the v2.0 stub, with
+    /// no queue or timers, always is), nothing in flight, nothing owed.
+    /// </summary>
+    private bool GiveUpSettled(SystemState s)
+    {
+        if (s.GaveUpA != Honest && s.GaveUpB != Honest) return false;
+        if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
+        bool Settled(DataLinkMachine m) =>
+            m.State == "Disconnected" || (QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
+        return Settled(s.A) && (s.StubPeer is not null || Settled(s.B))
+            && s.ToA.Count == 0 && s.ToB.Count == 0
+            && !s.SeizeOwedA && !s.SeizeOwedB;
+    }
+
+    /// <summary>
+    /// Retry-loop attempts on a page: the frames a station must lose before
+    /// it gives up honestly there. Establish_Data_Link starts RC at 1, so the
+    /// connect loops give up after N2 transmissions; DL-DISCONNECT starts RC
+    /// at 0, and Connected's T1 expiry sets it to 1 only after a first loss,
+    /// so AwaitingRelease and TimerRecovery give up after N2 + 1.
+    /// </summary>
+    private int GiveUpThreshold(string page) =>
+        page is "AwaitingConnection" or "AwaitingV22Connection" ? _o.N2 : _o.N2 + 1;
 
     /// <summary>One-line summary of a station for the counterexample log (the stub's own summary when it plays B).</summary>
     private static string SummaryOf(SystemState s, Station station) =>
@@ -441,6 +492,8 @@ public sealed class Stepper
             {
                 var frame = incoming[0];
                 var next = WithIncoming(s, station, incoming.Skip(1).ToList()) with { Budget = s.Budget - 1 };
+                // The give-up rule counts every drop as a loss for both stations.
+                if (_o.AcceptGiveUp) next = next with { LossesA = s.LossesA + 1, LossesB = s.LossesB + 1 };
                 return new StepOutcome(next,
                     new StepRecord(number, $"channel {peer}->{station}", $"DROPS {frame.Render()} (budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
                         null, Array.Empty<string>(), SummaryOf(next, Station.A), SummaryOf(next, Station.B)),
@@ -580,6 +633,7 @@ public sealed class Stepper
         var delivered = s.DeliveredAt(station);
         var acked = s.Acked(station);
         var linkUp = s.LinkUp(station);
+        var connectReported = false;
         var effectsText = new List<string>();
 
         if (result is not null)
@@ -618,8 +672,9 @@ public sealed class Stepper
                         }
                         break;
                     }
-                    case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" } when _o.DataAfterConfirm:
-                        linkUp = true;
+                    case UpperEffect { Primitive: "DL_CONNECT_confirm" or "DL_CONNECT_indication" }:
+                        if (_o.DataAfterConfirm) linkUp = true;
+                        connectReported = true;
                         break;
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
@@ -658,6 +713,20 @@ public sealed class Stepper
                     $"station {station} took {result.TransitionId} on DL_FLOW_ON_request but its own-receiver-busy condition is still set");
         }
 
+        // The give-up rule's bookkeeping: progress (this station's frames
+        // acknowledged further, or a link (re)establishment reported to its
+        // layer 3) clears its loss count; a T1 expiry that takes it to
+        // Disconnected is a give-up, honest if the losses since its last
+        // progress reach the page's retry-loop attempts.
+        var losses = s.Losses(station);
+        var gaveUp = s.GaveUp(station);
+        if (_o.AcceptGiveUp && result is not null)
+        {
+            if (connectReported || acked > s.Acked(station)) losses = 0;
+            if (input!.Event == "T1_expiry" && m.State == "Disconnected")
+                gaveUp = Math.Max(gaveUp, losses >= GiveUpThreshold(pre.State) ? Honest : Unjustified);
+        }
+
         if (violation is null && On(Invariants.DefinedState) && !KnownStates.Contains(m.State))
             violation = new Violation(Invariants.DefinedState, station, $"station {station} is in undefined state `{m.State}`");
 
@@ -689,6 +758,10 @@ public sealed class Stepper
             FlowRoundsB = station == Station.B ? flowRounds : s.FlowRoundsB,
             LinkUpA = station == Station.A ? linkUp : s.LinkUpA,
             LinkUpB = station == Station.B ? linkUp : s.LinkUpB,
+            LossesA = station == Station.A ? losses : s.LossesA,
+            LossesB = station == Station.B ? losses : s.LossesB,
+            GaveUpA = station == Station.A ? gaveUp : s.GaveUpA,
+            GaveUpB = station == Station.B ? gaveUp : s.GaveUpB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,

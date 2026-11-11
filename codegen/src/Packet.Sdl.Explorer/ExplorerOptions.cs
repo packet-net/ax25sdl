@@ -112,6 +112,13 @@ public enum Invariants
     FlowOffDelivery = 512,
     /// <summary>After DL_FLOW_OFF_request the station's own-receiver-busy condition is set, and after DL_FLOW_ON_request it is clear (§6.4.10).</summary>
     BusyTracksFlow = 1024,
+    /// <summary>
+    /// Not a switch: the kind a deadlock is reported under, with
+    /// <see cref="ExplorerOptions.AcceptGiveUp"/>, when the stuck state is a
+    /// settled honest give-up that lost data (everything else about it is
+    /// rest). Data lost in a give-up is reported as such, never accepted.
+    /// </summary>
+    GiveUpLoss = 2048,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
     Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow,
@@ -174,6 +181,27 @@ public sealed record ExplorerOptions
     /// Table-driven peer only. Off by default.
     /// </summary>
     public ReleaseBy Release { get; init; } = ReleaseBy.None;
+
+    /// <summary>
+    /// The give-up rule. A station that exhausts its N2 retries (a T1 expiry
+    /// that takes it to Disconnected) has given up honestly when at least as
+    /// many frames were dropped, on either channel, since that station last
+    /// made progress (its frames acknowledged further, or a link
+    /// (re)establishment reported to its layer 3) as its retry loop has
+    /// attempts: N2 on AwaitingConnection and AwaitingV22Connection, whose
+    /// Establish_Data_Link starts RC at 1, and N2 + 1 on TimerRecovery and
+    /// AwaitingRelease, whose count starts at 0 (DL-DISCONNECT) or reaches 1
+    /// only after the first loss (Connected's T1 expiry). Any other give-up is
+    /// unjustified. Quiescence then also accepts a settled honest give-up:
+    /// some station gave up honestly and none unjustifiably, each station
+    /// Disconnected or at rest as in plain quiescence, nothing in flight or
+    /// owed, and everything submitted delivered. A settled honest give-up
+    /// that lost data is not rest: it is a deadlock, reported as
+    /// <see cref="Invariants.GiveUpLoss"/> so the loss is visible as such.
+    /// With this on, no rest counts once a station has given up without
+    /// justification. Off by default.
+    /// </summary>
+    public bool AcceptGiveUp { get; init; }
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase

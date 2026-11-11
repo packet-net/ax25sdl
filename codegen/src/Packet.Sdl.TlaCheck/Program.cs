@@ -63,6 +63,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.Pre40 => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre40"),
     TableSetKind.Pre38 => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38"),
     TableSetKind.AckBroken => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ack-broken"),
+    TableSetKind.ReleaseStuck => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -216,7 +217,9 @@ static (string Kind, string Station, int Steps, List<string> Tids, string Note) 
                 ? (lastStep!.Field("viol"), lastStep.Field("violAt"), steps, tids, "")
                 : (r.Invariant!, lastStep?.Field("at") ?? "", steps, tids, "");
         case "deadlock":
-            return ("Deadlock", "", steps, tids, "");
+            // Under the give-up rule a deadlock in a settled honest give-up
+            // that lost data is reported as that loss, as the explorer does.
+            return (lastStep?.Field("lossy") == "yes" ? "GiveUpLoss" : "Deadlock", "", steps, tids, "");
         case "temporal":
             // The lasso: the states TLC prints, the last being "Back to state n" or a stuttering marker.
             return (phase == Phase.TimerFree ? "SelectiveProgress" : "Quiescence", "", r.Trace.Count, tids, "");
@@ -239,6 +242,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.Pre40 => "pre-40",
     TableSetKind.Pre38 => "pre-38",
     TableSetKind.AckBroken => "seeded ack-broken",
+    TableSetKind.ReleaseStuck => "seeded release-stuck",
     _ => "seeded livelock",
 };
 

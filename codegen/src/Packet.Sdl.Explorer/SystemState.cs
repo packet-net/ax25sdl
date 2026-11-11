@@ -72,6 +72,16 @@ public sealed record SystemState
 
     public bool ReleasedB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.AcceptGiveUp"/>: frames dropped on either channel since station A last made progress.</summary>
+    public int LossesA { get; init; }
+
+    public int LossesB { get; init; }
+
+    /// <summary>With <see cref="ExplorerOptions.AcceptGiveUp"/>: 0 station A never gave up, 1 it gave up honestly, 2 it gave up without the losses to justify it (sticky).</summary>
+    public int GaveUpA { get; init; }
+
+    public int GaveUpB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -86,6 +96,10 @@ public sealed record SystemState
     public int Offered(Station s) => s == Station.A ? OfferedA : OfferedB;
 
     public bool Released(Station s) => s == Station.A ? ReleasedA : ReleasedB;
+
+    public int Losses(Station s) => s == Station.A ? LossesA : LossesB;
+
+    public int GaveUp(Station s) => s == Station.A ? GaveUpA : GaveUpB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -118,7 +132,8 @@ public sealed record SystemState
           .Append("|k").Append(Inv(AckedA)).Append(',').Append(Inv(AckedB))
           .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
           .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB))
-          .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0');
+          .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0')
+          .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB));
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

@@ -173,8 +173,13 @@ public static class Explorer
                 if (nodes[i].Expanded && nodes[i].Terminal && !nodes[i].Quiescent)
                 {
                     var (trace, final) = Replay(stepper, PathTo(nodes, i));
-                    var v = new Violation(Invariants.Deadlock, null,
-                        "deadlock: this state has no enabled move and is not quiescent (" + Describe(stepper, final) + ")");
+                    // Under the give-up rule a settled honest give-up that lost
+                    // data is stuck too; it is reported as the loss it is.
+                    var v = stepper.IsGiveUpLoss(final)
+                        ? new Violation(Invariants.GiveUpLoss, null,
+                            "give-up loss: the link gave up honestly and has settled, but data was lost in the give-up (" + Describe(stepper, final) + ")")
+                        : new Violation(Invariants.Deadlock, null,
+                            "deadlock: this state has no enabled move and is not quiescent (" + Describe(stepper, final) + ")");
                     return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit, null) with { FiredTransitions = fired };
                 }
             }
