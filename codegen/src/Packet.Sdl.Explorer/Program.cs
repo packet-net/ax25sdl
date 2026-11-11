@@ -38,10 +38,16 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          T1 holds back the expiry that would exhaust N2 while the station is busy)
   --t3                   model T3 expiry (idle keepalive, T1 not running); at rest a Connected station keeps T1 or
                          T3 running, and with --accept-give-up a station left up after its peer gave up never settles
+  --unit-data A|B|both   that station's layer 3 (or either's) sends one UI datagram, once, in any state; at rest every
+                         datagram was sent and then reached its peer or was dropped
+  --ui-form plain|poll|response|long   with --unit-data: the datagram's form on the air (default plain, a UI command
+                         P=0 through DL_UNIT_DATA_request; poll and response are put on the air by the harness; long
+                         goes through the table and fails the receiver's N1 check)
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
   --disable LIST         comma list of invariants to switch off: defined-state, sequence, delivery,
-                         reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow
+                         reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow,
+                         peer-busy-hold, busy-indication, unit-data
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
@@ -63,6 +69,8 @@ var flowControl = FlowControlAt.None;
 var localBusy = FlowControlAt.None;
 var t3 = false;
 var longBusy = false;
+var unitData = FlowControlAt.None;
+var uiForm = UiForm.Plain;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
@@ -104,6 +112,26 @@ try
                     "both" => FlowControlAt.Both,
                     "none" => FlowControlAt.None,
                     var v => throw new ArgumentException($"unknown local-busy station `{v}` (A, B, both, none)"),
+                };
+                break;
+            case "--unit-data":
+                unitData = Next(args, ref i) switch
+                {
+                    "A" or "a" => FlowControlAt.A,
+                    "B" or "b" => FlowControlAt.B,
+                    "both" => FlowControlAt.Both,
+                    "none" => FlowControlAt.None,
+                    var v => throw new ArgumentException($"unknown unit-data station `{v}` (A, B, both, none)"),
+                };
+                break;
+            case "--ui-form":
+                uiForm = Next(args, ref i) switch
+                {
+                    "plain" => UiForm.Plain,
+                    "poll" => UiForm.Poll,
+                    "response" => UiForm.Response,
+                    "long" => UiForm.Oversize,
+                    var v => throw new ArgumentException($"unknown UI form `{v}` (plain, poll, response, long)"),
                 };
                 break;
             case "--t3": t3 = true; break;
@@ -191,6 +219,7 @@ try
                         "busy-tracks-flow" => Invariants.BusyTracksFlow,
                         "peer-busy-hold" => Invariants.PeerBusyHold,
                         "busy-indication" => Invariants.BusyIndication,
+                        "unit-data" => Invariants.UnitData,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }
@@ -221,6 +250,8 @@ try
         LocalBusy = localBusy,
         T3 = t3,
         LongBusy = longBusy,
+        UnitData = unitData,
+        UiForm = uiForm,
         Release = release,
         ReleaseEarly = releaseEarly,
         Reconnect = reconnect,

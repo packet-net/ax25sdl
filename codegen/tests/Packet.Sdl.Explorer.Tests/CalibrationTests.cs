@@ -1384,7 +1384,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Busy_B_Outlasting_N2_Polls_Tears_The_Link_Down()
     {
-        // Unfiled (docs/explorer.md, H5): with frames outstanding, each poll
+        // ax25spec#168 (docs/explorer.md, H5): with frames outstanding, each poll
         // answered by RNR F=1 takes figc4.5 t19_rnr_received_yes_yes_no, which
         // restarts T1 without resetting RC (and re-queues the outstanding frame
         // again), so after N2 RNR answers the link goes down with DL-ERROR I.
@@ -1478,7 +1478,8 @@ public class CalibrationTests(ITestOutputHelper output)
     public void Seeded_A_Busy_Station_That_Answers_RR_Is_Caught()
     {
         // The seeded fixture answers a poll with RR on Enquiry_Response's busy
-        // path (one of ax25spec#94's calibration mutations): busy B claims to
+        // path (the answer side; #94's gate names Transmit_Enquiry, see
+        // Seeded_A_Busy_Station_That_Polls_With_RR_Is_Caught): busy B claims to
         // be ready. busy-b on the real tables is clean.
         var result = Run(Busy(FlowControlAt.B, 2, 0) with { TablesDir = Fixtures.BusySaysRrDir });
         result.Outcome.Should().Be(Outcome.Violation);
@@ -1486,6 +1487,30 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation.Station.Should().Be(Station.B);
         result.Trace[^1].Transition.Should().Be("t21_rr_received_yes");
         result.CounterexampleLength.Should().Be(4);
+    }
+
+    [Fact]
+    public void Busy_A_Polls_With_RNR_When_Its_Frame_Is_Lost()
+    {
+        // A goes busy with a0 out, a0 is lost, and A's T1 expires while it is
+        // busy: Transmit_Enquiry's busy path polls with RNR command P=1.
+        var result = Run(Busy(FlowControlAt.A, 1, 0) with { Budget = 1, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(222);
+    }
+
+    [Fact]
+    public void Seeded_A_Busy_Station_That_Polls_With_RR_Is_Caught()
+    {
+        // ax25spec#94's gate mutation: the seeded fixture sends RR Command on
+        // Transmit_Enquiry's busy path, so busy A's T1 poll claims it is ready.
+        // busy-a-enq on the real tables is clean.
+        var result = Run(Busy(FlowControlAt.A, 1, 0) with { Budget = 1, Faults = FaultKinds.Drop, TablesDir = Fixtures.EnquirySaysRrDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[^1].Transition.Should().Be("t12_t1_expiry");
+        result.CounterexampleLength.Should().Be(5);
     }
 
     [Fact]
@@ -1598,5 +1623,209 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[3].Transition.Should().Be("t07_dl_connect_request");
         result.Trace[3].SummaryA.Should().StartWith("TimerRecovery");
         result.StatesExplored.Should().Be(45);
+    }
+    // ─── Coverage batch 5: UI frames (ExplorerOptions.UnitData) ─────────
+
+    private static ExplorerOptions Ui(FlowControlAt at, UiForm form = UiForm.Plain) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, FramesAb = 0, UnitData = at, UiForm = form,
+    };
+
+    [Theory]
+    [InlineData("connected", 1, 0, 51, "Connected/t04_dl_unit_data_request", "Connected/t18_ui_received_no")]
+    [InlineData("tr", 1, 1, 214, "TimerRecovery/t04_dl_unit_data_request", "TimerRecovery/t16_ui_received_no")]
+    public void UI_Datagrams_On_A_Live_Link_Are_Delivered(string name, int ab, int budget, int states, string send, string receive)
+    {
+        _ = name;
+        var result = Run(Ui(FlowControlAt.Both) with { FramesAb = ab, Budget = budget, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(new[] { send, receive });
+    }
+
+    [Fact]
+    public void UI_Datagrams_Around_A_Cold_Connect_Are_Delivered()
+    {
+        // B's datagram from Disconnected reaches A in AwaitingConnection; A's
+        // from AwaitingConnection queues behind its SABM, so it reaches B in
+        // Connected.
+        var result = Run(Ui(FlowControlAt.Both) with { Seed = SeedKind.Disconnected });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(27);
+        result.FiredTransitions.Should().Contain(new[]
+        {
+            "Disconnected/t02_dl_unit_data_request", "AwaitingConnection/t08_dl_unit_data_request", "AwaitingConnection/t12_ui_received_no",
+        });
+    }
+
+    [Fact]
+    public void UI_Poll_Answered_With_DM_Tears_Down_A_Link_That_Has_Just_Come_Up()
+    {
+        // ax25spec#154 (the tables take 4.3.3.6's reading: a UI poll is
+        // answered with DM in the disconnected state). B's UI poll reaches A
+        // while A awaits its UA; figc4.2 answers DM F=1; by the time the DM
+        // arrives B has accepted A's SABM, and the DM tears B down.
+        var result = Run(Ui(FlowControlAt.Both, UiForm.Poll) with { Seed = SeedKind.Disconnected });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[2].Transition.Should().Be("t12_ui_received_yes");
+        result.Trace[^1].Transition.Should().Be("t20_dm_received");
+        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.Trace[^1].SummaryB.Should().StartWith("Disconnected");
+        result.CounterexampleLength.Should().Be(8);
+    }
+
+    [Theory]
+    [InlineData(UiForm.Plain, "t02_dl_unit_data_request", "t10_ui_received_no")]
+    [InlineData(UiForm.Poll, Stepper.UiPollId, "t10_ui_received_yes")]
+    public void UI_In_Awaiting_V22_Connection_Is_Answered_The_Wrong_Way_Round(UiForm form, string send, string receive)
+    {
+        // ax25spec#170: figc4.6's UI column draws "P == 1?" with Yes going
+        // straight to the next state and No to DM (F = 1), the reverse of
+        // figc4.2 and of the July 1998 edition. A UI with P = 0 draws a DM; a
+        // UI poll draws nothing.
+        var result = Run(Ui(FlowControlAt.B, form) with { Seed = SeedKind.AwaitingV22Connection });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[0].Transition.Should().Be(send);
+        result.Trace[1].Transition.Should().Be(receive);
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void UI_In_Awaiting_V22_Connection_Without_The_Check_Tears_Down_The_Peer()
+    {
+        // The figc4.6 swap with the UnitData check off: B's plain UI draws
+        // DM F=1, which reaches B after it accepted the SABME, and B goes
+        // down while A comes up.
+        var result = Run(Ui(FlowControlAt.B) with { Seed = SeedKind.AwaitingV22Connection, Invariants = Invariants.Default & ~Invariants.UnitData });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t10_ui_received_no");
+        result.Trace[^1].Transition.Should().Be("t20_dm_received");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void UI_Sent_From_Awaiting_V22_Connection_Is_Clean()
+    {
+        var result = Run(Ui(FlowControlAt.A) with { Seed = SeedKind.AwaitingV22Connection });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(8);
+        result.FiredTransitions.Should().Contain("AwaitingV22Connection/t03_dl_unit_data_request");
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, FlowControlAt.A, 4, "Connected/t18_ui_received_yes")]
+    [InlineData(1, 1, 1, FlowControlAt.Both, 2865, "TimerRecovery/t16_ui_received_yes")]
+    public void UI_Polls_On_A_Live_Link_Are_Answered(int ab, int ba, int budget, FlowControlAt at, int states, string arm)
+    {
+        var result = Run(Ui(at, UiForm.Poll) with { FramesAb = ab, FramesBa = ba, Budget = budget, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void UI_Poll_To_A_Busy_Station_Is_Answered_With_RR()
+    {
+        // ax25spec#171: Enquiry_Response's head decision (added in the 2017
+        // redraw) sends a UI poll, whose frame is neither RR, RNR nor I, down
+        // the No branch, which sends RR without testing own receiver busy;
+        // the July 1998 edition tested it first. 4.3.3.6 says RR "or RNR, if
+        // appropriate" (ax25spec#154).
+        var result = Run(Ui(FlowControlAt.A, UiForm.Poll) with { LocalBusy = FlowControlAt.B });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[2].Transition.Should().Be("t18_ui_received_yes");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData(UiForm.Response, 9)]
+    [InlineData(UiForm.Oversize, 9)]
+    public void UI_Responses_And_Oversize_UI_Are_Refused_With_DL_ERROR(UiForm form, int states)
+    {
+        var result = Run(Ui(FlowControlAt.Both, form));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+    }
+
+    [Theory]
+    [InlineData(UiForm.Plain, 202, "AwaitingRelease/t05_dl_unit_data_request", "AwaitingRelease/t14_ui_received_no")]
+    [InlineData(UiForm.Poll, 512, "Disconnected/t11_ui_received_yes", "AwaitingRelease/t14_ui_received_yes")]
+    public void UI_Around_A_Release_Is_Clean(UiForm form, int states, string arm1, string arm2)
+    {
+        var result = Run(Ui(FlowControlAt.Both, form) with { FramesAb = 1, Release = ReleaseBy.A });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(new[] { arm1, arm2 });
+    }
+
+    [Fact]
+    public void Seeded_A_Swallowed_UI_Is_Caught()
+    {
+        var result = Run(Ui(FlowControlAt.Both) with { FramesAb = 1, TablesDir = Fixtures.UiSwallowedDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t18_ui_received_no");
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Seeded_A_UI_Never_Sent_Is_Not_At_Rest()
+    {
+        var result = Run(Ui(FlowControlAt.Both) with { FramesAb = 1, TablesDir = Fixtures.UiUnsentDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace.Should().Contain(r => r.Transition == "t04_dl_unit_data_request" && r.Effects.Count == 0);
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void Seeded_An_Unanswered_UI_Poll_Is_Caught()
+    {
+        var result = Run(Ui(FlowControlAt.A, UiForm.Poll) with { TablesDir = Fixtures.UiPollUnansweredDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[1].Transition.Should().Be("t18_ui_received_yes");
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Seeded_A_Delivered_UI_Response_Is_Caught()
+    {
+        var result = Run(Ui(FlowControlAt.Both, UiForm.Response) with { TablesDir = Fixtures.UiResponseDeliveredDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.B);
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Seeded_A_UI_Falling_To_A_Catch_All_Is_Caught()
+    {
+        // The seeded fixture deletes Timer Recovery's UI arms, so B's UI
+        // reaching A there falls to the lower-layer catch-all and is never
+        // delivered. The check keys on the frame, not on the event.
+        var result = Run(Ui(FlowControlAt.Both) with { FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, TablesDir = Fixtures.UiArmDeletedDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.UnitData);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[^1].Transition.Should().Be("t25_all_other_primitives__from_lower_layer");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void UI_Options_Need_The_Table_Driven_Peer_And_A_Sending_Station()
+    {
+        var a = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, UiForm = UiForm.Poll });
+        a.Should().Throw<ArgumentException>();
+        var b = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { UnitData = FlowControlAt.A });
+        b.Should().Throw<ArgumentException>();
     }
 }

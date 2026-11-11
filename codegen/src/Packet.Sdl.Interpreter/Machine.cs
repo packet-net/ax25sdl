@@ -596,8 +596,14 @@ public sealed class DataLinkMachine
         switch (action.Kind)
         {
             case "signal_upper":
-                _effects.Add(new UpperEffect(action.Verb,
-                    string.Equals(action.Verb, "DL_DATA_indication", StringComparison.Ordinal) ? _deliverData : null));
+                // DL_DATA_indication carries the delivered frame's label;
+                // DL_UNIT_DATA_indication the received UI frame's.
+                _effects.Add(new UpperEffect(action.Verb, action.Verb switch
+                {
+                    "DL_DATA_indication" => _deliverData,
+                    "DL_UNIT_DATA_indication" => _event.Data,
+                    _ => null,
+                }));
                 return;
             case "signal_lower":
                 ApplySignalLower(action.Verb);
@@ -639,7 +645,8 @@ public sealed class DataLinkMachine
             case "SABME": EmitU("SABME", command: true, PendingPBit(), expedited: false); return;
             case "SABME (P = 1)": EmitU("SABME", command: true, pf: true, expedited: false); return;
             case "DISC (P = 1)": EmitU("DISC", command: true, pf: true, expedited: false); return;
-            case "UI Command": EmitU("UI", command: true, PendingPBit(), expedited: false); return;
+            // The UI frame carries the DL-UNIT-DATA Request's payload label.
+            case "UI Command": _effects.Add(new FrameEffect("UI", Command: true, PendingPBit(), Nr: null, Ns: null, Expedited: false, Data: _event.Data)); return;
             case "XID_command": EmitU("XID", command: true, PendingPBit(), expedited: false); return;
 
             case "I Command":

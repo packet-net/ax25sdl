@@ -145,9 +145,35 @@ public enum Invariants
     /// is ever set on today's tables.
     /// </summary>
     BusyIndication = 8192,
+    /// <summary>
+    /// A UI frame reaching a station is handled as UI Check and section
+    /// 4.3.3.6 say (only checked with <see cref="ExplorerOptions.UnitData"/>,
+    /// the only source of UI frames): a UI command whose information field
+    /// passes the N1 check is delivered upward exactly once
+    /// (DL_UNIT_DATA_indication with its label) and nothing else is; a UI
+    /// response is not delivered and draws DL-ERROR (Q); a UI command that
+    /// fails the N1 check is not delivered and draws DL-ERROR (K). A UI
+    /// command with P = 1 is answered by exactly one response with F = 1: DM
+    /// outside the information transfer state, RR or RNR in it (Connected,
+    /// TimerRecovery); a UI command with P = 0 is answered by nothing.
+    /// </summary>
+    UnitData = 16384,
 
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication | UnitData,
+}
+
+/// <summary>The form of a UI datagram on the air (<see cref="ExplorerOptions.UiForm"/>).</summary>
+public enum UiForm
+{
+    /// <summary>A UI command with P = 0, through the sender's DL_UNIT_DATA_request arm.</summary>
+    Plain,
+    /// <summary>A UI command with P = 1, put on the air by the harness.</summary>
+    Poll,
+    /// <summary>A UI response with F = 0, put on the air by the harness.</summary>
+    Response,
+    /// <summary>A UI command with P = 0 through the sender's arm, whose information field fails the receiver's N1 check.</summary>
+    Oversize,
 }
 
 /// <summary>One exploration scenario. Bounds are deliberately small; see docs/explorer.md.</summary>
@@ -302,6 +328,32 @@ public sealed record ExplorerOptions
     /// by default.
     /// </summary>
     public bool T3 { get; init; }
+
+    /// <summary>
+    /// The stations whose layer 3 sends one UI datagram (labelled
+    /// <c>ua0</c> at A, <c>ub0</c> at B) with DL_UNIT_DATA_request, once, in
+    /// any state: every Data Link page has an arm for it. The move is a
+    /// layer-3 decision, not work in flight, so it does not hold back T1.
+    /// UI is unacknowledged, so a datagram the channel drops is honestly
+    /// lost; quiescence asks only that every datagram was sent and then
+    /// either reached its peer or was dropped, and the per-step
+    /// <see cref="Invariants.UnitData"/> check judges what the peer did with
+    /// it. Table-driven peer only. Off by default.
+    /// </summary>
+    public FlowControlAt UnitData { get; init; } = FlowControlAt.None;
+
+    /// <summary>
+    /// With <see cref="UnitData"/>, the form the datagram takes on the air.
+    /// <see cref="UiForm.Plain"/> and <see cref="UiForm.Oversize"/> go through the
+    /// sender's DL_UNIT_DATA_request arm (UI command, P = 0); a long one
+    /// fails the receiver's N1 check. <see cref="UiForm.Poll"/> (UI command
+    /// with P = 1) and <see cref="UiForm.Response"/> (UI response, F = 0) are
+    /// put on the air by the harness, as from another implementation: layer
+    /// 3 cannot ask for either (DL-UNIT-DATA Request carries no P bit and
+    /// the figures only send UI commands), and no table row runs at the
+    /// sender.
+    /// </summary>
+    public UiForm UiForm { get; init; } = UiForm.Plain;
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase

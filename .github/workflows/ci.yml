@@ -300,8 +300,15 @@ jobs:
           fi
           echo "TLA2TOOLS_JAR=$jar" >> "$GITHUB_ENV"
           java -version
+      # Four rows at a time on a runner with 8 or more cores, two otherwise:
+      # busy-both-trq alone takes about 4 minutes of TLC on an 8-core runner.
       - name: run the calibration suite, explorer against TLC
-        run: dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel 2 --heap 1g
+        run: |
+          set -euo pipefail
+          cores=$(nproc)
+          parallel=$(( cores >= 8 ? 4 : 2 ))
+          echo "runner has $cores cores: --parallel $parallel"
+          dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g
 
   rust-drift:
     name: codegen drift — Rust + cargo build/test/fmt

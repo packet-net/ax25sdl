@@ -37,6 +37,8 @@ public enum MoveKind
     BusyOff,
     /// <summary>T3_expiry at the station (<see cref="ExplorerOptions.T3"/>; quiescent-timeout rule, T1 not running).</summary>
     T3Expiry,
+    /// <summary>The station's layer 3 sends its UI datagram (<see cref="ExplorerOptions.UnitData"/>), in the form <see cref="ExplorerOptions.UiForm"/> names.</summary>
+    UnitData,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
@@ -124,6 +126,10 @@ public sealed class Stepper
             throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
         if (_o.LongBusy && _o.LocalBusy == FlowControlAt.None)
             throw new ArgumentException("a long busy period needs a busy station (--local-busy)", nameof(options));
+        if (_o.UnitData != FlowControlAt.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("UI datagrams are for the table-driven peer only (the v2.0 stub ignores UI)", nameof(options));
+        if (_o.UiForm != UiForm.Plain && _o.UnitData == FlowControlAt.None)
+            throw new ArgumentException("a UI form needs a station that sends UI (--unit-data)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -228,6 +234,7 @@ public sealed class Stepper
         // (Reconnect) is never at rest.
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
         if (!ReportsMatch(s)) return false;
+        if (!UnitDataAccounted(s)) return false;
         if (_o.AcceptGiveUp)
         {
             // The give-up rule: no rest counts after an unjustified give-up,
@@ -366,6 +373,25 @@ public sealed class Stepper
         _ => false,
     };
 
+    private bool SendsUnitData(Station station) => _o.UnitData switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.UnitData"/>, at rest every UI datagram
+    /// has been sent and then either reached its peer or was dropped by the
+    /// channel. UI is unacknowledged, so a dropped datagram is honestly lost;
+    /// one that never left its station, or is still on the air, is not
+    /// accounted for. What the peer did with one that arrived is the per-step
+    /// <see cref="Invariants.UnitData"/> check's business.
+    /// </summary>
+    private bool UnitDataAccounted(SystemState s) =>
+        (!SendsUnitData(Station.A) || (s.UiSentA && s.UiDoneA)) && (!SendsUnitData(Station.B) || (s.UiSentB && s.UiDoneB));
+
     private bool QuiescentState(string state) =>
         state == "Connected" || (_o.TimerRecoveryIsQuiescent && state == "TimerRecovery");
 
@@ -447,6 +473,10 @@ public sealed class Stepper
                 moves.Add(new Move(MoveKind.BusyOn, station));
             if (BusyOffReady(s, station))
                 moves.Add(new Move(MoveKind.BusyOff, station));
+
+            // Layer 3 sends its UI datagram once, in any state.
+            if (SendsUnitData(station) && !s.UiSent(station))
+                moves.Add(new Move(MoveKind.UnitData, station));
         }
 
         // Quiescent-timeout abstraction: a timer fires only once everything in
@@ -509,14 +539,18 @@ public sealed class Stepper
     /// Every T1 expiry in Timer Recovery costs a retry (figc4.5 t21 counts RC
     /// up, and an RNR answer does not reset it), so while the station is busy
     /// its peer's T1 does not fire in Timer Recovery once RC has reached
-    /// N2 - 1.
+    /// N2 - 1. Only while the busy station is in a data state (Connected or
+    /// TimerRecovery): own receiver busy can stay set after it leaves them,
+    /// and then the leave move can never fire, so a hold there would last for
+    /// ever.
     /// </summary>
     private bool BusyHoldsT1(SystemState s, Station station)
     {
         if (_o.LocalBusy == FlowControlAt.None || _o.LongBusy) return false;
         var peer = SystemState.Peer(station);
         var m = s.Machine(station);
-        return LocalBusies(peer) && s.Machine(peer).OwnReceiverBusy && m.State == "TimerRecovery" && m.Rc >= _o.N2 - 1;
+        var busy = s.Machine(peer);
+        return LocalBusies(peer) && busy.OwnReceiverBusy && IsDataState(busy.State) && m.State == "TimerRecovery" && m.Rc >= _o.N2 - 1;
     }
 
     private bool BusyOnReady(SystemState s, Station station) =>
@@ -623,6 +657,16 @@ public sealed class Stepper
                     $"station {move.Station} sent an I frame although its peer's RNR has not been cleared (section 6.4.9: a station that receives RNR stops transmitting I frames until the busy condition is cleared)"),
             };
         }
+        // A UI datagram is accounted for once it reaches its peer or the
+        // channel drops it (UnitData); the only UI frames are datagrams.
+        if (_o.UnitData != FlowControlAt.None && move.Kind is MoveKind.Deliver or MoveKind.Duplicate or MoveKind.Drop
+            && s.Incoming(move.Station)[0].Type == "UI")
+        {
+            outcome = outcome with
+            {
+                Next = move.Station == Station.A ? outcome.Next with { UiDoneB = true } : outcome.Next with { UiDoneA = true },
+            };
+        }
         // The give-up rule: a frame reaching a station after its peer gave up
         // was sent at or after the give-up (T1 only fires with both channels
         // empty), so the station has heard it.
@@ -658,7 +702,7 @@ public sealed class Stepper
                 if (station == Station.B && s.StubPeer is not null)
                     return InjectStub(s, frame, $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, number);
                 return Inject(s, station, FrameInput(s.Machine(station), frame, station),
-                    $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, clearOwed: false, number);
+                    $"receives {frame.Render()} from {peer}", incoming.Skip(1).ToList(), s.Budget, clearOwed: false, number, frame.Type);
             }
             case MoveKind.Duplicate:
             {
@@ -666,7 +710,7 @@ public sealed class Stepper
                 var action = $"receives {frame.Render()} from {peer} (channel fault: DUPLICATE, a copy stays at the head; budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})";
                 if (station == Station.B && s.StubPeer is not null)
                     return InjectStub(s, frame, action, incoming, s.Budget - 1, number);
-                return Inject(s, station, FrameInput(s.Machine(station), frame, station), action, incoming, s.Budget - 1, clearOwed: false, number);
+                return Inject(s, station, FrameInput(s.Machine(station), frame, station), action, incoming, s.Budget - 1, clearOwed: false, number, frame.Type);
             }
             case MoveKind.FlowOff:
                 return Inject(s, station, new EventInput("DL_FLOW_OFF_request"), "DL_FLOW_OFF_request (layer 3 turns flow off)", incoming, s.Budget, clearOwed: false, number);
@@ -737,6 +781,8 @@ public sealed class Stepper
             case MoveKind.BusyOn:
             case MoveKind.BusyOff:
                 return LocalBusy(s, station, move.Kind == MoveKind.BusyOn, number);
+            case MoveKind.UnitData:
+                return SendUnitData(s, station, incoming, number);
             default:
                 throw new ArgumentOutOfRangeException(nameof(move));
         }
@@ -785,6 +831,39 @@ public sealed class Stepper
         return new StepOutcome(next, record, null);
     }
 
+    /// <summary>Transition ids the harness reports for a UI datagram it puts on the air itself (not table rows).</summary>
+    public const string UiPollId = "pinned:ui_poll";
+
+    public const string UiResponseId = "pinned:ui_response";
+
+    /// <summary>The label of the station's UI datagram.</summary>
+    public static string UiLabel(Station station) => station == Station.A ? "ua0" : "ub0";
+
+    /// <summary>
+    /// The station's layer 3 sends its UI datagram (<see cref="ExplorerOptions.UnitData"/>).
+    /// A plain or long datagram goes through the page's DL_UNIT_DATA_request
+    /// arm; a poll (UI command, P = 1) or a response (UI response, F = 0) is
+    /// put on the air by the harness, since layer 3 cannot ask for either.
+    /// </summary>
+    private StepOutcome SendUnitData(SystemState s, Station station, IReadOnlyList<Frame> incoming, int number)
+    {
+        var label = UiLabel(station);
+        if (_o.UiForm is UiForm.Plain or UiForm.Oversize)
+        {
+            var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_UNIT_DATA_request"), Data: label),
+                "DL_UNIT_DATA_request (layer 3 sends a UI datagram)", incoming, s.Budget, clearOwed: false, number);
+            return outcome with { Next = station == Station.A ? outcome.Next with { UiSentA = true } : outcome.Next with { UiSentB = true } };
+        }
+        var poll = _o.UiForm == UiForm.Poll;
+        var frame = new Frame("UI", Command: poll, Pf: poll, Nr: null, Ns: null, Data: label);
+        var outgoing = new List<Frame>(s.Outgoing(station)) { frame };
+        var next = station == Station.A ? s with { ToB = outgoing, UiSentA = true } : s with { ToA = outgoing, UiSentB = true };
+        var record = new StepRecord(number, station.ToString(),
+            poll ? "UI command P=1 put on the air (a UI poll)" : "UI response put on the air",
+            poll ? UiPollId : UiResponseId, new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+        return new StepOutcome(next, record, null);
+    }
+
     private EventInput? FrameInput(DataLinkMachine m, Frame frame, Station into)
     {
         var ev = FrameEvent(m, frame);
@@ -792,7 +871,8 @@ public sealed class Stepper
         var atoms = new Dictionary<string, bool>(StringComparer.Ordinal)
         {
             ["able_to_establish"] = !(_o.PeerDeclinesSabme && into == Station.B && frame.Type == "SABME"),
-            ["info_field_length_le_N1_and_content_is_octet_aligned"] = true,
+            // Only a long UI datagram fails the N1 check.
+            ["info_field_length_le_N1_and_content_is_octet_aligned"] = !(_o.UiForm == UiForm.Oversize && frame.Type == "UI"),
         };
         return new EventInput(ev, Pf: frame.Pf, Command: frame.Command, Nr: frame.Nr, Ns: frame.Ns, Data: frame.Data, Atoms: atoms);
     }
@@ -842,7 +922,7 @@ public sealed class Stepper
     /// the frame (reported as a MachineError).
     /// </summary>
     private StepOutcome Inject(SystemState s, Station station, EventInput? input, string action,
-        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number)
+        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null)
     {
         var peer = SystemState.Peer(station);
         var pre = s.Machine(station);
@@ -959,6 +1039,13 @@ public sealed class Stepper
             if (!reset) acked += Distance(pre.Va, m.Va, m.Modulo);
         }
 
+        // A UI frame's handling (UnitData): delivered or refused as UI Check
+        // says, and a poll answered as section 4.3.3.6 says. Keyed on the
+        // frame being UI, not on the event it is dispatched as, so a page
+        // that lost its UI arm (the frame falls to a catch-all) is caught.
+        if (violation is null && result is not null && frameType == "UI" && _o.UnitData != FlowControlAt.None && On(Invariants.UnitData))
+            violation = UnitDataCheck(station, pre, input!, _o.UiForm == UiForm.Oversize, result.Effects);
+
         // Layer-3 flow control bookkeeping and the busy-condition check
         // (§6.4.10: entering the busy condition is what DL-FLOW-OFF is for,
         // and the figure's own DL-FLOW-ON arm only acts when busy is set).
@@ -1074,6 +1161,57 @@ public sealed class Stepper
             return new Violation(Invariants.SequenceSanity, station,
                 $"station {station}: SREJ exception count {Inv(m.SrejectException)} exceeds the window k={Inv(m.K)}: more selective rejects outstanding than there can be gaps (state {m.State})");
         return null;
+    }
+
+    /// <summary>
+    /// The UnitData check on one received UI frame. Delivery (UI Check,
+    /// figc4.7): a command whose information field passes the N1 check is
+    /// delivered upward once, with its label; a
+    /// response is not delivered and draws DL-ERROR (Q); a command that fails
+    /// the N1 check is not delivered and draws DL-ERROR (K). The answer
+    /// (section 4.3.3.6, the reading the tables take on ax25spec#154): a
+    /// command with P = 1 is answered by exactly one frame, a response with
+    /// F = 1, DM outside the information transfer state and RR or RNR in it;
+    /// a command with P = 0 by none. What a station sends on a UI response is
+    /// not judged. Whether the information field is too long is the
+    /// scenario's (<see cref="UiForm.Oversize"/>), not read back from the
+    /// atom the harness supplied, so a harness that failed to supply it is
+    /// caught too; and the label it must carry is the peer's datagram's, not
+    /// read back from the frame, so a frame that lost its label is caught.
+    /// </summary>
+    private static Violation? UnitDataCheck(Station station, DataLinkMachine pre, EventInput input, bool longInfo, IReadOnlyList<Effect> effects)
+    {
+        var command = input.Command ?? true;
+        var poll = command && input.Pf == true;
+        var label = UiLabel(SystemState.Peer(station));
+        var indications = effects.OfType<UpperEffect>().Where(e => e.Primitive == "DL_UNIT_DATA_indication").ToList();
+        var errors = effects.OfType<UpperEffect>().Where(e => e.Primitive.StartsWith("DL-ERROR", StringComparison.Ordinal)).Select(e => e.Primitive).ToList();
+        var frames = effects.OfType<FrameEffect>().ToList();
+        var what = $"station {station} in {pre.State} received UI {(command ? "cmd P=" : "rsp F=")}{(input.Pf == true ? "1" : "0")} [{label}]{(longInfo ? " (information field too long)" : "")}";
+        if (command && !longInfo)
+        {
+            if (indications.Count != 1 || indications[0].Detail != label)
+                return new Violation(Invariants.UnitData, station,
+                    $"{what} but delivered {(indications.Count == 0 ? "nothing" : string.Join(", ", indications.Select(i => i.Detail ?? "(no label)")))} upward: a UI command that passes UI Check is delivered once (DL-UNIT-DATA Indication)");
+        }
+        else
+        {
+            var expected = command ? "DL-ERROR Indication (K)" : "DL-ERROR Indication (Q)";
+            if (indications.Count != 0 || !errors.Contains(expected))
+                return new Violation(Invariants.UnitData, station,
+                    $"{what} and {(indications.Count != 0 ? "delivered it upward" : "did not report " + expected)}: UI Check refuses it with {expected}");
+        }
+        if (!command) return null;
+        if (!poll)
+        {
+            return frames.Count == 0 ? null : new Violation(Invariants.UnitData, station,
+                $"{what} and sent {string.Join(", ", frames.Select(f => Frame.FromEffect(f).Render()))}: a UI command with P = 0 asks for no response");
+        }
+        var dataState = IsDataState(pre.State);
+        var answered = frames.Count == 1 && !frames[0].Command && frames[0].Pf
+            && (dataState ? frames[0].Frame is "RR" or "RNR" : frames[0].Frame == "DM");
+        return answered ? null : new Violation(Invariants.UnitData, station,
+            $"{what} and sent {(frames.Count == 0 ? "nothing" : string.Join(", ", frames.Select(f => Frame.FromEffect(f).Render())))}: section 4.3.3.6 answers a UI command with P = 1 with {(dataState ? "RR or RNR" : "DM")} F=1");
     }
 
     /// <summary>A station whose own receiver is busy sends RNR, not RR, REJ or SREJ (§6.4.10).</summary>

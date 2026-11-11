@@ -29,6 +29,18 @@ public enum TableSetKind
     BusyDelivers,
     /// <summary>A seeded-defect fixture (fixtures/tables-busy-says-rr): a busy station answers a poll with RR.</summary>
     BusySaysRr,
+    /// <summary>A seeded-defect fixture (fixtures/tables-enquiry-says-rr): a busy station's T1 poll is RR, not RNR (Transmit_Enquiry).</summary>
+    EnquirySaysRr,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-swallowed): Connected swallows a UI command with P = 0.</summary>
+    UiSwallowed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-unsent): DL-UNIT-DATA Request in Connected sends nothing.</summary>
+    UiUnsent,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-poll-unanswered): Connected does not answer a UI poll.</summary>
+    UiPollUnanswered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-response-delivered): UI Check delivers a UI response.</summary>
+    UiResponseDelivered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-ui-arm-deleted): Timer Recovery has no UI arm, so a UI falls to its lower-layer catch-all.</summary>
+    UiArmDeleted,
     /// <summary>A seeded-defect fixture (fixtures/tables-t3-dead): Connected has no T3 expiry arm.</summary>
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
@@ -421,7 +433,7 @@ public static class Scenarios
             FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.Both, TimerRecoveryIsQuiescent = true,
         }, "clean");
         Add("busy-b-b1", "#91 (after a busy period)", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B, Budget = 1 }, "Deadlock, 21");
-        Add("busy-b-long", "unfiled (RNR answers count RC)", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B, LongBusy = true }, "Deadlock, 18");
+        Add("busy-b-long", "ax25spec#168", TableSetKind.Current, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B, LongBusy = true }, "Deadlock, 18");
         Add("busy-b-ro", "ax25spec#95 (H4), H2", TableSetKind.Current, o => o with
         {
             FramesAb = 2, LocalBusy = FlowControlAt.B, Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop,
@@ -443,6 +455,18 @@ public static class Scenarios
         Add("seeded-rnr-ignored", "seeded (peer-busy hold)", TableSetKind.RnrIgnored, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "PeerBusyHold at A, 3");
         Add("seeded-busy-delivers", "seeded (busy delivery)", TableSetKind.BusyDelivers, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "FlowOffDelivery at B, 3");
         Add("seeded-busy-says-rr", "seeded (busy indication)", TableSetKind.BusySaysRr, o => o with { FramesAb = 2, LocalBusy = FlowControlAt.B }, "BusyIndication at B, 4");
+        // ax25spec#94's gate mutation: a busy station's own T1 poll
+        // (Transmit_Enquiry) is RR instead of RNR. busy-a-enq is the cheap
+        // scenario that reaches that path: A goes busy with a0 out and a0 is
+        // lost, so A's T1 expires while it is busy.
+        Add("busy-a-enq", "peer-busy control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, LocalBusy = FlowControlAt.A, Budget = 1, Faults = FaultKinds.Drop,
+        }, "clean");
+        Add("seeded-enquiry-says-rr", "seeded (busy indication, Transmit_Enquiry)", TableSetKind.EnquirySaysRr, o => o with
+        {
+            FramesAb = 1, LocalBusy = FlowControlAt.A, Budget = 1, Faults = FaultKinds.Drop,
+        }, "BusyIndication at A, 5");
 
         // Coverage batch 4: T3 (ExplorerOptions.T3). The keepalive fires only
         // when nothing is in flight and no T1 runs at either station.
@@ -467,11 +491,66 @@ public static class Scenarios
         Add("seeded-t3-dead", "seeded (give-up settles with T3)", TableSetKind.T3Dead, o => o with
         {
             FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true, T3 = true,
-        }, "Deadlock, 4");
+        }, "Deadlock, 5");
         Add("seeded-no-keepalive", "seeded (keepalive at rest)", TableSetKind.NoKeepalive, o => o with
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, T3 = true,
         }, "Deadlock, 2");
+
+        // Coverage batch 5: UI frames (ExplorerOptions.UnitData). Each named
+        // station's layer 3 sends one UI datagram, once, in any state; the
+        // per-step UnitData check judges what the receiver does with it, and
+        // at rest every datagram was sent and then arrived or was dropped.
+        Add("ui-connected", "UI control", TableSetKind.Current, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both }, "clean");
+        Add("ui-tr", "UI control", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, UnitData = FlowControlAt.Both, Budget = 1, Faults = FaultKinds.Drop,
+        }, "clean");
+        Add("ui-cold", "UI control", TableSetKind.Current, o => o with { Seed = SeedKind.Disconnected, FramesAb = 0, UnitData = FlowControlAt.Both }, "clean");
+        Add("ui-cold-poll", "ax25spec#154", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll,
+        }, "Deadlock, 8");
+        Add("ui-v22", "ax25spec#170", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B,
+        }, "UnitData at A, 2");
+        Add("ui-v22-poll", "ax25spec#170", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, UiForm = UiForm.Poll,
+        }, "UnitData at A, 2");
+        Add("ui-v22-check-off", "ax25spec#170", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, Invariants = Default & ~Invariants.UnitData,
+        }, "Deadlock, 5");
+        Add("ui-v22-a", "UI control", TableSetKind.Current, o => o with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.A }, "clean");
+        Add("ui-poll", "UI control (ax25spec#154 reading)", TableSetKind.Current, o => o with { FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll }, "clean");
+        Add("ui-poll-tr", "UI control (ax25spec#154 reading)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 1, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll, Budget = 1, Faults = FaultKinds.Drop,
+        }, "clean");
+        Add("ui-poll-busy", "ax25spec#171 (ax25spec#154 reading)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll, LocalBusy = FlowControlAt.B,
+        }, "BusyIndication at B, 3");
+        Add("ui-response", "UI control", TableSetKind.Current, o => o with { FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Response }, "clean");
+        Add("ui-long", "UI control", TableSetKind.Current, o => o with { FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Oversize }, "clean");
+        Add("ui-release", "UI control", TableSetKind.Current, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both, Release = ReleaseBy.A }, "clean");
+        Add("ui-release-poll", "UI control (ax25spec#154 reading)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, UnitData = FlowControlAt.Both, Release = ReleaseBy.A, UiForm = UiForm.Poll,
+        }, "clean");
+        Add("seeded-ui-swallowed", "seeded (UI delivered)", TableSetKind.UiSwallowed, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both }, "UnitData at B, 2");
+        Add("seeded-ui-unsent", "seeded (UI accounted at rest)", TableSetKind.UiUnsent, o => o with { FramesAb = 1, UnitData = FlowControlAt.Both }, "Deadlock, 6");
+        Add("seeded-ui-poll-unanswered", "seeded (UI poll answered)", TableSetKind.UiPollUnanswered, o => o with { FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll }, "UnitData at B, 2");
+        Add("seeded-ui-response-delivered", "seeded (UI response refused)", TableSetKind.UiResponseDelivered, o => o with
+        {
+            FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Response,
+        }, "UnitData at B, 2");
+        Add("seeded-ui-arm-deleted", "seeded (UI handled on a catch-all)", TableSetKind.UiArmDeleted, o => o with
+        {
+            FramesAb = 1, UnitData = FlowControlAt.Both, Budget = 1, Faults = FaultKinds.Drop,
+        }, "UnitData at A, 5");
 
         return list;
     }

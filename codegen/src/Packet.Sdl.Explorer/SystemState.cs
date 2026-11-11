@@ -117,6 +117,16 @@ public sealed record SystemState
 
     public bool BusyUsedB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.UnitData"/>: station A's layer 3 has sent its UI datagram (once per scenario).</summary>
+    public bool UiSentA { get; init; }
+
+    public bool UiSentB { get; init; }
+
+    /// <summary>With <see cref="ExplorerOptions.UnitData"/>: station A's UI datagram is accounted for: it reached B (whatever B then did with it, which the per-step <see cref="Invariants.UnitData"/> check judges) or the channel dropped it.</summary>
+    public bool UiDoneA { get; init; }
+
+    public bool UiDoneB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -149,6 +159,10 @@ public sealed record SystemState
     public bool T3Loop(Station s) => s == Station.A ? T3LoopA : T3LoopB;
 
     public bool HeardBusy(Station s) => s == Station.A ? HeardBusyA : HeardBusyB;
+
+    public bool UiSent(Station s) => s == Station.A ? UiSentA : UiSentB;
+
+    public bool UiDone(Station s) => s == Station.A ? UiDoneA : UiDoneB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -188,7 +202,8 @@ public sealed record SystemState
           .Append("|u").Append(Inv(ReportA)).Append(Inv(ReportB))
           .Append("|y").Append(BusyUsedA ? '1' : '0').Append(BusyUsedB ? '1' : '0')
           .Append("|t").Append(T3LoopA ? '1' : '0').Append(T3LoopB ? '1' : '0')
-          .Append(HeardBusyA ? '1' : '0').Append(HeardBusyB ? '1' : '0');
+          .Append(HeardBusyA ? '1' : '0').Append(HeardBusyB ? '1' : '0')
+          .Append("|v").Append(UiSentA ? '1' : '0').Append(UiSentB ? '1' : '0').Append(UiDoneA ? '1' : '0').Append(UiDoneB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }
