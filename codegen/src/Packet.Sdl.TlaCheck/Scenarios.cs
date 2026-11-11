@@ -509,15 +509,15 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll,
         }, "Deadlock, 8");
-        Add("ui-v22", "unfiled (figc4.6 UI P swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B,
         }, "UnitData at A, 2");
-        Add("ui-v22-poll", "unfiled (figc4.6 UI P swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22-poll", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, UiForm = UiForm.Poll,
         }, "UnitData at A, 2");
-        Add("ui-v22-check-off", "unfiled (figc4.6 UI P swapped)", TableSetKind.Current, o => o with
+        Add("ui-v22-check-off", "unfiled (H6: figc4.6 UI P labels swapped)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, UnitData = FlowControlAt.B, Invariants = Default & ~Invariants.UnitData,
         }, "Deadlock, 5");
@@ -527,7 +527,7 @@ public static class Scenarios
         {
             FramesAb = 1, FramesBa = 1, UnitData = FlowControlAt.Both, UiForm = UiForm.Poll, Budget = 1, Faults = FaultKinds.Drop,
         }, "clean");
-        Add("ui-poll-busy", "unfiled (Enquiry_Response skips the busy test), ax25spec#154 reading", TableSetKind.Current, o => o with
+        Add("ui-poll-busy", "unfiled (H7: Enquiry Response skips the busy test), ax25spec#154 reading", TableSetKind.Current, o => o with
         {
             FramesAb = 0, UnitData = FlowControlAt.A, UiForm = UiForm.Poll, LocalBusy = FlowControlAt.B,
         }, "BusyIndication at B, 3");
