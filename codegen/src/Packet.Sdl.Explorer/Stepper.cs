@@ -254,16 +254,19 @@ public sealed class Stepper
     /// <summary>
     /// The give-up rule's settled state, data aside: some station gave up
     /// honestly and none without justification, each table-driven station is
-    /// Disconnected or at rest as plain quiescence has it (the v2.0 stub, with
-    /// no queue or timers, always is), nothing in flight, nothing owed.
+    /// Disconnected or at rest as plain quiescence has it and has heard
+    /// nothing from its peer since the peer gave up (the v2.0 stub, with no
+    /// queue or timers, always is), nothing in flight, nothing owed.
     /// </summary>
     private bool GiveUpSettled(SystemState s)
     {
         if (s.GaveUpA != Honest && s.GaveUpB != Honest) return false;
         if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
-        bool Settled(DataLinkMachine m) =>
-            m.State == "Disconnected" || (QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
-        return Settled(s.A) && (s.StubPeer is not null || Settled(s.B))
+        // A station still up counts only if nothing its peer sent after giving
+        // up reached it: one that received the DM and stayed up is not settled.
+        bool Settled(DataLinkMachine m, bool heard) =>
+            m.State == "Disconnected" || (!heard && QuiescentState(m.State) && m.QueueEntries.Count == 0 && m.Vs == m.Va);
+        return Settled(s.A, s.HeardGiveUpA) && (s.StubPeer is not null || Settled(s.B, s.HeardGiveUpB))
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && !s.SeizeOwedA && !s.SeizeOwedB;
     }
@@ -462,6 +465,22 @@ public sealed class Stepper
     public StepOutcome Apply(SystemState s, Move move, int number)
     {
         ArgumentNullException.ThrowIfNull(s);
+        var outcome = ApplyMove(s, move, number);
+        // The give-up rule: a frame reaching a station after its peer gave up
+        // was sent at or after the give-up (T1 only fires with both channels
+        // empty), so the station has heard it.
+        if (_o.AcceptGiveUp && move.Kind is MoveKind.Deliver or MoveKind.Duplicate && s.GaveUp(SystemState.Peer(move.Station)) != 0)
+        {
+            outcome = outcome with
+            {
+                Next = move.Station == Station.A ? outcome.Next with { HeardGiveUpA = true } : outcome.Next with { HeardGiveUpB = true },
+            };
+        }
+        return outcome;
+    }
+
+    private StepOutcome ApplyMove(SystemState s, Move move, int number)
+    {
         var station = move.Station;
         var peer = SystemState.Peer(station);
         var incoming = s.Incoming(station);

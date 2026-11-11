@@ -64,6 +64,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.Pre38 => Path.Combine(root, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38"),
     TableSetKind.AckBroken => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ack-broken"),
     TableSetKind.ReleaseStuck => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck"),
+    TableSetKind.DmIgnored => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -243,6 +244,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.Pre38 => "pre-38",
     TableSetKind.AckBroken => "seeded ack-broken",
     TableSetKind.ReleaseStuck => "seeded release-stuck",
+    TableSetKind.DmIgnored => "seeded dm-ignored",
     _ => "seeded livelock",
 };
 

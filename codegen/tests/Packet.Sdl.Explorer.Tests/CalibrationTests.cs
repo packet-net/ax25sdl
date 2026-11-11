@@ -785,6 +785,31 @@ public class CalibrationTests(ITestOutputHelper output)
     // ─── Coverage batch 2: the give-up rule (ExplorerOptions.AcceptGiveUp) ──
 
     [Fact]
+    public void GiveUp_Seeded_A_Peer_That_Ignores_The_Dm_Is_Not_Settled()
+    {
+        // The seeded fixture ignores a DM in Connected. A gives up honestly
+        // from TimerRecovery and its DM reaches B, which stays up: B heard the
+        // give-up, so it is not settled, and the run is a plain deadlock. On
+        // the real tables B disconnects and the same state is the give-up loss.
+        var o = new ExplorerOptions
+        {
+            TablesDir = Fixtures.DmIgnoredDir, FramesAb = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        };
+        var result = Run(o);
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[4].Transition.Should().Be("t21_t1_expiry_yes_no");
+        result.Trace[5].Actor.Should().Be("B");
+        result.Trace[5].Transition.Should().Be("t20_dm_received", "the seeded arm: the DM is ignored");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(6);
+
+        var real = Run(o with { TablesDir = Fixtures.CurrentDir });
+        real.Violation!.Kind.Should().Be(Invariants.GiveUpLoss);
+        real.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
     public void GiveUp_An_Honest_Connect_Give_Up_Is_Rest_Only_With_The_Rule()
     {
         // From figc4.6 with N2 = 2 and two drops, both SABMEs are lost and A
@@ -940,7 +965,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Reorder_A_Stale_Rej_Resets_The_Link_And_The_Outstanding_Frame_Is_Lost()
     {
-        // Unfiled. A reordered REJ nr=0 arrives after the RR nr=1 that
+        // ax25spec#95 (reordering; docs/explorer.md H4). A reordered REJ nr=0 arrives after the RR nr=1 that
         // overtook it: N(r) is below V(a), figc4.4 takes it as an N(r) error
         // (DL-ERROR J) and re-establishes; B resets on the SABM (DL-ERROR F),
         // and a1, outstanding at A, is never sent again.
@@ -962,7 +987,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Reorder_A_Stale_N_r_On_An_I_Frame_Resets_The_Link_And_Both_Ends_Lose_Data()
     {
-        // Unfiled, the same family with every check on: A's I frame a0 (nr=0)
+        // ax25spec#95, the same family with every check on: A's I frame a0 (nr=0)
         // is overtaken by A's RR nr=1, so B finds N(r) below V(a), discards a0
         // and re-establishes; neither a0 nor b1 is ever delivered.
         var result = Run(new ExplorerOptions
@@ -981,7 +1006,7 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Reorder_An_I_Frame_From_Before_A_Reset_Is_Delivered_Again_After_It()
     {
-        // Unfiled. A stale RR causes an N(r) error reset (as above); a copy of
+        // ax25spec#95. A stale RR causes an N(r) error reset (as above); a copy of
         // a0 sent before the reset is reordered behind the SABM and arrives
         // after it, where N(s) = 0 = V(r) again, so B delivers a0 a second time.
         var result = Run(new ExplorerOptions

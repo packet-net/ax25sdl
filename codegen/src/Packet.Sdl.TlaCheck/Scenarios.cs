@@ -17,6 +17,8 @@ public enum TableSetKind
     Livelock,
     /// <summary>A seeded-defect fixture (fixtures/tables-release-stuck): Connected answers DISC with UA but stays Connected.</summary>
     ReleaseStuck,
+    /// <summary>A seeded-defect fixture (fixtures/tables-dm-ignored): Connected ignores a DM and stays up.</summary>
+    DmIgnored,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -238,7 +240,7 @@ public static class Scenarios
         {
             FramesAb = 3, FramesBa = 0, K = 4, N2 = 2, Budget = 3, Faults = FaultKinds.Drop, DropScope = DropScope.InteriorI, AcceptGiveUp = true,
         }, "Deadlock, 30");
-        Add("d9-n1-release", "#9", TableSetKind.Current, o => o with
+        Add("d9-n1-release", "#9, #91", TableSetKind.Current, o => o with
         {
             FramesAb = 0, FramesBa = 1, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true,
         }, "Deadlock, 11");
@@ -269,15 +271,15 @@ public static class Scenarios
         {
             FramesAb = 2, K = 2, Srej = true, Budget = 2, Faults = FaultKinds.Reorder, Invariants = Default & ~Invariants.RejectCoherence,
         }, "clean");
-        Add("ro-stale-rej", "unfiled (reorder)", TableSetKind.Current, o => o with
+        Add("ro-stale-rej", "ax25spec#95", TableSetKind.Current, o => o with
         {
             FramesAb = 2, K = 2, Budget = 3, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, "Deadlock, 11");
-        Add("ro-stale-i", "unfiled (reorder)", TableSetKind.Current, o => o with
+        Add("ro-stale-i", "ax25spec#95", TableSetKind.Current, o => o with
         {
             FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Reorder | FaultKinds.Drop,
         }, "Deadlock, 9");
-        Add("ro-reset-dup", "unfiled (reorder)", TableSetKind.Current, o => o with
+        Add("ro-reset-dup", "ax25spec#95", TableSetKind.Current, o => o with
         {
             FramesAb = 2, K = 2, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, "Delivery at B, 18");
@@ -294,6 +296,13 @@ public static class Scenarios
         // The release quiescence rule: B acknowledges A's DISC but stays
         // Connected, so the link ends with one end Disconnected and the other
         // not. Both tools must call that stuck, not released.
+        // The give-up rule's settled state: A gives up from TimerRecovery and
+        // its DM reaches B, which ignores it and stays up. A peer that heard
+        // the give-up and stayed up is not settled, in either tool.
+        Add("seeded-dm-ignored", "seeded (give-up rest)", TableSetKind.DmIgnored, o => o with
+        {
+            FramesAb = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "Deadlock");
         Add("seeded-release-stuck", "seeded (release rest)", TableSetKind.ReleaseStuck, o => o with { FramesAb = 2, Release = ReleaseBy.A }, "Deadlock");
 
         return list;

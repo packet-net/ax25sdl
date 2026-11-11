@@ -257,7 +257,7 @@ S0 ==
      off |-> [s \in Stations |-> FALSE], rounds |-> [s \in Stations |-> 0],
      up |-> [s \in Stations |-> FALSE], offered |-> [s \in Stations |-> 0],
      rel |-> [s \in Stations |-> FALSE],
-     loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0],
+     loss |-> [s \in Stations |-> 0], gave |-> [s \in Stations |-> 0], heard |-> [s \in Stations |-> FALSE],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -285,13 +285,14 @@ AtRest(st) == st = "Connected" \/ (TimerRecoveryQuiescent /\ st = "TimerRecovery
 
 \* The give-up rule's settled state, data aside (Stepper.GiveUpSettled): some
 \* station gave up honestly and none without justification, each table-driven
-\* station Disconnected or at rest as plain quiescence has it (the stub always
-\* is), nothing in flight, nothing owed.
+\* station Disconnected or at rest as plain quiescence has it and deaf to its
+\* peer since the peer gave up (the stub always is), nothing in flight, nothing
+\* owed.
 GiveUpSettled(S) ==
-    LET Settled(m) == m.st = "Disconnected" \/ (AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
+    LET Settled(m, heard) == m.st = "Disconnected" \/ (~heard /\ AtRest(m.st) /\ m.q = <<>> /\ m.vs = m.va)
     IN  /\ (S.gave["A"] = 1 \/ S.gave["B"] = 1)
         /\ S.gave["A"] # 2 /\ S.gave["B"] # 2
-        /\ Settled(S.m["A"]) /\ (StubB \/ Settled(S.m["B"]))
+        /\ Settled(S.m["A"], S.heard["A"]) /\ (StubB \/ Settled(S.m["B"], S.heard["B"]))
         /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
         /\ ~S.owed["A"] /\ ~S.owed["B"]
 
@@ -367,11 +368,15 @@ CanSubmit(s) == viol = NoViol /\ SubmitReady(sys, s)
 CanRelease(s) == viol = NoViol /\ ReleaseReady(sys, s)
 CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sys.m[s].st, "T1_expiry")
 
+\* The give-up rule: a frame reaching s after its peer gave up was sent at or
+\* after the give-up (T1 only fires with both channels empty), so s heard it.
+Heard(r, s) == [r EXCEPT !.sys.heard[s] = @ \/ (AcceptGiveUp /\ sys.gave[Other(s)] # 0)]
+
 Deliver(s) ==
     /\ CanDeliver(s)
     /\ LET f == Head(sys.ch[s])
-       IN  Take(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
-                ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), "deliver", s, f)
+       IN  Take(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), Tail(sys.ch[s]), sys.budget, FALSE)
+                      ELSE StubReceive(sys, f, Tail(sys.ch[s]), sys.budget), s), "deliver", s, f)
 
 Drop(s) ==
     /\ viol = NoViol
@@ -385,8 +390,8 @@ Dup(s) ==
     /\ viol = NoViol
     /\ sys.ch[s] # <<>> /\ sys.budget > 0 /\ "dup" \in Faults
     /\ LET f == Head(sys.ch[s])
-       IN  Take(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
-                ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), "duplicate", s, f)
+       IN  Take(Heard(IF Table(s) THEN Inject(sys, s, FrameInput(sys.m[s], f, s), sys.ch[s], sys.budget - 1, FALSE)
+                      ELSE StubReceive(sys, f, sys.ch[s], sys.budget - 1), s), "duplicate", s, f)
 
 Reorder(s) ==
     /\ viol = NoViol

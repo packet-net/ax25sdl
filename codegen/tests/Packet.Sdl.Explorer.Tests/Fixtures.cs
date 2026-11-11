@@ -20,6 +20,9 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which Connected answers DISC with UA but stays Connected (codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
     public static string ReleaseStuckDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck");
 
+    /// <summary>The TlaCheck seeded fixture in which Connected ignores a DM and stays up.</summary>
+    public static string DmIgnoredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored");
+
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);
 
     public static TableSet Tables(string dir)

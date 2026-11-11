@@ -82,6 +82,11 @@ public sealed record SystemState
 
     public int GaveUpB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.AcceptGiveUp"/>: station A has received a frame its peer sent after giving up (the DM, say), so A cannot be left up as if it never heard.</summary>
+    public bool HeardGiveUpA { get; init; }
+
+    public bool HeardGiveUpB { get; init; }
+
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
@@ -100,6 +105,8 @@ public sealed record SystemState
     public int Losses(Station s) => s == Station.A ? LossesA : LossesB;
 
     public int GaveUp(Station s) => s == Station.A ? GaveUpA : GaveUpB;
+
+    public bool HeardGiveUp(Station s) => s == Station.A ? HeardGiveUpA : HeardGiveUpB;
 
     /// <summary>Channel carrying frames INTO <paramref name="s"/>.</summary>
     public IReadOnlyList<Frame> Incoming(Station s) => s == Station.A ? ToA : ToB;
@@ -133,7 +140,8 @@ public sealed record SystemState
           .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
           .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB))
           .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0')
-          .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB));
+          .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB))
+          .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }
