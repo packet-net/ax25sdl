@@ -1,0 +1,185 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "simplex_phy",
+  "state": "TransmitterStart",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc2a.4",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_ph_expedited_data_request",
+      "from": "TransmitterStart",
+      "on": "PH_EXPEDITED_DATA_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add Frame to Priority Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_all_other_primitives__from_upper_layer",
+      "from": "TransmitterStart",
+      "on": "all_other_primitives__from_upper_layer",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Add to Normal Queue",
+          "kind": "internal_out"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_t100_expiry",
+      "from": "TransmitterStart",
+      "on": "T100_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Clear Repeater Up",
+          "kind": "processing"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_t103_expiry_yes",
+      "from": "TransmitterStart",
+      "on": "T103_expiry",
+      "guard": "repeater_up",
+      "actions": [
+        {
+          "verb": "Start T105",
+          "kind": "processing"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_t103_expiry_no",
+      "from": "TransmitterStart",
+      "on": "T103_expiry",
+      "guard": "not repeater_up",
+      "actions": [
+        {
+          "verb": "Start T104",
+          "kind": "processing"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_t104_expiry",
+      "from": "TransmitterStart",
+      "on": "T104_expiry",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Set Repeater Up",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T105",
+          "kind": "processing"
+        }
+      ],
+      "next": "TransmitterStart",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_t105_expiry_yes",
+      "from": "TransmitterStart",
+      "on": "T105_expiry",
+      "guard": "digipeating",
+      "actions": [
+        {
+          "verb": "Start T106",
+          "kind": "processing"
+        },
+        {
+          "verb": "Resume Processing Priority Queue",
+          "kind": "processing"
+        }
+      ],
+      "next": "Digipeating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_t105_expiry_no_yes",
+      "from": "TransmitterStart",
+      "on": "T105_expiry",
+      "guard": "not digipeating and interrupted",
+      "actions": [
+        {
+          "verb": "Start T106",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "Resume Processing Normal Queue",
+          "kind": "processing"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t06_t105_expiry_no_no",
+      "from": "TransmitterStart",
+      "on": "T105_expiry",
+      "guard": "not digipeating and not interrupted",
+      "actions": [
+        {
+          "verb": "Start T106",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start T107",
+          "kind": "processing"
+        },
+        {
+          "verb": "PH_SEIZE_confirm",
+          "kind": "signal_upper"
+        },
+        {
+          "verb": "Resume Processing Normal Queue",
+          "kind": "processing"
+        }
+      ],
+      "next": "Transmitting",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ]
+}

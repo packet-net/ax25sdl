@@ -78,6 +78,10 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.UiArmDeleted => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ui-arm-deleted"),
     TableSetKind.T3Dead => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-t3-dead"),
     TableSetKind.NoKeepalive => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-no-keepalive"),
+    TableSetKind.FrameErrorUnreported => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-unreported"),
+    TableSetKind.FrameErrorArmsDeleted => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-arms-deleted"),
+    TableSetKind.ResetUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed"),
+    TableSetKind.RrResets => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -244,7 +248,8 @@ static (string Kind, string Station, int Steps, List<string> Tids, string Note) 
         case "deadlock":
             // Under the give-up rule a deadlock in a settled honest give-up
             // that lost data is reported as that loss, as the explorer does.
-            return (lastStep?.Field("lossy") == "yes" ? "GiveUpLoss" : "Deadlock", "", steps, tids, "");
+            // So is a settled honest frame-error reset that lost data.
+            return (lastStep?.Field("lossy") switch { "yes" => "GiveUpLoss", "reset" => "ResetLoss", _ => "Deadlock" }, "", steps, tids, "");
         case "temporal":
             // The lasso: the states TLC prints, the last being "Back to state n" or a stuttering marker.
             return (phase == Phase.TimerFree ? "SelectiveProgress" : "Quiescence", "", r.Trace.Count, tids, "");
@@ -282,6 +287,10 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.UiArmDeleted => "seeded ui-arm-deleted",
     TableSetKind.T3Dead => "seeded t3-dead",
     TableSetKind.NoKeepalive => "seeded no-keepalive",
+    TableSetKind.FrameErrorUnreported => "seeded frame-error-unreported",
+    TableSetKind.FrameErrorArmsDeleted => "seeded frame-error-arms-deleted",
+    TableSetKind.ResetUnconfirmed => "seeded reset-unconfirmed",
+    TableSetKind.RrResets => "seeded rr-resets",
     _ => "seeded livelock",
 };
 

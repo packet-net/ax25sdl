@@ -43,11 +43,14 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --ui-form plain|poll|response|long   with --unit-data: the datagram's form on the air (default plain, a UI command
                          P=0 through DL_UNIT_DATA_request; poll and response are put on the air by the harness; long
                          goes through the table and fails the receiver's N1 check)
+  --frame-errors LIST    comma list of corrupted forms a frame may arrive in, as a channel fault under the budget:
+                         control, info, length, n1, i-response; the receiver reports each with its DL-ERROR, a
+                         reset is honest only on a corrupted frame, and data an honest reset loses is reset-loss
   --flow-rounds N        FLOW_OFF/FLOW_ON rounds per flow-controlling station (default 1)
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
   --disable LIST         comma list of invariants to switch off: defined-state, sequence, delivery,
                          reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow,
-                         peer-busy-hold, busy-indication, unit-data
+                         peer-busy-hold, busy-indication, unit-data, frame-error
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
@@ -71,6 +74,7 @@ var t3 = false;
 var longBusy = false;
 var unitData = FlowControlAt.None;
 var uiForm = UiForm.Plain;
+var frameErrors = FrameErrors.None;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
@@ -133,6 +137,20 @@ try
                     "long" => UiForm.Oversize,
                     var v => throw new ArgumentException($"unknown UI form `{v}` (plain, poll, response, long)"),
                 };
+                break;
+            case "--frame-errors":
+                foreach (var f in Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    frameErrors |= f switch
+                    {
+                        "control" => FrameErrors.ControlField,
+                        "info" => FrameErrors.InfoNotPermitted,
+                        "length" => FrameErrors.Length,
+                        "n1" => FrameErrors.N1,
+                        "i-response" => FrameErrors.IResponse,
+                        var v => throw new ArgumentException($"unknown frame error `{v}` (control, info, length, n1, i-response)"),
+                    };
+                }
                 break;
             case "--t3": t3 = true; break;
             case "--long-busy": longBusy = true; break;
@@ -220,6 +238,7 @@ try
                         "peer-busy-hold" => Invariants.PeerBusyHold,
                         "busy-indication" => Invariants.BusyIndication,
                         "unit-data" => Invariants.UnitData,
+                        "frame-error" => Invariants.FrameError,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }
@@ -252,6 +271,7 @@ try
         LongBusy = longBusy,
         UnitData = unitData,
         UiForm = uiForm,
+        FrameErrors = frameErrors,
         Release = release,
         ReleaseEarly = releaseEarly,
         Reconnect = reconnect,

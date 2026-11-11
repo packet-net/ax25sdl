@@ -37,6 +37,7 @@ CONSTANTS
     T3Moves,           \* model T3 expiry (idle keepalive), the keepalive rest rule and the stricter give-up settle
     UnitDataAt,        \* stations whose layer 3 sends one UI datagram, once, in any state, subset of {"A", "B"}
     UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
+    FrameErrors,       \* corrupted forms a frame may arrive in, subset of {"control", "info", "length", "n1", "iresp"}
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -105,7 +106,7 @@ FrameInput(m, f, into) ==
     [ev |-> FrameEvent(m, f), pf |-> IF f.pf THEN 1 ELSE 0, cmd |-> IF f.cmd THEN 1 ELSE 0,
      nr |-> f.nr, ns |-> f.ns, data |-> f.data,
      able |-> ~(PeerDeclinesSabme /\ into = "B" /\ f.type = "SABME"), info |-> ~(UiForm = "long" /\ f.type = "UI"),
-     ftype |-> f.type]
+     ftype |-> f.type, fe |-> ""]
 
 \* The link multiplexer's confirm (pinned semantic 2); a page without the arm
 \* takes it through its lower-layer catch-all.
@@ -172,6 +173,35 @@ UnitDataCheck(s, pre, e, fx) ==
         ELSE IF ~ans THEN Viol("UnitData", s, "station " \o s \o " in " \o pre.st \o " answered the UI frame [" \o e.data \o "] other than as section 4.3.3.6 says")
         ELSE NoViol
 
+\* The frame-error input each corrupted form raises, and the DL-ERROR the
+\* figures report it with (Stepper.FrameErrorInput).
+ErrEvent(form) ==
+    CASE form = "control" -> "control_field_error"
+      [] form = "info" -> "info_not_permitted_in_frame"
+      [] OTHER -> "u_or_s_frame_length_error"
+ErrCode(form) ==
+    CASE form = "control" -> "DL-ERROR Indication (L)"
+      [] form = "info" -> "DL-ERROR Indication (M)"
+      [] form = "length" -> "DL-ERROR Indication (N)"
+      [] OTHER -> "DL-ERROR Indication (O)"
+
+\* Every DL-ERROR Indication spelling the tables use (Stepper.IsErrorIndication
+\* matches the prefix).
+ErrorPrims ==
+    {"DL-ERROR Indication (" \o c \o ")" :
+        c \in {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "add"}}
+    \cup {"DL_ERROR_indication_D", "DL_ERROR_indication_C_D"}
+
+\* A corrupted frame's handling (Stepper.FrameErrorCheck): reported with the
+\* DL-ERROR the figures draw for its form, and not delivered upward.
+FrameErrorCheck(s, pre, form, fx) ==
+    LET prims == {fx[i].prim : i \in {j \in 1..Len(fx) : fx[j].kind = "dl"}}
+    IN  IF prims \cap {"DL_DATA_indication", "DL_UNIT_DATA_indication"} # {}
+        THEN Viol("FrameError", s, "station " \o s \o " in " \o pre.st \o " delivered a corrupted frame (" \o form \o ") upward")
+        ELSE IF ErrCode(form) \notin prims
+        THEN Viol("FrameError", s, "station " \o s \o " in " \o pre.st \o " received a corrupted frame (" \o form \o ") and did not report " \o ErrCode(form))
+        ELSE NoViol
+
 \* Route one dispatch's effects in order: frames to the outgoing channel
 \* (checking reject coherence), deliveries to the delivery count (checking
 \* order and flow-off), a seize request to the owed flag, a connect confirm
@@ -206,11 +236,15 @@ Route(s, m, fx, acc, flowOff, i) ==
                                           ELSE vf]
                 ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_CONNECT_confirm", "DL_CONNECT_indication"}
                      THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN TRUE ELSE @, !.conn = TRUE,
-                                      !.pend = IF fe.prim = "DL_CONNECT_confirm" THEN FALSE ELSE @, !.rep = 1]
+                                      !.pend = IF fe.prim = "DL_CONNECT_confirm" THEN FALSE ELSE @, !.rep = 1,
+                                      !.told = IF @ >= 1 THEN 2 ELSE @]
                 ELSE IF fe.kind = "dl" /\ fe.prim \in {"DL_DISCONNECT_indication", "DL_DISCONNECT_confirm"}
                      THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN FALSE ELSE @,
                                       !.pend = IF fe.prim = "DL_DISCONNECT_indication" THEN FALSE ELSE @, !.rep = 2]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
+                \* The reset rule: layer 3 has been told of an error, and of the
+                \* reset once a connect report follows.
+                ELSE IF fe.kind = "dl" /\ fe.prim \in ErrorPrims THEN [acc EXCEPT !.told = 1]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
 
@@ -246,7 +280,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         \* was busy delivers nothing either (the flow-off delivery check).
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
-                    pend |-> S.pend[s], rep |-> S.rep[s], v |-> v1],
+                    pend |-> S.pend[s], rep |-> S.rep[s], told |-> S.told[s], v |-> v1],
                    S.off[s] \/ (BusyAt # {} /\ pre.own), 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -268,8 +302,19 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         \* dispatched as, so a page that lost its UI arm is caught.
         uiv == IF ok /\ e.ftype = "UI" /\ UnitDataAt # {} /\ "UnitData" \in StepChecks
                THEN UnitDataCheck(s, pre, e, c.fx) ELSE NoViol
+        \* Keyed on the corruption (fe), not on the event it is dispatched as.
+        fev == IF ok /\ e.fe # "" /\ "FrameError" \in StepChecks
+               THEN FrameErrorCheck(s, pre, e.fe, c.fx) ELSE NoViol
+        \* The reset rule (FrameErrors): a station that sends SABM or SABME from
+        \* Connected or TimerRecovery has reset the link, honestly (1) only on
+        \* the corrupted frame itself, else unjustified (2, sticky). A reset
+        \* layer 3 asked for (DL-CONNECT Request) is not the data link's.
+        rst == IF FrameErrors # {} /\ ok /\ pre.st \in DataStates /\ e.ev # "DL_CONNECT_request"
+                  /\ \E i \in 1..Len(c.fx) : c.fx[i].kind = "frame" /\ c.fx[i].frame.type \in {"SABM", "SABME"}
+               THEN Max(S.rs[s], IF e.fe # "" THEN 1 ELSE 2) ELSE S.rs[s]
         v2 == IF r.v # NoViol THEN r.v
               ELSE IF uiv # NoViol THEN uiv
+              ELSE IF fev # NoViol THEN fev
               ELSE IF flowOffNow /\ "BusyTracksFlow" \in StepChecks /\ ~m.own
                    THEN Viol("BusyTracksFlow", s, "station " \o s \o " took " \o c.tid \o " on DL_FLOW_OFF_request but its own-receiver-busy condition is still clear")
               ELSE IF flowOnNow /\ "BusyTracksFlow" \in StepChecks /\ m.own
@@ -278,6 +323,7 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
     IN  [sys |-> [S EXCEPT !.m[s] = m, !.ch[s] = newIn, !.ch[Other(s)] = r.out, !.owed[s] = r.owed,
                            !.budget = newBudget, !.deliv[s] = r.deliv, !.acked[s] = acked, !.up[s] = r.up, !.pend[s] = r.pend, !.rep[s] = r.rep,
                            !.loss[s] = loss, !.gave[s] = gave, !.t3loop[s] = t3loop,
+                           !.rs[s] = rst, !.told[s] = IF FrameErrors = {} THEN 0 ELSE r.told,
                            !.off[s] = IF flowOffNow THEN TRUE ELSE IF flowOnNow THEN FALSE ELSE @,
                            !.rounds[s] = IF flowOnNow THEN @ + 1 ELSE @],
          viol |-> v2,
@@ -340,6 +386,7 @@ S0 ==
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE], hb |-> [s \in Stations |-> FALSE],
      uis |-> [s \in Stations |-> FALSE], uid |-> [s \in Stations |-> FALSE],
+     rs |-> [s \in Stations |-> 0], told |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -401,6 +448,39 @@ AllDelivered(S) == S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
 GiveUpLoss(S) == AcceptGiveUp /\ GiveUpSettled(S) /\ ~AllDelivered(S)
 
 (***************************************************************************)
+(* The reset rule's settled loss (Stepper.IsResetLoss)                     *)
+(***************************************************************************)
+
+\* At rest every UI datagram was sent and then reached its peer or was
+\* dropped (Stepper.UnitDataAccounted).
+UiAccounted(S) == \A s \in UnitDataAt : S.uis[s] /\ S.uid[s]
+
+\* Plain quiescence, everything but the delivery count (Stepper.PlainRest).
+PlainRest(S) ==
+    LET a == S.m["A"]
+        b == S.m["B"]
+    IN  /\ IF ReleaseAt # {}
+           THEN /\ S.rel["A"] \/ S.rel["B"]
+                /\ a.st = "Disconnected" /\ b.st = "Disconnected"
+                /\ a.q = <<>> /\ b.q = <<>> /\ ~S.owed["A"] /\ ~S.owed["B"]
+           ELSE /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~S.owed["A"] /\ KeepsAlive(a)
+                /\ IF StubB THEN S.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~S.owed["B"] /\ KeepsAlive(b)
+        /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
+
+\* With FrameErrors: a settled honest reset that lost data, the layer 3 of
+\* every station whose data was lost told (a DL-ERROR, then a DL-CONNECT
+\* confirm or indication: told = 2). Not rest; a deadlock there is reported
+\* as the loss it is (see last.lossy).
+ResetLoss(S) ==
+    /\ FrameErrors # {} /\ ~AllDelivered(S)
+    /\ \E s \in Stations : S.rs[s] = 1
+    /\ \A s \in Stations : S.rs[s] # 2
+    /\ ~S.pend["A"] /\ ~S.pend["B"] /\ ReportsMatch(S) /\ UiAccounted(S)
+    /\ S.deliv["B"] < FramesAB => S.told["A"] = 2
+    /\ S.deliv["A"] < FramesBA => S.told["B"] = 2
+    /\ PlainRest(S)
+
+(***************************************************************************)
 (* Moves (Stepper.EnabledMoves / Apply)                                    *)
 (***************************************************************************)
 
@@ -410,10 +490,11 @@ Take(r, move, s, f) ==
     \* tick flips on every move, so no move is ever a stuttering step: a move
     \* that changes nothing else (a self-loop) still counts as taken for the
     \* liveness fairness, and cannot discharge it by stuttering.
-    \* lossy marks a settled honest give-up that lost data, so TlaCheck can
-    \* report a deadlock there as GiveUpLoss, as the explorer does.
+    \* lossy marks a settled honest give-up that lost data ("yes"), or a
+    \* settled honest reset that lost data ("reset"), so TlaCheck can report a
+    \* deadlock there as GiveUpLoss or ResetLoss, as the explorer does.
     /\ last' = [move |-> move, at |-> s, frame |-> f, tid |-> r.tid, arms |-> r.arms, tick |-> 1 - last.tick,
-                 lossy |-> IF GiveUpLoss(r.sys) THEN "yes" ELSE ""]
+                 lossy |-> IF GiveUpLoss(r.sys) THEN "yes" ELSE IF ResetLoss(r.sys) THEN "reset" ELSE ""]
 
 TakeChannel(S2, move, s, f) == Take([sys |-> S2, viol |-> NoViol, tid |-> "", arms |-> {}], move, s, f)
 
@@ -492,9 +573,6 @@ SendUnitData(S, s) ==
               tid |-> IF poll THEN "pinned:ui_poll" ELSE "pinned:ui_response",
               arms |-> {}]
 
-\* At rest every UI datagram was sent and then reached its peer or was
-\* dropped (Stepper.UnitDataAccounted).
-UiAccounted(S) == \A s \in UnitDataAt : S.uis[s] /\ S.uid[s]
 
 \* The quiescent-timeout abstraction: a timer fires only when nothing is in
 \* flight, owed, ready to pop or waiting to be submitted anywhere. A pending
@@ -581,6 +659,41 @@ Reorder(s) ==
     /\ LET q == sys.ch[s]
        IN  TakeChannel([sys EXCEPT !.ch[s] = <<q[2], q[1]>> \o SubSeq(q, 3, Len(q)), !.budget = @ - 1], "reorder", s, q[1])
 
+\* Frame errors (FrameErrors, Stepper.CorruptApplies): a channel fault that
+\* delivers the head frame corrupted. A control field error can hit any frame;
+\* an information field where none is permitted an S or U frame other than UI
+\* and FRMR; a length error an S or U frame other than UI; the N1 failure and
+\* the I response an I frame, and only at a station in Connected or
+\* TimerRecovery (the pages with an I frame input).
+CorruptApplies(form, f, m) ==
+    CASE form = "control" -> TRUE
+      [] form = "info" -> f.type \notin {"I", "UI", "FRMR"}
+      [] form = "length" -> f.type \notin {"I", "UI"}
+      [] OTHER -> f.type = "I" /\ m.st \in DataStates
+
+\* The input the receiver sees: the frame-error event (the page's lower-layer
+\* catch-all if it has no arm), or the I frame with the N1 atom false or the
+\* command bit lost. The frame is not received as itself (ftype "").
+CorruptInput(m, f, s, form) ==
+    IF form \in {"n1", "iresp"}
+    THEN [FrameInput(m, IF form = "iresp" THEN [f EXCEPT !.cmd = FALSE] ELSE f, s)
+             EXCEPT !.info = IF form = "n1" THEN FALSE ELSE @, !.ftype = "", !.fe = form]
+    ELSE [Event(IF Handles(m.st, ErrEvent(form)) THEN ErrEvent(form)
+                ELSE IF Handles(m.st, "all_other_primitives__from_lower_layer") THEN "all_other_primitives__from_lower_layer"
+                ELSE "") EXCEPT !.fe = form]
+
+\* The give-up rule counts a corrupted frame as a loss, as a drop.
+CountLoss(r) == IF AcceptGiveUp THEN [r EXCEPT !.sys.loss = [x \in Stations |-> @[x] + 1]] ELSE r
+
+Corrupt(s, form) ==
+    /\ viol = NoViol
+    /\ Table(s) /\ form \in FrameErrors
+    /\ sys.ch[s] # <<>> /\ sys.budget > 0
+    /\ CorruptApplies(form, Head(sys.ch[s]), sys.m[s])
+    /\ LET f == Head(sys.ch[s])
+       IN  Take(UiDone(Heard(CountLoss(Inject(sys, s, CorruptInput(sys.m[s], f, s, form), Tail(sys.ch[s]), sys.budget - 1, FALSE)), s), s, f),
+                "corrupt-" \o form, s, f)
+
 \* A pop is the only move that sends I frames: one sent while the peer-busy
 \* hold is up is a violation (PeerBusyHold).
 Pop(s) ==
@@ -657,22 +770,16 @@ UnitData(s) ==
 \* stub is at rest once it is connected. With ReleaseAt, at rest means
 \* released: both Disconnected after a layer 3 issued its release.
 PlainQuiescent ==
-    LET a == sys.m["A"]
-        b == sys.m["B"]
-    IN  /\ IF ReleaseAt # {}
-           THEN /\ sys.rel["A"] \/ sys.rel["B"]
-                /\ a.st = "Disconnected" /\ b.st = "Disconnected"
-                /\ a.q = <<>> /\ b.q = <<>> /\ ~sys.owed["A"] /\ ~sys.owed["B"]
-           ELSE /\ AtRest(a.st) /\ a.q = <<>> /\ a.vs = a.va /\ ~sys.owed["A"] /\ KeepsAlive(a)
-                /\ IF StubB THEN sys.stub.up ELSE AtRest(b.st) /\ b.q = <<>> /\ b.vs = b.va /\ ~sys.owed["B"] /\ KeepsAlive(b)
-        /\ sys.ch["A"] = <<>> /\ sys.ch["B"] = <<>>
-        /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
+    /\ PlainRest(sys)
+    /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
 
 \* With AcceptGiveUp, a settled honest give-up with everything delivered is at
 \* rest too, and nothing is once a station has given up without justification.
 \* A layer 3 still waiting for the answer to its reconnect is never at rest.
 Quiescent ==
     /\ ~sys.pend["A"] /\ ~sys.pend["B"]
+    \* The reset rule: no rest after a reset the injected error does not justify.
+    /\ ~(FrameErrors # {} /\ \E s \in Stations : sys.rs[s] = 2)
     /\ ReportsMatch(sys)
     /\ UiAccounted(sys)
     /\ \/ AcceptGiveUp /\ GiveUpSettled(sys) /\ AllDelivered(sys)
@@ -692,8 +799,12 @@ Init == sys = SeedState /\ viol = NoViol /\ last = NoStep
 \* The explorer's move order, so that both breadth-first searches meet the
 \* same first violation.
 Next ==
-    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A") \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A") \/ UnitData("A")
-    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B") \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B") \/ UnitData("B")
+    \/ Deliver("A") \/ Drop("A") \/ Dup("A") \/ Reorder("A")
+       \/ Corrupt("A", "control") \/ Corrupt("A", "info") \/ Corrupt("A", "length") \/ Corrupt("A", "n1") \/ Corrupt("A", "iresp")
+       \/ Pop("A") \/ Seize("A") \/ FlowOn("A") \/ FlowOff("A") \/ SubmitData("A") \/ Release("A") \/ Reconnect("A") \/ BusyOn("A") \/ BusyOff("A") \/ UnitData("A")
+    \/ Deliver("B") \/ Drop("B") \/ Dup("B") \/ Reorder("B")
+       \/ Corrupt("B", "control") \/ Corrupt("B", "info") \/ Corrupt("B", "length") \/ Corrupt("B", "n1") \/ Corrupt("B", "iresp")
+       \/ Pop("B") \/ Seize("B") \/ FlowOn("B") \/ FlowOff("B") \/ SubmitData("B") \/ Release("B") \/ Reconnect("B") \/ BusyOn("B") \/ BusyOff("B") \/ UnitData("B")
     \/ T1("A") \/ T1("B")
     \/ T3("A") \/ T3("B")
     \/ Rest

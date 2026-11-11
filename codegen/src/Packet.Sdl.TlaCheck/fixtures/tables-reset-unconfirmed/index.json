@@ -1,0 +1,215 @@
+{
+  "$schema": "./schema.json",
+  "kind": "index",
+  "pages": [
+    {
+      "file": "awaiting_connection.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "AwaitingConnection",
+      "figure": "figc4.2"
+    },
+    {
+      "file": "awaiting_release.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "AwaitingRelease",
+      "figure": "figc4.3"
+    },
+    {
+      "file": "awaiting_v22_connection.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "AwaitingV22Connection",
+      "figure": "figc4.6"
+    },
+    {
+      "file": "classes_of_procedures_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.3"
+    },
+    {
+      "file": "connected.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "Connected",
+      "figure": "figc4.4"
+    },
+    {
+      "file": "disconnected.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "Disconnected",
+      "figure": "figc4.1"
+    },
+    {
+      "file": "duplex_phy_receiver_ready.g.json",
+      "kind": "state",
+      "machine": "duplex_phy",
+      "state": "ReceiverReady",
+      "figure": "figc2b.1"
+    },
+    {
+      "file": "duplex_phy_receiving.g.json",
+      "kind": "state",
+      "machine": "duplex_phy",
+      "state": "Receiving",
+      "figure": "figc2b.2"
+    },
+    {
+      "file": "duplex_phy_transmitter_ready.g.json",
+      "kind": "state",
+      "machine": "duplex_phy",
+      "state": "TransmitterReady",
+      "figure": "figc2b.3"
+    },
+    {
+      "file": "duplex_phy_transmitter_start.g.json",
+      "kind": "state",
+      "machine": "duplex_phy",
+      "state": "TransmitterStart",
+      "figure": "figc2b.4"
+    },
+    {
+      "file": "duplex_phy_transmitting.g.json",
+      "kind": "state",
+      "machine": "duplex_phy",
+      "state": "Transmitting",
+      "figure": "figc2b.5"
+    },
+    {
+      "file": "n1_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.5"
+    },
+    {
+      "file": "negotiating.g.json",
+      "kind": "state",
+      "machine": "management_data_link",
+      "state": "Negotiating",
+      "figure": "figc5.2"
+    },
+    {
+      "file": "optional_functions_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.4"
+    },
+    {
+      "file": "ready.g.json",
+      "kind": "state",
+      "machine": "management_data_link",
+      "state": "Ready",
+      "figure": "figc5.1"
+    },
+    {
+      "file": "reassembler_ready.g.json",
+      "kind": "state",
+      "machine": "reassembler",
+      "state": "Ready",
+      "figure": "figc6.2"
+    },
+    {
+      "file": "reassembler_reassembling_data.g.json",
+      "kind": "state",
+      "machine": "reassembler",
+      "state": "ReassemblingData",
+      "figure": "figc6.3"
+    },
+    {
+      "file": "reassembler_reassembling_unit_data.g.json",
+      "kind": "state",
+      "machine": "reassembler",
+      "state": "ReassemblingUnitData",
+      "figure": "figc6.4"
+    },
+    {
+      "file": "retry_notification_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.7"
+    },
+    {
+      "file": "simplex_phy_digipeating.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "Digipeating",
+      "figure": "figc2a.6"
+    },
+    {
+      "file": "simplex_phy_ready.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "Ready",
+      "figure": "figc2a.1"
+    },
+    {
+      "file": "simplex_phy_receiver_start.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "ReceiverStart",
+      "figure": "figc2a.7"
+    },
+    {
+      "file": "simplex_phy_receiving.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "Receiving",
+      "figure": "figc2a.2"
+    },
+    {
+      "file": "simplex_phy_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "simplex_phy",
+      "figure": "figc2a.s"
+    },
+    {
+      "file": "simplex_phy_transmitter_start.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "TransmitterStart",
+      "figure": "figc2a.4"
+    },
+    {
+      "file": "simplex_phy_transmitter_suppression.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "TransmitterSuppression",
+      "figure": "figc2a.3"
+    },
+    {
+      "file": "simplex_phy_transmitting.g.json",
+      "kind": "state",
+      "machine": "simplex_phy",
+      "state": "Transmitting",
+      "figure": "figc2a.5"
+    },
+    {
+      "file": "subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "data_link",
+      "figure": "figc4.7"
+    },
+    {
+      "file": "t1_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.8"
+    },
+    {
+      "file": "timer_recovery.g.json",
+      "kind": "state",
+      "machine": "data_link",
+      "state": "TimerRecovery",
+      "figure": "figc4.5"
+    },
+    {
+      "file": "window_negotiation_subroutines.g.json",
+      "kind": "subroutines",
+      "machine": "management_data_link",
+      "figure": "figc5.6"
+    }
+  ]
+}

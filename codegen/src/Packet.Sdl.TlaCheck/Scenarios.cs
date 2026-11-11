@@ -45,6 +45,14 @@ public enum TableSetKind
     T3Dead,
     /// <summary>A seeded-defect fixture (fixtures/tables-no-keepalive): neither end of a cold connect starts T3.</summary>
     NoKeepalive,
+    /// <summary>A seeded-defect fixture (fixtures/tables-frame-error-unreported): Connected's control field error arm (version 2.0) does not report DL-ERROR (L).</summary>
+    FrameErrorUnreported,
+    /// <summary>A seeded-defect fixture (fixtures/tables-frame-error-arms-deleted): Timer Recovery has no frame-error arms, so a corrupted frame falls to its lower-layer catch-all.</summary>
+    FrameErrorArmsDeleted,
+    /// <summary>A seeded-defect fixture (fixtures/tables-reset-unconfirmed): AwaitingConnection does not confirm a connect layer 3 initiated.</summary>
+    ResetUnconfirmed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-rr-resets): an in-window RR in Connected resets the link.</summary>
+    RrResets,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -551,6 +559,39 @@ public static class Scenarios
         {
             FramesAb = 1, UnitData = FlowControlAt.Both, Budget = 1, Faults = FaultKinds.Drop,
         }, "UnitData at A, 5");
+
+        // Coverage batch 6, part 1: frame errors (FrameErrors), one channel
+        // fault, no other faults unless stated (a duplicated UA would reset
+        // the link without justification, #114, and the reset rule never
+        // lets that rest).
+        const FrameErrors FE3 = FrameErrors.ControlField | FrameErrors.InfoNotPermitted | FrameErrors.Length;
+        const FrameErrors FE5 = FE3 | FrameErrors.N1 | FrameErrors.IResponse;
+        ExplorerOptions Fe(ExplorerOptions o, FrameErrors fe) => o with { FrameErrors = fe, Budget = 1, Faults = FaultKinds.None };
+        Add("fe-cold", "frame-error control", TableSetKind.Current, o => Fe(o, FE3) with { Seed = SeedKind.Disconnected, FramesAb = 0 }, "clean");
+        Add("fe-v22", "frame-error control", TableSetKind.Current, o => Fe(o, FE3) with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0 }, "clean");
+        Add("fe-release", "frame-error control (honest reset, nothing lost)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, Release = ReleaseBy.A }, "clean");
+        Add("fe-a1", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1 }, "ResetLoss, 4");
+        Add("fe-a1-srej", "reset-loss control", TableSetKind.Current, o => Fe(o, FE5) with { FramesAb = 1, Srej = true }, "ResetLoss, 4");
+        Add("fe-ab1-ctl", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "ResetLoss, 4");
+        Add("fe-iresp", "frame-error control", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with { FramesAb = 1 }, "clean");
+        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "Quiescence");
+        Add("fe-tr-b3", "ax25spec#50", TableSetKind.Current, o => Fe(o, FrameErrors.N1 | FrameErrors.IResponse) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop,
+        }, "Deadlock, 4");
+        Add("fe-iresp-trq", "I response in Timer Recovery (unfiled lead)", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop, TimerRecoveryIsQuiescent = true,
+        }, "clean");
+        Add("busy-a-tr2", "#91 (H1)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 1, LocalBusy = FlowControlAt.A, Budget = 2, Faults = FaultKinds.Drop,
+        }, "Deadlock, 14");
+        Add("seeded-fe-unreported", "seeded (frame error reported)", TableSetKind.FrameErrorUnreported, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "FrameError at B, 2");
+        Add("seeded-fe-arms-deleted", "seeded (frame error on a catch-all)", TableSetKind.FrameErrorArmsDeleted, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "FrameError at A, 3");
+        Add("seeded-reset-unconfirmed", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "Deadlock, 4");
+        Add("seeded-rr-resets", "seeded (unjustified reset never rests)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, Budget = 0 }, "Deadlock, 6");
+        Add("seeded-rr-resets-loss", "seeded (unjustified reset is no reset loss)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 2, K = 1, Budget = 0 }, "Deadlock, 6");
 
         return list;
     }

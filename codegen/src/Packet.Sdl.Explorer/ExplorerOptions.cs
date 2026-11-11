@@ -159,8 +159,51 @@ public enum Invariants
     /// </summary>
     UnitData = 16384,
 
+    /// <summary>
+    /// A corrupted frame reaching a station (only with
+    /// <see cref="ExplorerOptions.FrameErrors"/>, the only source of them) is
+    /// reported to layer 3 with the DL-ERROR Indication the figures draw for
+    /// it and is not delivered: (L) for a control field error, (M) for an
+    /// information field in a frame that may not carry one, (N) for a U or S
+    /// frame of the wrong length, (O) for an I frame that fails the N1 check
+    /// and (O) for an I response (the figures' code; the error list in
+    /// Appendix C4 gives S). Keyed on the corruption, not on the event the
+    /// page dispatches it as, so a page that lost its arm is caught.
+    /// </summary>
+    FrameError = 32768,
+
+    /// <summary>
+    /// Not a switch: the kind a deadlock is reported under, with
+    /// <see cref="ExplorerOptions.FrameErrors"/>, when the stuck state is a
+    /// settled honest frame-error reset that lost data, with the layer 3 of
+    /// every station that lost data told (a DL-ERROR Indication, then a
+    /// DL-CONNECT Confirm or Indication). Data lost in a reset is reported as
+    /// such, never accepted (the precedent is <see cref="GiveUpLoss"/>).
+    /// </summary>
+    ResetLoss = 65536,
+
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication | UnitData,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication | UnitData | FrameError,
+}
+
+/// <summary>
+/// The corrupted forms a frame can arrive in (<see cref="ExplorerOptions.FrameErrors"/>):
+/// the frame-error inputs of the Data Link figures.
+/// </summary>
+[Flags]
+public enum FrameErrors
+{
+    None = 0,
+    /// <summary>Any frame, its control field unknown or not implemented: <c>control_field_error</c>.</summary>
+    ControlField = 1,
+    /// <summary>An S or U frame that may not carry an information field (not UI, FRMR or I) arrives with one: <c>info_not_permitted_in_frame</c>.</summary>
+    InfoNotPermitted = 2,
+    /// <summary>An S or U frame (not UI) of the wrong length for its type: <c>u_or_s_frame_length_error</c>.</summary>
+    Length = 4,
+    /// <summary>An I frame reaching a station in Connected or TimerRecovery fails the N1 check (<c>info_field_length_le_N1_and_content_is_octet_aligned</c> false).</summary>
+    N1 = 8,
+    /// <summary>An I frame reaching a station in Connected or TimerRecovery arrives as a response (its command bit lost).</summary>
+    IResponse = 16,
 }
 
 /// <summary>The form of a UI datagram on the air (<see cref="ExplorerOptions.UiForm"/>).</summary>
@@ -354,6 +397,23 @@ public sealed record ExplorerOptions
     /// sender.
     /// </summary>
     public UiForm UiForm { get; init; } = UiForm.Plain;
+
+    /// <summary>
+    /// Frame errors: a channel fault, while the fault budget lasts, that
+    /// delivers the head frame of a channel corrupted, in each form named here
+    /// that applies to it (see <see cref="FrameErrors"/>). The
+    /// receiver sees the frame-error input the figures draw for that form, not
+    /// the frame. Two rules come with it (pinned semantic 17): the
+    /// <see cref="Invariants.FrameError"/> check on each corrupted frame, and
+    /// the reset rule: a station that resets the link (sends SABM or SABME
+    /// from Connected or TimerRecovery, other than at layer 3's own
+    /// DL-CONNECT Request) does so honestly only on the corrupted frame
+    /// itself; no state is at rest after any other reset, and a settled
+    /// honest reset that lost data, with every losing station's layer 3 told,
+    /// is reported as <see cref="Invariants.ResetLoss"/>. Table-driven
+    /// stations only. Off by default.
+    /// </summary>
+    public FrameErrors FrameErrors { get; init; } = FrameErrors.None;
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase

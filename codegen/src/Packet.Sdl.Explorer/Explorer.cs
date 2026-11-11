@@ -178,6 +178,11 @@ public static class Explorer
                     var v = stepper.IsGiveUpLoss(final)
                         ? new Violation(Invariants.GiveUpLoss, null,
                             "give-up loss: the link gave up honestly and has settled, but data was lost in the give-up (" + Describe(stepper, final) + ")")
+                        // With frame errors, a settled honest reset that lost
+                        // data (layer 3 told) is reported as that loss too.
+                        : stepper.IsResetLoss(final)
+                        ? new Violation(Invariants.ResetLoss, null,
+                            "reset loss: a frame error reset the link honestly, layer 3 was told and the link has settled, but data was lost in the reset (" + Describe(stepper, final) + ")")
                         : new Violation(Invariants.Deadlock, null,
                             "deadlock: this state has no enabled move and is not quiescent (" + Describe(stepper, final) + ")");
                     return new ExplorationResult(Outcome.Violation, v, trace, nodes.Count, edges, maxDepth, depthBoundHit, stateBoundHit, null) with { FiredTransitions = fired };

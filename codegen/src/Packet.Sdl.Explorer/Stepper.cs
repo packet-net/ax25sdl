@@ -39,12 +39,25 @@ public enum MoveKind
     T3Expiry,
     /// <summary>The station's layer 3 sends its UI datagram (<see cref="ExplorerOptions.UnitData"/>), in the form <see cref="ExplorerOptions.UiForm"/> names.</summary>
     UnitData,
+    /// <summary>Channel fault: the head frame arrives with an unknown control field (<see cref="FrameErrors.ControlField"/>).</summary>
+    CorruptControl,
+    /// <summary>Channel fault: the head frame arrives with an information field it may not carry (<see cref="FrameErrors.InfoNotPermitted"/>).</summary>
+    CorruptInfo,
+    /// <summary>Channel fault: the head frame arrives with the wrong length for its type (<see cref="FrameErrors.Length"/>).</summary>
+    CorruptLength,
+    /// <summary>Channel fault: the head I frame arrives failing the N1 check (<see cref="FrameErrors.N1"/>).</summary>
+    CorruptN1,
+    /// <summary>Channel fault: the head I frame arrives as a response (<see cref="FrameErrors.IResponse"/>).</summary>
+    CorruptIResponse,
 }
 
 /// <summary>One BFS edge: a move applied to a station (for channel moves, the station the channel flows into).</summary>
 public readonly record struct Move(MoveKind Kind, Station Station)
 {
-    public bool IsFault => Kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder;
+    public bool IsFault => Kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder || IsCorrupt;
+
+    /// <summary>A frame-error fault (<see cref="ExplorerOptions.FrameErrors"/>).</summary>
+    public bool IsCorrupt => Kind is MoveKind.CorruptControl or MoveKind.CorruptInfo or MoveKind.CorruptLength or MoveKind.CorruptN1 or MoveKind.CorruptIResponse;
 
     public override string ToString() => $"{Kind}@{Station}";
 }
@@ -130,6 +143,8 @@ public sealed class Stepper
             throw new ArgumentException("UI datagrams are for the table-driven peer only (the v2.0 stub ignores UI)", nameof(options));
         if (_o.UiForm != UiForm.Plain && _o.UnitData == FlowControlAt.None)
             throw new ArgumentException("a UI form needs a station that sends UI (--unit-data)", nameof(options));
+        if (_o.FrameErrors != FrameErrors.None && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("frame errors are for the table-driven peer only (the v2.0 stub has no frame-error inputs)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -235,6 +250,9 @@ public sealed class Stepper
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
         if (!ReportsMatch(s)) return false;
         if (!UnitDataAccounted(s)) return false;
+        // The reset rule: no rest counts after a reset the injected error
+        // does not justify.
+        if (_o.FrameErrors != FrameErrors.None && (s.ResetA == Unjustified || s.ResetB == Unjustified)) return false;
         if (_o.AcceptGiveUp)
         {
             // The give-up rule: no rest counts after an unjustified give-up,
@@ -242,13 +260,22 @@ public sealed class Stepper
             if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
             if (GiveUpSettled(s) && AllDelivered(s)) return true;
         }
+        return PlainRest(s) && AllDelivered(s);
+    }
+
+    /// <summary>
+    /// Plain quiescence, everything but the delivery count: both stations at
+    /// rest (or, with a release, both Disconnected after it), nothing in
+    /// flight or queued, nothing outstanding or owed.
+    /// </summary>
+    private bool PlainRest(SystemState s)
+    {
         if (_o.Release != ReleaseBy.None)
         {
             return (s.ReleasedA || s.ReleasedB)
                 && s.A.State == "Disconnected" && s.B.State == "Disconnected"
                 && s.ToA.Count == 0 && s.ToB.Count == 0
                 && s.A.QueueEntries.Count == 0 && s.B.QueueEntries.Count == 0
-                && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
                 && !s.SeizeOwedA && !s.SeizeOwedB;
         }
         // With the v2.0 stub as B, "B at rest" is simply "the stub is
@@ -261,8 +288,28 @@ public sealed class Stepper
             && s.ToA.Count == 0 && s.ToB.Count == 0
             && s.A.QueueEntries.Count == 0
             && s.A.Vs == s.A.Va
-            && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length
             && !s.SeizeOwedA;
+    }
+
+    /// <summary>
+    /// With <see cref="ExplorerOptions.FrameErrors"/>: the state is a settled
+    /// honest reset that lost data, so a deadlock there is reported as
+    /// <see cref="Invariants.ResetLoss"/> rather than as a plain deadlock.
+    /// Settled: some station reset honestly and none without justification,
+    /// the system is at rest in every respect but the delivery count, and the
+    /// layer 3 of every station whose data was lost has been told (a DL-ERROR
+    /// Indication, then a DL-CONNECT Confirm or Indication).
+    /// </summary>
+    public bool IsResetLoss(SystemState s)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        if (_o.FrameErrors == FrameErrors.None || AllDelivered(s)) return false;
+        if (s.ResetA != Honest && s.ResetB != Honest) return false;
+        if (s.ResetA == Unjustified || s.ResetB == Unjustified) return false;
+        if (s.ReconnectPendingA || s.ReconnectPendingB || !ReportsMatch(s) || !UnitDataAccounted(s)) return false;
+        if (s.DeliveredAtB < _submittedA.Length && s.ToldA != 2) return false;
+        if (s.DeliveredAtA < _submittedB.Length && s.ToldB != 2) return false;
+        return PlainRest(s);
     }
 
     /// <summary>
@@ -418,6 +465,16 @@ public sealed class Stepper
                         moves.Add(new Move(MoveKind.Duplicate, station));
                     if (_o.Faults.HasFlag(FaultKinds.Reorder) && incoming.Count >= 2)
                         moves.Add(new Move(MoveKind.Reorder, station));
+                    // Frame errors, one move per form that applies to the
+                    // head frame (never into the v2.0 stub).
+                    if (!(station == Station.B && s.StubPeer is not null))
+                    {
+                        foreach (var (kind, form) in CorruptKinds)
+                        {
+                            if (_o.FrameErrors.HasFlag(form) && CorruptApplies(form, incoming[0], s.Machine(station)))
+                                moves.Add(new Move(kind, station));
+                        }
+                    }
                 }
             }
 
@@ -511,6 +568,44 @@ public sealed class Stepper
 
         return moves;
     }
+
+    /// <summary>The frame-error moves, in move order, with the form each injects.</summary>
+    private static readonly (MoveKind Kind, FrameErrors Form)[] CorruptKinds =
+    {
+        (MoveKind.CorruptControl, FrameErrors.ControlField),
+        (MoveKind.CorruptInfo, FrameErrors.InfoNotPermitted),
+        (MoveKind.CorruptLength, FrameErrors.Length),
+        (MoveKind.CorruptN1, FrameErrors.N1),
+        (MoveKind.CorruptIResponse, FrameErrors.IResponse),
+    };
+
+    private static FrameErrors FormOf(MoveKind kind) => CorruptKinds.First(c => c.Kind == kind).Form;
+
+    /// <summary>
+    /// Whether a frame can arrive corrupted in this form: a control field
+    /// error can hit any frame; an information field where none is permitted
+    /// an S or U frame that may not carry one (not I, UI or FRMR); a length
+    /// error an S or U frame other than UI (whose length is UI Check's N1
+    /// test); the N1 failure and the I response an I frame, and only at a
+    /// station in Connected or TimerRecovery, the pages that draw an I frame
+    /// input (elsewhere an I frame goes to a catch-all, corrupted or not).
+    /// </summary>
+    private static bool CorruptApplies(FrameErrors form, Frame frame, DataLinkMachine into) => form switch
+    {
+        FrameErrors.ControlField => true,
+        FrameErrors.InfoNotPermitted => frame.Type is not ("I" or "UI" or "FRMR"),
+        FrameErrors.Length => frame.Type is not ("I" or "UI"),
+        _ => frame.Type == "I" && IsDataState(into.State),
+    };
+
+    /// <summary>The frame-error input each form raises, and the DL-ERROR Indication the figures report it with.</summary>
+    private static (string Event, string Error) FrameErrorInput(FrameErrors form) => form switch
+    {
+        FrameErrors.ControlField => ("control_field_error", "DL-ERROR Indication (L)"),
+        FrameErrors.InfoNotPermitted => ("info_not_permitted_in_frame", "DL-ERROR Indication (M)"),
+        FrameErrors.Length => ("u_or_s_frame_length_error", "DL-ERROR Indication (N)"),
+        _ => ("I_received", "DL-ERROR Indication (O)"),
+    };
 
     private bool SubmitReady(SystemState s, Station station) =>
         _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
@@ -659,7 +754,7 @@ public sealed class Stepper
         }
         // A UI datagram is accounted for once it reaches its peer or the
         // channel drops it (UnitData); the only UI frames are datagrams.
-        if (_o.UnitData != FlowControlAt.None && move.Kind is MoveKind.Deliver or MoveKind.Duplicate or MoveKind.Drop
+        if (_o.UnitData != FlowControlAt.None && (move.Kind is MoveKind.Deliver or MoveKind.Duplicate or MoveKind.Drop || move.IsCorrupt)
             && s.Incoming(move.Station)[0].Type == "UI")
         {
             outcome = outcome with
@@ -670,7 +765,7 @@ public sealed class Stepper
         // The give-up rule: a frame reaching a station after its peer gave up
         // was sent at or after the give-up (T1 only fires with both channels
         // empty), so the station has heard it.
-        if (_o.AcceptGiveUp && move.Kind is MoveKind.Deliver or MoveKind.Duplicate && s.GaveUp(SystemState.Peer(move.Station)) != 0)
+        if (_o.AcceptGiveUp && (move.Kind is MoveKind.Deliver or MoveKind.Duplicate || move.IsCorrupt) && s.GaveUp(SystemState.Peer(move.Station)) != 0)
         {
             outcome = outcome with
             {
@@ -736,6 +831,42 @@ public sealed class Stepper
                     new StepRecord(number, $"channel {peer}->{station}", $"REORDERS {incoming[0].Render()} behind {incoming[1].Render()} (budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
                         null, Array.Empty<string>(), SummaryOf(next, Station.A), SummaryOf(next, Station.B)),
                     null);
+            }
+            case MoveKind.CorruptControl or MoveKind.CorruptInfo or MoveKind.CorruptLength or MoveKind.CorruptN1 or MoveKind.CorruptIResponse:
+            {
+                // The receiver sees the frame-error input, not the frame; the
+                // frame itself is lost. N1 and I response are I frame inputs
+                // with the atom false or the command bit lost.
+                var frame = incoming[0];
+                var form = FormOf(move.Kind);
+                var m = s.Machine(station);
+                EventInput? input;
+                if (form is FrameErrors.N1 or FrameErrors.IResponse)
+                {
+                    input = FrameInput(m, form == FrameErrors.IResponse ? frame with { Command = false } : frame, station, n1Fails: form == FrameErrors.N1);
+                }
+                else
+                {
+                    var ev = FrameErrorInput(form).Event;
+                    input = Handles(m, ev) ? new EventInput(ev)
+                        : Handles(m, "all_other_primitives__from_lower_layer") ? new EventInput("all_other_primitives__from_lower_layer")
+                        : null;
+                }
+                var what = form switch
+                {
+                    FrameErrors.ControlField => "control field error",
+                    FrameErrors.InfoNotPermitted => "information field not permitted",
+                    FrameErrors.Length => "U or S frame length error",
+                    FrameErrors.N1 => "information field fails the N1 check",
+                    _ => "arrives as a response",
+                };
+                var outcome = Inject(s, station, input,
+                    $"receives {frame.Render()} from {peer} corrupted: {what} (channel fault: FRAME ERROR; budget {Inv(s.Budget)} -> {Inv(s.Budget - 1)})",
+                    incoming.Skip(1).ToList(), s.Budget - 1, clearOwed: false, number, frameType: null, corrupt: form);
+                // The give-up rule counts a corrupted frame as a loss, as a drop.
+                if (_o.AcceptGiveUp)
+                    outcome = outcome with { Next = outcome.Next with { LossesA = outcome.Next.LossesA + 1, LossesB = outcome.Next.LossesB + 1 } };
+                return outcome;
             }
             case MoveKind.Pop:
                 return Inject(s, station, new EventInput("I_frame_pops_off_queue"), "I frame pops off queue", incoming, s.Budget, clearOwed: false, number);
@@ -864,7 +995,7 @@ public sealed class Stepper
         return new StepOutcome(next, record, null);
     }
 
-    private EventInput? FrameInput(DataLinkMachine m, Frame frame, Station into)
+    private EventInput? FrameInput(DataLinkMachine m, Frame frame, Station into, bool n1Fails = false)
     {
         var ev = FrameEvent(m, frame);
         if (ev is null) return null;
@@ -872,7 +1003,8 @@ public sealed class Stepper
         {
             ["able_to_establish"] = !(_o.PeerDeclinesSabme && into == Station.B && frame.Type == "SABME"),
             // Only a long UI datagram fails the N1 check.
-            ["info_field_length_le_N1_and_content_is_octet_aligned"] = !(_o.UiForm == UiForm.Oversize && frame.Type == "UI"),
+            // and an I frame corrupted to fail it (FrameErrors.N1).
+            ["info_field_length_le_N1_and_content_is_octet_aligned"] = !(_o.UiForm == UiForm.Oversize && frame.Type == "UI") && !n1Fails,
         };
         return new EventInput(ev, Pf: frame.Pf, Command: frame.Command, Nr: frame.Nr, Ns: frame.Ns, Data: frame.Data, Atoms: atoms);
     }
@@ -922,7 +1054,7 @@ public sealed class Stepper
     /// the frame (reported as a MachineError).
     /// </summary>
     private StepOutcome Inject(SystemState s, Station station, EventInput? input, string action,
-        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null)
+        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null, FrameErrors corrupt = FrameErrors.None)
     {
         var peer = SystemState.Peer(station);
         var pre = s.Machine(station);
@@ -961,6 +1093,7 @@ public sealed class Stepper
         var reconnectPending = s.ReconnectPending(station);
         var report = s.Report(station);
         var connectReported = false;
+        var told = s.Told(station);
         var effectsText = new List<string>();
 
         if (result is not null)
@@ -1014,6 +1147,7 @@ public sealed class Stepper
                         if (ue.Primitive == "DL_CONNECT_confirm") reconnectPending = false;
                         report = 1;
                         connectReported = true;
+                        if (told >= 1) told = 2;
                         break;
                     case UpperEffect { Primitive: "DL_DISCONNECT_indication" or "DL_DISCONNECT_confirm" } ue:
                         // Layer 3 stops submitting once it is told the link is
@@ -1025,6 +1159,11 @@ public sealed class Stepper
                         break;
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
+                        break;
+                    case UpperEffect ue when IsErrorIndication(ue.Primitive):
+                        // The reset rule: layer 3 has been told of an error,
+                        // and is told of the reset once a connect report follows.
+                        told = 1;
                         break;
                     default:
                         break;
@@ -1045,6 +1184,22 @@ public sealed class Stepper
         // that lost its UI arm (the frame falls to a catch-all) is caught.
         if (violation is null && result is not null && frameType == "UI" && _o.UnitData != FlowControlAt.None && On(Invariants.UnitData))
             violation = UnitDataCheck(station, pre, input!, _o.UiForm == UiForm.Oversize, result.Effects);
+
+        // A corrupted frame (FrameError): reported with the DL-ERROR the
+        // figures draw for its form and not delivered, whatever event the
+        // page dispatched it as.
+        if (violation is null && result is not null && corrupt != FrameErrors.None && On(Invariants.FrameError))
+            violation = FrameErrorCheck(station, pre, corrupt, result.Effects);
+
+        // The reset rule's bookkeeping (FrameErrors): a station that sends
+        // SABM or SABME from Connected or TimerRecovery has reset the link;
+        // honestly only on the corrupted frame itself. A reset layer 3 asked
+        // for (DL-CONNECT Request) is not the data link's.
+        var resetMark = s.Reset(station);
+        if (_o.FrameErrors != FrameErrors.None && result is not null && IsDataState(pre.State) && input!.Event != "DL_CONNECT_request"
+            && result.Effects.OfType<FrameEffect>().Any(f => f.Frame is "SABM" or "SABME"))
+            resetMark = Math.Max(resetMark, corrupt != FrameErrors.None ? Honest : Unjustified);
+        if (_o.FrameErrors == FrameErrors.None) told = 0;
 
         // Layer-3 flow control bookkeeping and the busy-condition check
         // (§6.4.10: entering the busy condition is what DL-FLOW-OFF is for,
@@ -1127,6 +1282,10 @@ public sealed class Stepper
             GaveUpB = station == Station.B ? gaveUp : s.GaveUpB,
             T3LoopA = station == Station.A ? t3Loop : s.T3LoopA,
             T3LoopB = station == Station.B ? t3Loop : s.T3LoopB,
+            ResetA = station == Station.A ? resetMark : s.ResetA,
+            ResetB = station == Station.B ? resetMark : s.ResetB,
+            ToldA = station == Station.A ? told : s.ToldA,
+            ToldB = station == Station.B ? told : s.ToldB,
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
@@ -1212,6 +1371,26 @@ public sealed class Stepper
             && (dataState ? frames[0].Frame is "RR" or "RNR" : frames[0].Frame == "DM");
         return answered ? null : new Violation(Invariants.UnitData, station,
             $"{what} and sent {(frames.Count == 0 ? "nothing" : string.Join(", ", frames.Select(f => Frame.FromEffect(f).Render())))}: section 4.3.3.6 answers a UI command with P = 1 with {(dataState ? "RR or RNR" : "DM")} F=1");
+    }
+
+    private static bool IsErrorIndication(string primitive) =>
+        primitive.StartsWith("DL-ERROR", StringComparison.Ordinal) || primitive.StartsWith("DL_ERROR", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The FrameError check on one corrupted frame: the station reports the
+    /// DL-ERROR Indication the figures draw for the form ((L), (M), (N); (O)
+    /// for an I frame failing the N1 check and for an I response) and
+    /// delivers nothing upward.
+    /// </summary>
+    private static Violation? FrameErrorCheck(Station station, DataLinkMachine pre, FrameErrors form, IReadOnlyList<Effect> effects)
+    {
+        var expected = FrameErrorInput(form).Error;
+        var ups = effects.OfType<UpperEffect>().ToList();
+        if (ups.Any(e => e.Primitive is "DL_DATA_indication" or "DL_UNIT_DATA_indication"))
+            return new Violation(Invariants.FrameError, station,
+                $"station {station} in {pre.State} delivered a corrupted frame ({form}) upward");
+        return ups.Any(e => e.Primitive == expected) ? null : new Violation(Invariants.FrameError, station,
+            $"station {station} in {pre.State} received a corrupted frame ({form}) and did not report {expected} to layer 3");
     }
 
     /// <summary>A station whose own receiver is busy sends RNR, not RR, REJ or SREJ (§6.4.10).</summary>
