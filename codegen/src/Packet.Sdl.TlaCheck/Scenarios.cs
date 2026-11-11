@@ -150,6 +150,69 @@ public static class Scenarios
         Add("h1", "H1", TableSetKind.Current, H1, "Deadlock, 19");
         Add("h1-tr-quiescent", "H1 control", TableSetKind.Current, o => H1(o) with { TimerRecoveryIsQuiescent = true }, "clean");
 
+        // Coverage batch 1 (ax25spec#116, Phase 2): existing moves, new
+        // scenarios, chosen to fire table rows no earlier row reaches. A
+        // deadlock row explores its whole graph before reporting, so it fires
+        // every reachable row even though its verdict is the shortest
+        // deadlock.
+        //
+        // A duplicated UA reaches a station that is already Connected: figc4.4
+        // t17 resets the link (#114) and the reset SABM makes the peer discard
+        // its queue (#50), so both stations' data is lost. At modulo 8 with
+        // version 2.2 set, and at modulo 128.
+        ExplorerOptions Dup114(ExplorerOptions o, bool mod128) => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = mod128, DataAfterConfirm = true,
+        };
+        Add("d114-cold-dup-ua", "#114/#50", TableSetKind.Current, o => Dup114(o, false) with
+        {
+            FramesAb = 1, FramesBa = 1, Srej = true, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 7");
+        Add("d114-cold-dup-ua-mod128", "#114/#50", TableSetKind.Current, o => Dup114(o, true) with
+        {
+            FramesAb = 0, FramesBa = 1, N2 = 2, Budget = 1, Faults = FaultKinds.Duplicate,
+        }, "Deadlock, 6");
+        // The #44/#48 cold connect with B's data after its indication and
+        // drops and duplicates: the same two-step deadlock, a wider graph.
+        Add("d44-48-cold-faults", "#44/#48", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, PeerDeclinesSabme = true, DataAfterConfirm = true,
+            FramesAb = 0, FramesBa = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 2");
+        // #44 masks #45 with N2 = 2: the swallowed FRMR costs one try, one
+        // dropped SABM the other, and figc4.2 gives up.
+        Add("d45-cold-n2", "#44 masks #45", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, Peer = PeerKind.V20Frmr, FramesAb = 0, N2 = 2, Budget = 1, Faults = FaultKinds.Drop,
+        }, "Deadlock, 5");
+        Add("v20-frmr-dup", "#44/#45 control", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, Peer = PeerKind.V20Frmr, FramesAb = 0, Budget = 2, Faults = FaultKinds.Duplicate,
+        }, "clean");
+        // #91 (hypothesis H1) at k = 1 and at k = 2, reaching the figc4.5
+        // I-frame arms the h1 row does not.
+        Add("h1-k1", "#91 (H1)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 15");
+        Add("h1-k2-ab3", "#91 (H1)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 3, FramesBa = 1, K = 2, Budget = 2, Faults = FaultKinds.Drop,
+        }, "Deadlock, 17");
+
+        // The orderly release (ExplorerOptions.Release): layer 3 issues
+        // DL_DISCONNECT_request on an established link once everything is
+        // delivered; quiescence is then both stations Disconnected.
+        Add("release-a", "release control", TableSetKind.Current, o => o with { FramesAb = 2, Release = ReleaseBy.A }, "clean");
+        Add("release-both-cold", "release", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Srej = true, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.Both,
+        }, "clean");
+        Add("release-a-tr", "release, #91 rescued", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.A,
+        }, "clean");
+
         // Seeded defects (fixtures/README.md): no real defect fails these two
         // checks on any table set, so each has a deliberately broken table to
         // prove it can fire, in both tools.

@@ -56,6 +56,16 @@ public enum FlowControlAt
     Both,
 }
 
+/// <summary>Which stations' layer 3 issues DL_DISCONNECT_request (an orderly release) once the exchange is complete.</summary>
+public enum ReleaseBy
+{
+    None,
+    /// <summary>Station A's layer 3 only.</summary>
+    A,
+    /// <summary>Either station's layer 3 (so both may release at once).</summary>
+    Both,
+}
+
 /// <summary>What plays station B.</summary>
 public enum PeerKind
 {
@@ -153,6 +163,17 @@ public sealed record ExplorerOptions
     /// submit data too.
     /// </summary>
     public bool DataAfterConfirm { get; init; }
+
+    /// <summary>
+    /// Orderly release. The layer 3 of each station named here issues
+    /// DL_DISCONNECT_request once, on an established link (Connected or
+    /// TimerRecovery, the pages with a direct arm for it), once every frame
+    /// either station submitted has been delivered upward at its peer: the
+    /// application knows the exchange is complete. Quiescence then means both
+    /// stations Disconnected with everything delivered, not both Connected.
+    /// Table-driven peer only. Off by default.
+    /// </summary>
+    public ReleaseBy Release { get; init; } = ReleaseBy.None;
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase

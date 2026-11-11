@@ -99,6 +99,12 @@ public sealed class Tlc
             FlowControlAt.Both => new[] { "A", "B" },
             _ => Array.Empty<string>(),
         };
+        var releaseAt = o.Release switch
+        {
+            ReleaseBy.A => new[] { "A" },
+            ReleaseBy.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var stepChecks = new List<string>();
         if (On(Invariants.RejectCoherence)) stepChecks.Add("RejectCoherence");
         if (On(Invariants.Delivery)) stepChecks.Add("Delivery");
@@ -133,6 +139,7 @@ public sealed class Tlc
             _ => "\"v20-dm\"",
         });
         C("FlowAt", Set(flowAt));
+        C("ReleaseAt", Set(releaseAt));
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
         C("StepChecks", Set(stepChecks));

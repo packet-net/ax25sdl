@@ -595,4 +595,162 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.NoViolation);
     }
+
+    // ─── Coverage batch 1 (ax25spec#116 Phase 2): rows no earlier case reaches ──
+    //
+    // Each of these exists to fire table rows the rest of the suite never
+    // reaches (docs/tla.md, the coverage paragraph). A deadlock is reported
+    // only after the whole graph is explored, so a deadlock row fires every
+    // reachable row even though its verdict is the shortest deadlock.
+
+    [Fact]
+    public void Defect114_A_Duplicated_Ua_Resets_An_Up_Link_And_Both_Queues_Are_Lost()
+    {
+        // Cold connect at modulo 8 with version 2.2 set, each layer 3 holding
+        // one frame until its link is up. A's UA arrives twice: the first
+        // connects A, the second hits Connected, where figc4.4 t17 resets the
+        // link (ax25spec#114) and discards A's queued frame; B takes the reset
+        // SABM on figc4.4 t14, whose Clear Exception Conditions discards B's
+        // queue too (the #50 class). Both links come back up with nothing to send.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, DataAfterConfirm = true,
+            FramesAb = 1, FramesBa = 1, Srej = true, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t04_ua_received_yes_yes");
+        result.Trace[3].Transition.Should().Be("t17_ua_received_yes", "#114: the duplicate UA resets an up link");
+        result.Trace[5].Transition.Should().Be("t14_sabm_received_yes", "#50: the reset discards the responder's queue");
+        result.Violation.Message.Should().Contain("delivered at A: 0/1, at B: 0/1");
+        result.CounterexampleLength.Should().Be(7);
+    }
+
+    [Fact]
+    public void Defect114_At_Modulo_128_The_Duplicated_Ua_Resets_Through_The_Modulo_8_Arm()
+    {
+        // The same duplicate at modulo 128: A's version 2.2 flag is clear (the
+        // tables never set it on a SABME connect, #44/#54), so figc4.4 takes
+        // t17_ua_received_no and re-establishes with SABME from Awaiting
+        // Connection; B resets on it and discards its frame.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, DataAfterConfirm = true,
+            FramesAb = 0, FramesBa = 1, N2 = 2, Budget = 1, Faults = FaultKinds.Duplicate,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[2].Transition.Should().Be("t17_ua_received_no");
+        result.Trace[4].Transition.Should().Be("t15_sabme_received_yes");
+        result.Violation.Message.Should().Contain("delivered at A: 0/1");
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void Defect44_48_Cold_Connect_With_Faults_Still_Dies_On_The_Dm_First()
+    {
+        // The #44/#48 seed with B's data after its indication, drops and
+        // duplicates: a wider graph, the same two-step deadlock.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, PeerDeclinesSabme = true, DataAfterConfirm = true,
+            FramesAb = 0, FramesBa = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t03_dm_received_yes");
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Defect45_Cold_With_N2_Of_2_The_Swallowed_Frmr_Costs_The_Connect()
+    {
+        // #44 masks #45 with N2 = 2: the FRMR is swallowed by figc4.2's
+        // catch-all, so one try is gone; the T1 retry's SABM is dropped, and
+        // the second expiry gives up (t05_t1_expiry_yes). With the fallback
+        // the figures intend, the FRMR would have been answered by a SABM at
+        // once and the retry would have connected.
+        var result = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { N2 = 2, Budget = 1, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[1].Transition.Should().Be("t06_all_other_primitives__from_lower_layer");
+        result.Trace[^1].Transition.Should().Be("t05_t1_expiry_yes");
+        result.Trace[^1].SummaryA.Should().StartWith("Disconnected");
+        result.CounterexampleLength.Should().Be(5);
+
+        Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Budget = 2, Faults = FaultKinds.Duplicate })
+            .Outcome.Should().Be(Outcome.NoViolation, "duplicated FRMR, SABM and UA all resolve");
+    }
+
+    [Theory]
+    [InlineData(1, 2, 1, 15, Station.A)]
+    [InlineData(3, 1, 2, 17, Station.B)]
+    public void HypothesisH1_Also_Strands_A_Station_At_Other_Windows(int ab, int ba, int k, int length, Station stuck)
+    {
+        // ax25spec#91 (H1) again, from scenarios that reach figc4.5 I-frame
+        // arms the h1 row does not: the station is left in TimerRecovery with
+        // T1 stopped and nothing outstanding.
+        var faults = k == 1 ? FaultKinds.Drop | FaultKinds.Duplicate : FaultKinds.Drop;
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = ab, FramesBa = ba, K = k, Budget = 2, Faults = faults,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        var summary = stuck == Station.A ? result.Trace[^1].SummaryA : result.Trace[^1].SummaryB;
+        summary.Should().StartWith("TimerRecovery").And.Contain("t1=stopped");
+        result.CounterexampleLength.Should().Be(length);
+    }
+
+    // ─── The orderly release (ExplorerOptions.Release) ─────────────────
+
+    [Fact]
+    public void Release_After_Delivery_Disconnects_Both_Stations_Cleanly()
+    {
+        // A's layer 3 issues DL_DISCONNECT_request once both of its frames are
+        // delivered: DISC, UA, both Disconnected, which is quiescence here.
+        Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, FramesAb = 2, Release = ReleaseBy.A })
+            .Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    [Fact]
+    public void Release_By_Either_Station_After_A_Cold_Connect_With_Faults_Is_Clean()
+    {
+        // Either layer 3 may release (so both DISCs can cross), with drops and
+        // duplicates on the connect and on the release.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Srej = true,
+            Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.Both,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(829);
+        result.FiredTransitions.Should().Contain(new[]
+        {
+            "Connected/t01_dl_disconnect_request", "Connected/t19_disc_received", "AwaitingRelease/t03_ua_received_yes",
+            "AwaitingRelease/t12_disc_received", "AwaitingRelease/t02_t1_expiry_no", "Disconnected/t12_disc_received",
+        });
+    }
+
+    [Fact]
+    public void Release_Rescues_The_Station_Hypothesis_H1_Strands()
+    {
+        // The h1-k1 scenario with A's layer 3 releasing: the station stranded
+        // in TimerRecovery (#91) is taken out of it by DL_DISCONNECT_request,
+        // so the run is clean. A release scenario therefore cannot see #91.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 2, K = 1, Budget = 2,
+            Faults = FaultKinds.Drop | FaultKinds.Duplicate, Release = ReleaseBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t01_dl_disconnect_request");
+    }
+
+    [Fact]
+    public void Release_Is_For_The_Table_Driven_Peer_Only()
+    {
+        var act = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Release = ReleaseBy.A });
+        act.Should().Throw<ArgumentException>();
+    }
 }
