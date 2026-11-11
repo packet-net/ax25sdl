@@ -1993,6 +1993,24 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void A_Reset_At_Modulo_128_Reaches_Timer_Recovery_With_SABME()
+    {
+        // t3-reconnect-cold-mod128: t3-reconnect-cold with A at modulo 128.
+        // B's keepalive poll puts B in Timer Recovery and A's layer 3 reset
+        // sends SABME, which reaches figc4.5's SABME column with V(s) = V(a)
+        // (t14_sabme_received_yes, residue until this batch). The verdict is
+        // the same #167 livelock as at modulo 8.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        result.StatesExplored.Should().Be(45);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t14_sabme_received_yes");
+    }
+
+    [Fact]
     public void Seeded_An_Unreported_Frame_Error_Is_Caught()
     {
         var result = Run(Fe(FrameErrors.ControlField, Fixtures.FrameErrorUnreportedDir) with { FramesAb = 1 });
