@@ -5,8 +5,8 @@ var usage = """
 usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
 
   --tables DIR           JSON tables directory (default spec/json)
-  --frames-ab N          I frames A submits for B, 0..3 (default 2)
-  --frames-ba N          I frames B submits for A, 0..3 (default 0)
+  --frames-ab N          I frames A submits for B, 0 or more (default 2; the space grows fast)
+  --frames-ba N          I frames B submits for A, 0 or more (default 0; the space grows fast)
   --k N                  window size 1..7 (default 4; keep <= 4 unless testing the k > modulus/2 constraint)
   --srej                 selective reject negotiated (default off)
   --n2 N                 retry limit (default 4)

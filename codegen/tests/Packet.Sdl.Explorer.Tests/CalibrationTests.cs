@@ -343,13 +343,17 @@ public class CalibrationTests(ITestOutputHelper output)
     {
         // figc4.1's SABME arm says "Set Version 2.2" as a processing box,
         // not a call of the Set_Version_2_2 subroutine (ax25spec#54), so B
-        // takes the v2.2 flag but keeps modulo 8 while A runs at 128. With
+        // takes the v2.2 flag but keeps modulo 8 while A runs at 128. (A is
+        // at 128 only because the --mod128 seed sets it by hand: A's own
+        // connect path never applies the modulus either, the same #54
+        // defect on the initiator side.) With
         // k = 1 and nine frames, B acknowledges a7 with N(r) = 0; A expects
         // 8, takes it as an N(r) error (DL-ERROR J), re-establishes, and the
         // re-establishment discards a8: deadlock with 8 of 9 delivered.
         var result = Run(ColdThenData(mod128: true) with { FramesAb = 9, K = 1 });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Violation.Message.Should().Contain("at B: 8/9", "a8 is lost: 8 of 9 delivered");
         result.Trace[^3].Transition.Should().Be("t21_rr_received_no_no", "A's N(r) check fails on B's wrapped N(r)");
         result.Trace[^3].Effects.Should().Contain(e => e.Contains("DL-ERROR Indication (J)", StringComparison.Ordinal));
         result.Trace[^1].SummaryA.Should().StartWith("Connected vs=0 va=0 vr=0").And.Contain("q=[]");
