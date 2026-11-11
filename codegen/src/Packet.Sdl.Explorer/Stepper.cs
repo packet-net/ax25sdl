@@ -1234,9 +1234,13 @@ public sealed class Stepper
                     case LmEffect { Primitive: "LM_seize_request" }:
                         owed = true;
                         break;
-                    case UpperEffect ue when IsErrorIndication(ue.Primitive):
-                        // The reset rule: layer 3 has been told of an error,
-                        // and is told of the reset once a connect report follows.
+                    case UpperEffect ue when ue.Primitive == "DL-ERROR Indication (F)"
+                                             || (corrupt != FrameErrors.None && ue.Primitive == FrameErrorInput(corrupt).Error):
+                        // The reset rule: layer 3 has been told of the error
+                        // behind a reset (the corrupted frame's own code at
+                        // the station that received it, (F) "data link reset"
+                        // at a station that takes the peer's SABM), and of the
+                        // reset once a connect report follows.
                         told = 1;
                         break;
                     default:
@@ -1446,9 +1450,6 @@ public sealed class Stepper
         return answered ? null : new Violation(Invariants.UnitData, station,
             $"{what} and sent {(frames.Count == 0 ? "nothing" : string.Join(", ", frames.Select(f => Frame.FromEffect(f).Render())))}: section 4.3.3.6 answers a UI command with P = 1 with {(dataState ? "RR or RNR" : "DM")} F=1");
     }
-
-    private static bool IsErrorIndication(string primitive) =>
-        primitive.StartsWith("DL-ERROR", StringComparison.Ordinal) || primitive.StartsWith("DL_ERROR", StringComparison.Ordinal);
 
     /// <summary>
     /// The FrameError check on one corrupted frame: the station reports the

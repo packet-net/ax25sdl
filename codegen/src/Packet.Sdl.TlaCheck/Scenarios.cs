@@ -53,6 +53,8 @@ public enum TableSetKind
     ResetUnconfirmed,
     /// <summary>A seeded-defect fixture (fixtures/tables-rr-resets): an in-window RR in Connected resets the link.</summary>
     RrResets,
+    /// <summary>A seeded-defect fixture (fixtures/tables-reset-wrong-code): Connected reports a reset by the peer (SABM, V(s) != V(a)) as DL-ERROR (A), not (F).</summary>
+    ResetWrongCode,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -580,7 +582,7 @@ public static class Scenarios
         {
             FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop,
         }, "Deadlock, 4");
-        Add("fe-iresp-trq", "I response in Timer Recovery (unfiled lead)", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with
+        Add("fe-iresp-trq", "ax25spec#175, #176", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with
         {
             FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop, TimerRecoveryIsQuiescent = true,
         }, "clean");
@@ -592,6 +594,18 @@ public static class Scenarios
         {
             Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
         }, "Quiescence");
+
+        // From the review of batch 6: rows the first cut recorded as not fired.
+        Add("tr-rej", "#91 (H1)", TableSetKind.Current, o => o with { FramesAb = 1, FramesBa = 3, K = 2, Budget = 3, Faults = FaultKinds.Drop }, "Deadlock, 17");
+        Add("tr-srej-rc-off", "#42 (runaway), masked by #42/#47 with the checks on", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, FramesBa = 2, Srej = true, Budget = 4, Faults = FaultKinds.Drop,
+            Invariants = Default & ~Invariants.RejectCoherence & ~Invariants.Delivery,
+        }, "SequenceSanity at A, 24");
+        Add("dl-error-u", "ax25spec#168", TableSetKind.Current, o => o with
+        {
+            FramesAb = 0, LocalBusy = FlowControlAt.B, LongBusy = true, T3 = true, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "Deadlock, 6");
 
         // Coverage batch 6, part 2: injected frames (Inject, InjectedFrame).
         ExplorerOptions Inj(ExplorerOptions o, FlowControlAt at, InjectedFrame f) => o with { Inject = at, InjectedFrame = f, Budget = 0 };
@@ -612,6 +626,7 @@ public static class Scenarios
         Add("seeded-fe-arms-deleted", "seeded (frame error on a catch-all)", TableSetKind.FrameErrorArmsDeleted, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, "FrameError at A, 3");
         Add("seeded-reset-unconfirmed", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, "Deadlock, 4");
         Add("seeded-reset-unconfirmed-a", "seeded (reset loss needs layer 3 told)", TableSetKind.ResetUnconfirmed, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, "Deadlock, 6");
+        Add("seeded-reset-wrong-code", "seeded (told by the reset's own code)", TableSetKind.ResetWrongCode, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "Deadlock, 4");
         Add("seeded-rr-resets", "seeded (unjustified reset never rests)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, Budget = 0 }, "Deadlock, 6");
         Add("seeded-rr-resets-loss", "seeded (unjustified reset is no reset loss)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 2, K = 1, Budget = 0 }, "Deadlock, 6");
 

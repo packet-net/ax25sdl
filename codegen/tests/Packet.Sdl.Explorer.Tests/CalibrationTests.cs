@@ -1954,7 +1954,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[1].Transition.Should().Be("t26_i_received_yes_no_no");
         result.Trace[^1].Transition.Should().Be("t04_ua_received_yes_no_yes");
         result.CounterexampleLength.Should().Be(4);
-        result.StatesExplored.Should().Be(2114);
+        result.StatesExplored.Should().Be(2124);
         result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t22_i_received_yes_no", "TimerRecovery/t22_i_received_no" });
     }
 
@@ -2008,6 +2008,72 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Quiescence);
         result.StatesExplored.Should().Be(45);
         result.FiredTransitions.Should().Contain("TimerRecovery/t14_sabme_received_yes");
+    }
+
+    [Fact]
+    public void Timer_Recovery_Reaches_Its_Reject_Exception_Arm_Before_H1()
+    {
+        // tr-rej (from the review of batch 6): figc4.5's I frame arm with a
+        // reject exception fires with all checks on; the row ends in H1.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 3, K = 2, Budget = 3, Faults = FaultKinds.Drop,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery");
+        result.CounterexampleLength.Should().Be(17);
+        result.StatesExplored.Should().Be(3666);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_yes_no");
+    }
+
+    [Fact]
+    public void Timer_Recovery_Reaches_Its_SREJ_Exception_Arm_With_The_Checks_Off()
+    {
+        // tr-srej-rc-off: with SREJ the #42/#47 checks fire first; with
+        // reject coherence and delivery off the row reaches the arm with an
+        // SREJ outstanding on the way to the #42 runaway, which the SREJ
+        // count bound catches (as d42-rc-off).
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 1, FramesBa = 2, Srej = true, Budget = 4, Faults = FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence & ~Invariants.Delivery,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.SequenceSanity);
+        result.Violation.Station.Should().Be(Station.A);
+        result.CounterexampleLength.Should().Be(24);
+        result.StatesExplored.Should().Be(2753);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_yes");
+    }
+
+    [Fact]
+    public void A_Lost_Poll_To_A_Busy_Peer_Ends_In_DL_ERROR_U()
+    {
+        // dl-error-u, ax25spec#168: after the RNR A polls on T1, the poll
+        // is lost, and with N2 = 1 the next expiry gives up with DL-ERROR U.
+        // The give-up rule calls it unjustified (one loss against N2 + 1).
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 0, LocalBusy = FlowControlAt.B, LongBusy = true, T3 = true, N2 = 1,
+            Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[4].Transition.Should().Be("t21_t1_expiry_yes_yes_yes");
+        result.Trace[4].Effects.Should().Contain(e => e.Contains("DL-ERROR Indication (U)", StringComparison.Ordinal));
+        result.CounterexampleLength.Should().Be(6);
+    }
+
+    [Fact]
+    public void Seeded_A_Reset_Told_With_The_Wrong_Code_Is_Not_A_Reset_Loss()
+    {
+        // The peer reports the reset as DL-ERROR (A), not (F): its layer 3
+        // was not told what happened, so the loss of a0 is a deadlock.
+        var result = Run(Fe(FrameErrors.ControlField, Fixtures.ResetWrongCodeDir) with { FramesAb = 1 });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(4);
     }
 
     [Fact]

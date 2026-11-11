@@ -69,6 +69,9 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which Awaiting Connection does not confirm a connect layer 3 initiated.</summary>
     public static string ResetUnconfirmedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed");
 
+    /// <summary>The TlaCheck seeded fixture in which Connected reports a reset by the peer as DL-ERROR (A), not (F).</summary>
+    public static string ResetWrongCodeDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code");
+
     /// <summary>The TlaCheck seeded fixture in which an in-window RR in Connected resets the link.</summary>
     public static string RrResetsDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets");
 

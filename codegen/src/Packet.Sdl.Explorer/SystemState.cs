@@ -127,7 +127,6 @@ public sealed record SystemState
 
     public bool UiDoneB { get; init; }
 
-    /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     /// <summary>
     /// With <see cref="ExplorerOptions.FrameErrors"/>, the link resets each
     /// station has made (sent SABM or SABME from Connected or TimerRecovery):
@@ -152,6 +151,7 @@ public sealed record SystemState
 
     public bool InjectedB { get; init; }
 
+    /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
 
     public DataLinkMachine Machine(Station s) => s == Station.A ? A : B;

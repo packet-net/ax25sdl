@@ -26,7 +26,7 @@ deadlock), and the same number of distinct states (clean runs).
 
 A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
-unreachable, with their reasons.
+not fired, each with its status and reason.
 
 exit code: 0 every row agrees (and the accounting holds), 1 some row
 disagrees, a run failed, or the accounting does not hold
@@ -87,6 +87,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.FrameErrorArmsDeleted => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-frame-error-arms-deleted"),
     TableSetKind.ResetUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed"),
     TableSetKind.RrResets => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets"),
+    TableSetKind.ResetWrongCode => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -306,6 +307,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.FrameErrorArmsDeleted => "seeded frame-error-arms-deleted",
     TableSetKind.ResetUnconfirmed => "seeded reset-unconfirmed",
     TableSetKind.RrResets => "seeded rr-resets",
+    TableSetKind.ResetWrongCode => "seeded reset-wrong-code",
     _ => "seeded livelock",
 };
 

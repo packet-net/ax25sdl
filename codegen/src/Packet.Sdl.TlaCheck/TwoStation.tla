@@ -187,13 +187,6 @@ ErrCode(form) ==
       [] form = "length" -> "DL-ERROR Indication (N)"
       [] OTHER -> "DL-ERROR Indication (O)"
 
-\* Every DL-ERROR Indication spelling the tables use (Stepper.IsErrorIndication
-\* matches the prefix).
-ErrorPrims ==
-    {"DL-ERROR Indication (" \o c \o ")" :
-        c \in {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "add"}}
-    \cup {"DL_ERROR_indication_D", "DL_ERROR_indication_C_D"}
-
 \* A corrupted frame's handling (Stepper.FrameErrorCheck): reported with the
 \* DL-ERROR the figures draw for its form, and not delivered upward.
 FrameErrorCheck(s, pre, form, fx) ==
@@ -244,9 +237,10 @@ Route(s, m, fx, acc, flowOff, i) ==
                      THEN [acc EXCEPT !.up = IF DataAfterConfirm THEN FALSE ELSE @,
                                       !.pend = IF fe.prim = "DL_DISCONNECT_indication" THEN FALSE ELSE @, !.rep = 2]
                 ELSE IF fe.kind = "lm" /\ fe.prim = "LM_seize_request" THEN [acc EXCEPT !.owed = TRUE]
-                \* The reset rule: layer 3 has been told of an error, and of the
-                \* reset once a connect report follows.
-                ELSE IF fe.kind = "dl" /\ fe.prim \in ErrorPrims THEN [acc EXCEPT !.told = 1]
+                \* The reset rule: layer 3 has been told of the error behind a
+                \* reset (acc.tell: the corrupted frame's own code, or (F) "data
+                \* link reset"), and of the reset once a connect report follows.
+                ELSE IF fe.kind = "dl" /\ fe.prim \in acc.tell THEN [acc EXCEPT !.told = 1]
                 ELSE acc
          IN  Route(s, m, fx, nxt, flowOff, i + 1)
 
@@ -282,7 +276,8 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         \* was busy delivers nothing either (the flow-off delivery check).
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
-                    pend |-> S.pend[s], rep |-> S.rep[s], told |-> S.told[s], v |-> v1],
+                    pend |-> S.pend[s], rep |-> S.rep[s], told |-> S.told[s],
+                    tell |-> {"DL-ERROR Indication (F)"} \cup (IF e.fe # "" THEN {ErrCode(e.fe)} ELSE {}), v |-> v1],
                    S.off[s] \/ (BusyAt # {} /\ pre.own), 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0

@@ -55,13 +55,14 @@ public static class Coverage
 
     /// <summary>
     /// The accounting check: the rows never fired must be exactly the rows
-    /// <c>unfired.txt</c> records as unreachable, each with its group and
+    /// <c>unfired.txt</c> records as not fired, each with its group, status and
     /// reason. A listed row that fires, or an unfired row that is not
     /// listed, is reported and fails the run, so the list cannot rot.
     /// </summary>
     public static (bool Ok, string Text) CheckExpectedUnfired(string currentDir, string listPath, IReadOnlyList<string> neverFired)
     {
         var expected = new Dictionary<string, string>(StringComparer.Ordinal);
+        var status = new Dictionary<string, string>(StringComparer.Ordinal);
         var groups = new List<string>();
         string? group = null;
         foreach (var raw in File.ReadAllLines(listPath))
@@ -70,7 +71,11 @@ public static class Coverage
             if (line.Length == 0 || line.StartsWith('#')) continue;
             if (line.StartsWith("group ", StringComparison.Ordinal))
             {
-                group = line[6..line.IndexOf(':', StringComparison.Ordinal)];
+                var parts = line[6..].Split(':', 3);
+                if (parts.Length < 3 || parts[1].Trim() is not ("spec" or "harness" or "not-yet"))
+                    throw new InvalidOperationException($"{listPath}: `{line}` is not \"group <name>: spec|harness|not-yet: <reason>\"");
+                group = parts[0].Trim();
+                status[group] = parts[1].Trim();
                 groups.Add(group);
                 continue;
             }
@@ -84,9 +89,10 @@ public static class Coverage
         var unlisted = neverFired.Where(k => !expected.ContainsKey(k)).ToList();
         var sb = new StringBuilder();
         var total = inventory.Count;
-        sb.Append(CultureInfo.InvariantCulture, $"Accounting: {total - never.Count} of {total} rows fired, {expected.Count - firedButListed.Count - unknown.Count} recorded unreachable in {groups.Count} groups ({Path.GetFileName(listPath)}), {unlisted.Count} unaccounted.\n");
+        int Count(string st) => expected.Count(kv => status[kv.Value] == st && never.Contains(kv.Key));
+        sb.Append(CultureInfo.InvariantCulture, $"Accounting: {total - never.Count} of {total} rows fired, {never.Count - unlisted.Count} not fired and each accounted for with a reason in {groups.Count} groups ({Path.GetFileName(listPath)}): {Count("spec")} unreachable in the specification as transcribed, {Count("harness")} not reachable in this harness, {Count("not-yet")} not yet reached; {unlisted.Count} unaccounted.\n");
         foreach (var k in unknown) sb.Append("  listed but not a row of the current tables: ").Append(k).Append('\n');
-        foreach (var k in firedButListed) sb.Append("  listed as unreachable but fired: ").Append(k).Append(" (group ").Append(expected[k]).Append(")\n");
+        foreach (var k in firedButListed) sb.Append("  listed as not fired but fired: ").Append(k).Append(" (group ").Append(expected[k]).Append(")\n");
         foreach (var k in unlisted) sb.Append("  never fired and not listed: ").Append(k).Append('\n');
         return (unknown.Count == 0 && firedButListed.Count == 0 && unlisted.Count == 0, sb.ToString());
     }
