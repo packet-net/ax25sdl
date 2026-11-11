@@ -19,6 +19,8 @@ public enum TableSetKind
     ReleaseStuck,
     /// <summary>A seeded-defect fixture (fixtures/tables-dm-ignored): Connected ignores a DM and stays up.</summary>
     DmIgnored,
+    /// <summary>A seeded-defect fixture (fixtures/tables-reconnect-swallowed): Connected ignores DL-CONNECT Request.</summary>
+    ReconnectSwallowed,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -288,6 +290,69 @@ public static class Scenarios
             FramesAb = 2, K = 2, Srej = true, Budget = 4, Faults = FaultKinds.Reorder | FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, "SequenceSanity at B, 16");
 
+        // Coverage batch 3: layer 3 primitives. Upper-layer primitives with no
+        // arm on the page go to its all_other_primitives__from_upper_layer
+        // catch-all, and a layer 3 that is told its link is down stops
+        // submitting until the link is reported up again. This scenario was a
+        // MachineError on main (A's layer 3 submitted into Disconnected at
+        // step 15); now the whole graph is explored.
+        Add("l3-down-mod128", "layer 3 link-down", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, DataAfterConfirm = true, FramesAb = 1, FramesBa = 1,
+            Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 7");
+
+        // DL_CONNECT_request on a live or waiting link (ExplorerOptions.Reconnect),
+        // once everything is delivered; the layer 3 must then get its confirm
+        // (or a DL_DISCONNECT_indication).
+        Add("reconnect-a", "reconnect control", TableSetKind.Current, o => o with { FramesAb = 2, Reconnect = ReconnectBy.A }, "clean");
+        Add("reconnect-both-srej", "reconnect control", TableSetKind.Current, o => o with { FramesAb = 2, Srej = true, Reconnect = ReconnectBy.Both }, "clean");
+        Add("reconnect-cold", "reconnect control", TableSetKind.Current, o => o with { Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A }, "clean");
+        Add("reconnect-v22", "reconnect control", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.A,
+        }, "clean");
+        Add("reconnect-both-cold", "reconnect control", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, Reconnect = ReconnectBy.Both,
+        }, "clean");
+        // figc4.5's DL-CONNECT Request stays in Timer Recovery, so the UA that
+        // answers its own SABM arrives on an up link and resets it (#114); the
+        // reset clears Layer 3 Initiated and the layer 3 never gets a confirm.
+        Add("reconnect-tr", "#114 (figc4.5 t07)", TableSetKind.Current, o => o with
+        {
+            FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.A,
+        }, "Deadlock, 12");
+        // A reset of the #44/#54 mod-128 link: B (version 2.2 flag, modulo 8)
+        // sends SABM from Awaiting V2.2 Connection and retries with SABME, A
+        // (modulo 128, flag clear) waits in Awaiting Connection and answers
+        // that SABME with DM (#115's crossing), B tears down on it (#48).
+        Add("reconnect-cold-mod128", "#44/#54, #115, #48", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.Both,
+        }, "Deadlock, 10");
+
+        // DL_DISCONNECT_request while the link is being set up
+        // (ExplorerOptions.ReleaseEarly). Figures C4.2 and C4.6 draw a Save
+        // (Requeue); codegen does not emit it yet (packet-net/ax25sdl#97), so
+        // the generated tables drop the request and the link comes up.
+        Add("release-early-cold", "ax25sdl#97", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
+        }, "Deadlock, 3");
+        Add("release-early-v22", "ax25sdl#97", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
+        }, "Deadlock, 3");
+
+        // Data offered before the confirm as a move (ExplorerOptions.DataBeforeConfirm):
+        // a0 offered while A awaits the UA is discarded (ax25spec#161), a1
+        // offered after it is delivered, and B sees the gap.
+        Add("d161-move", "ax25spec#161", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, DataAfterConfirm = true, DataBeforeConfirm = true, FramesAb = 2,
+        }, "Delivery at B, 6");
+
         // Seeded defects (fixtures/README.md): no real defect fails these two
         // checks on any table set, so each has a deliberately broken table to
         // prove it can fire, in both tools.
@@ -304,6 +369,10 @@ public static class Scenarios
             FramesAb = 1, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
         }, "Deadlock");
         Add("seeded-release-stuck", "seeded (release rest)", TableSetKind.ReleaseStuck, o => o with { FramesAb = 2, Release = ReleaseBy.A }, "Deadlock");
+        // The reconnect answer rule: Connected ignores DL-CONNECT Request, so
+        // the link stays up and quiet but A's layer 3 never hears back. Both
+        // tools must call that stuck (reconnect-a on the real tables is clean).
+        Add("seeded-reconnect-swallowed", "seeded (reconnect answer)", TableSetKind.ReconnectSwallowed, o => o with { FramesAb = 2, Reconnect = ReconnectBy.A }, "Deadlock, 7");
 
         return list;
     }

@@ -72,6 +72,16 @@ public sealed record SystemState
 
     public bool ReleasedB { get; init; }
 
+    /// <summary>With <see cref="ExplorerOptions.Reconnect"/>: station A's layer 3 has issued its DL_CONNECT_request on a live or waiting link.</summary>
+    public bool ReconnectedA { get; init; }
+
+    public bool ReconnectedB { get; init; }
+
+    /// <summary>With <see cref="ExplorerOptions.Reconnect"/>: station A's layer 3 is waiting for the answer to that request (DL_CONNECT_confirm or DL_DISCONNECT_indication).</summary>
+    public bool ReconnectPendingA { get; init; }
+
+    public bool ReconnectPendingB { get; init; }
+
     /// <summary>With <see cref="ExplorerOptions.AcceptGiveUp"/>: frames dropped on either channel since station A last made progress.</summary>
     public int LossesA { get; init; }
 
@@ -101,6 +111,10 @@ public sealed record SystemState
     public int Offered(Station s) => s == Station.A ? OfferedA : OfferedB;
 
     public bool Released(Station s) => s == Station.A ? ReleasedA : ReleasedB;
+
+    public bool Reconnected(Station s) => s == Station.A ? ReconnectedA : ReconnectedB;
+
+    public bool ReconnectPending(Station s) => s == Station.A ? ReconnectPendingA : ReconnectPendingB;
 
     public int Losses(Station s) => s == Station.A ? LossesA : LossesB;
 
@@ -141,7 +155,8 @@ public sealed record SystemState
           .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB))
           .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0')
           .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB))
-          .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0');
+          .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0')
+          .Append("|c").Append(ReconnectedA ? '1' : '0').Append(ReconnectedB ? '1' : '0').Append(ReconnectPendingA ? '1' : '0').Append(ReconnectPendingB ? '1' : '0');
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

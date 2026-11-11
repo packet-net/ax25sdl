@@ -65,6 +65,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.AckBroken => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-ack-broken"),
     TableSetKind.ReleaseStuck => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck"),
     TableSetKind.DmIgnored => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-dm-ignored"),
+    TableSetKind.ReconnectSwallowed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -245,6 +246,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.AckBroken => "seeded ack-broken",
     TableSetKind.ReleaseStuck => "seeded release-stuck",
     TableSetKind.DmIgnored => "seeded dm-ignored",
+    TableSetKind.ReconnectSwallowed => "seeded reconnect-swallowed",
     _ => "seeded livelock",
 };
 

@@ -21,8 +21,13 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --mod128               seed A at modulo 128 so DL_CONNECT_request sends SABME
   --data-after-confirm   disconnected seed: each station's layer 3 submits its data only once the link is up
                          (DL_CONNECT_confirm at A, DL_CONNECT_indication at B); B may then have data too
+  --data-before-confirm  with the disconnected seed: A's layer 3 submits its data by moves from the start, without
+                         waiting for DL_CONNECT_confirm (implies --data-after-confirm for B)
   --release A|both       that station's layer 3 (or either's) issues DL_DISCONNECT_request once, on an established
                          link, when everything both sides submitted is delivered; quiescence is then both Disconnected
+  --release-early        with --release: the release may also come while the link is being set up
+  --reconnect A|both     that station's layer 3 (or either's) issues DL_CONNECT_request once, on a live or waiting
+                         link, when everything both sides submitted is delivered, and must then get its confirm
   --accept-give-up       the give-up rule: a station that exhausts N2 after enough losses since its last progress
                          has given up honestly, and a settled honest give-up with everything delivered is quiescent
                          (one that lost data is a give-up-loss violation; an unjustified give-up never rests)
@@ -43,13 +48,14 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 
 string tables = "spec/json";
 int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
-bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
+bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, dataBeforeConfirm = false, releaseEarly = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
 var peer = PeerKind.Tables;
 var flowControl = FlowControlAt.None;
 var release = ReleaseBy.None;
+var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
 
 try
@@ -90,6 +96,15 @@ try
                     var v => throw new ArgumentException($"unknown release station `{v}` (A, both, none)"),
                 };
                 break;
+            case "--reconnect":
+                reconnect = Next(args, ref i) switch
+                {
+                    "A" or "a" => ReconnectBy.A,
+                    "both" => ReconnectBy.Both,
+                    "none" => ReconnectBy.None,
+                    var v => throw new ArgumentException($"unknown reconnect station `{v}` (A, both, none)"),
+                };
+                break;
             case "--peer":
                 peer = Next(args, ref i) switch
                 {
@@ -103,6 +118,8 @@ try
             case "--peer-declines-sabme": peerDeclines = true; break;
             case "--mod128": mod128 = true; break;
             case "--data-after-confirm": dataAfterConfirm = true; break;
+            case "--data-before-confirm": dataAfterConfirm = true; dataBeforeConfirm = true; break;
+            case "--release-early": releaseEarly = true; break;
             case "--accept-give-up": acceptGiveUp = true; break;
             case "--selective-progress": selective = true; break;
             case "--rej-may-equal-vs": rejMayEqualVs = true; break;
@@ -179,6 +196,9 @@ try
         Peer = peer,
         FlowControl = flowControl,
         Release = release,
+        ReleaseEarly = releaseEarly,
+        Reconnect = reconnect,
+        DataBeforeConfirm = dataBeforeConfirm,
         AcceptGiveUp = acceptGiveUp,
         FlowRounds = flowRounds,
         FlowOffAfterDelivered = flowOffAfter,

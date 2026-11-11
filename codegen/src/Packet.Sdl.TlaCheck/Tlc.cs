@@ -105,6 +105,12 @@ public sealed class Tlc
             ReleaseBy.Both => new[] { "A", "B" },
             _ => Array.Empty<string>(),
         };
+        var reconnectAt = o.Reconnect switch
+        {
+            ReconnectBy.A => new[] { "A" },
+            ReconnectBy.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var stepChecks = new List<string>();
         if (On(Invariants.RejectCoherence)) stepChecks.Add("RejectCoherence");
         if (On(Invariants.Delivery)) stepChecks.Add("Delivery");
@@ -140,6 +146,9 @@ public sealed class Tlc
         });
         C("FlowAt", Set(flowAt));
         C("ReleaseAt", Set(releaseAt));
+        C("ReleaseEarly", Bool(o.ReleaseEarly));
+        C("ReconnectAt", Set(reconnectAt));
+        C("DataBeforeConfirm", Bool(o.DataBeforeConfirm));
         C("AcceptGiveUp", Bool(o.AcceptGiveUp));
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
