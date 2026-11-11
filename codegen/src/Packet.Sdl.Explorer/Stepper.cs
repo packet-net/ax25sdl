@@ -620,7 +620,7 @@ public sealed class Stepper
             outcome = outcome with
             {
                 Violation = new Violation(Invariants.PeerBusyHold, move.Station,
-                    $"station {move.Station} sent an I frame although its peer's RNR has not been cleared (§6.4.9: a station that receives RNR stops transmitting I frames until the busy condition is cleared)"),
+                    $"station {move.Station} sent an I frame although its peer's RNR has not been cleared (section 6.4.9: a station that receives RNR stops transmitting I frames until the busy condition is cleared)"),
             };
         }
         // The give-up rule: a frame reaching a station after its peer gave up
@@ -1080,7 +1080,7 @@ public sealed class Stepper
     private static Violation? BusyIndicationCheck(Station station, DataLinkMachine m, Frame frame) =>
         m.OwnReceiverBusy && frame.Type is "RR" or "REJ" or "SREJ"
             ? new Violation(Invariants.BusyIndication, station,
-                $"station {station} sent {frame.Render()} while its own receiver is busy: a busy station indicates it with RNR (§6.4.10)")
+                $"station {station} sent {frame.Render()} while its own receiver is busy: a busy station indicates it with RNR (section 6.4.10)")
             : null;
 
     /// <summary>Emitter side: a REJ/SREJ with N(r)=x must name V(r) or a not-yet-held frame inside the receive window.</summary>
