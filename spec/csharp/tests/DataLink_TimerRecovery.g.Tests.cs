@@ -14,7 +14,7 @@ public class DataLink_TimerRecovery_GeneratedTests
 {
     [Fact] public void SourceFigure() => DataLink_TimerRecovery.Source.Figure.Should().Be("figc4.5");
 
-    [Fact] public void TransitionsArePresent() => DataLink_TimerRecovery.Transitions.Count.Should().Be(92);
+    [Fact] public void TransitionsArePresent() => DataLink_TimerRecovery.Transitions.Count.Should().Be(94);
 
     [Fact] public void SavesAreAsTranscribed() => DataLink_TimerRecovery.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
@@ -291,7 +291,7 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.On.Should().Be(Ax25Event.SABMReceived);
         t.Next.Should().Be("Connected");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.VsEqVa, false) });
-        t.Actions.Count.Should().Be(5);
+        t.Actions.Count.Should().Be(10);
         t.Actions[0].Verb.Should().Be(Ax25ActionVerb.FAssignP);
         t.Actions[0].Kind.Should().Be(ActionKind.Processing);
         t.Actions[1].Verb.Should().Be(Ax25ActionVerb.SetVersion20);
@@ -302,6 +302,16 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.Actions[3].Kind.Should().Be(ActionKind.Subroutine);
         t.Actions[4].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationF);
         t.Actions[4].Kind.Should().Be(ActionKind.SignalUpper);
+        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.StopT1);
+        t.Actions[5].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.StopT3);
+        t.Actions[6].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[7].Verb.Should().Be(Ax25ActionVerb.VSAssign0);
+        t.Actions[7].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[8].Verb.Should().Be(Ax25ActionVerb.VAAssign0);
+        t.Actions[8].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[9].Verb.Should().Be(Ax25ActionVerb.VRAssign0);
+        t.Actions[9].Kind.Should().Be(ActionKind.Processing);
     }
 
     [Fact] public void t13_sabm_received_no()
@@ -343,7 +353,7 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.On.Should().Be(Ax25Event.SABMEReceived);
         t.Next.Should().Be("Connected");
         t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.VsEqVa, false) });
-        t.Actions.Count.Should().Be(5);
+        t.Actions.Count.Should().Be(10);
         t.Actions[0].Verb.Should().Be(Ax25ActionVerb.FAssignP);
         t.Actions[0].Kind.Should().Be(ActionKind.Processing);
         t.Actions[1].Verb.Should().Be(Ax25ActionVerb.SetVersion22);
@@ -354,6 +364,16 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.Actions[3].Kind.Should().Be(ActionKind.Subroutine);
         t.Actions[4].Verb.Should().Be(Ax25ActionVerb.DLERRORIndicationF);
         t.Actions[4].Kind.Should().Be(ActionKind.SignalUpper);
+        t.Actions[5].Verb.Should().Be(Ax25ActionVerb.StopT1);
+        t.Actions[5].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[6].Verb.Should().Be(Ax25ActionVerb.StopT3);
+        t.Actions[6].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[7].Verb.Should().Be(Ax25ActionVerb.VSAssign0);
+        t.Actions[7].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[8].Verb.Should().Be(Ax25ActionVerb.VAAssign0);
+        t.Actions[8].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[9].Verb.Should().Be(Ax25ActionVerb.VRAssign0);
+        t.Actions[9].Kind.Should().Be(ActionKind.Processing);
     }
 
     [Fact] public void t14_sabme_received_no()
@@ -587,12 +607,25 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.Actions[1].Kind.Should().Be(ActionKind.Processing);
     }
 
-    [Fact] public void t18_rr_received_no_no_no()
+    [Fact] public void t18_rr_received_no_no_no_yes()
     {
-        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t18_rr_received_no_no_no");
+        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t18_rr_received_no_no_no_yes");
         t.On.Should().Be(Ax25Event.RRReceived);
-        t.Next.Should().Be("TimerRecovery");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true) });
+        t.Next.Should().Be("AwaitingV22Connection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true), new GuardTerm(Ax25Guard.Version22, false) });
+        t.Actions.Count.Should().Be(2);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.ClearPeerReceiverBusy);
+        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.NRRecovery);
+        t.Actions[1].Kind.Should().Be(ActionKind.Subroutine);
+    }
+
+    [Fact] public void t18_rr_received_no_no_no_no()
+    {
+        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t18_rr_received_no_no_no_no");
+        t.On.Should().Be(Ax25Event.RRReceived);
+        t.Next.Should().Be("AwaitingConnection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true), new GuardTerm(Ax25Guard.Version22, true) });
         t.Actions.Count.Should().Be(2);
         t.Actions[0].Verb.Should().Be(Ax25ActionVerb.ClearPeerReceiverBusy);
         t.Actions[0].Kind.Should().Be(ActionKind.Processing);
@@ -738,12 +771,25 @@ public class DataLink_TimerRecovery_GeneratedTests
         t.Actions[1].Kind.Should().Be(ActionKind.Processing);
     }
 
-    [Fact] public void t19_rnr_received_no_no_no()
+    [Fact] public void t19_rnr_received_no_no_no_yes()
     {
-        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t19_rnr_received_no_no_no");
+        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t19_rnr_received_no_no_no_yes");
         t.On.Should().Be(Ax25Event.RNRReceived);
-        t.Next.Should().Be("TimerRecovery");
-        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true) });
+        t.Next.Should().Be("AwaitingV22Connection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true), new GuardTerm(Ax25Guard.Version22, false) });
+        t.Actions.Count.Should().Be(2);
+        t.Actions[0].Verb.Should().Be(Ax25ActionVerb.SetPeerReceiverBusy);
+        t.Actions[0].Kind.Should().Be(ActionKind.Processing);
+        t.Actions[1].Verb.Should().Be(Ax25ActionVerb.NRRecovery);
+        t.Actions[1].Kind.Should().Be(ActionKind.Subroutine);
+    }
+
+    [Fact] public void t19_rnr_received_no_no_no_no()
+    {
+        var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t19_rnr_received_no_no_no_no");
+        t.On.Should().Be(Ax25Event.RNRReceived);
+        t.Next.Should().Be("AwaitingConnection");
+        t.Guard.Should().Equal(new GuardTerm[] { new GuardTerm(Ax25Guard.ResponseAndFEq1, true), new GuardTerm(Ax25Guard.CommandAndPEq1, true), new GuardTerm(Ax25Guard.VaLeNrLeVs, true), new GuardTerm(Ax25Guard.Version22, true) });
         t.Actions.Count.Should().Be(2);
         t.Actions[0].Verb.Should().Be(Ax25ActionVerb.SetPeerReceiverBusy);
         t.Actions[0].Kind.Should().Be(ActionKind.Processing);

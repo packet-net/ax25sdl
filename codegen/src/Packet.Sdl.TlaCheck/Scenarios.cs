@@ -688,12 +688,14 @@ public static class Scenarios
         Add("seeded-injected-twice", "seeded (injected payload delivered twice)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
         Add("seeded-injected-undelivered", "seeded (injected payload accepted, not delivered)", TableSetKind.InjectedUndelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
         // From the review of batch 7: both stations inject an I frame in
-        // sequence; B's N(r) error recovery in Timer Recovery stays there
-        // (#12's errata branch) and A delivers b0 twice.
-        Add("ip-both", "ax25spec#12 (errata branch stays in TR)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
+        // sequence and B, in Timer Recovery, meets an RR with N(r) past V(s).
+        // #12's errata branch stayed in Timer Recovery and A delivered b0
+        // twice (Delivery at A, 18); fixed by ax25spec#180, which leaves for
+        // Awaiting Connection as the 1998 figure draws.
+        Add("ip-both", "ax25spec#12 fixed (#180)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
         {
             FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
-        }, "Delivery at A, 18");
+        }, "clean");
 
         return list;
     }

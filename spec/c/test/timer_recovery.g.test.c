@@ -24,7 +24,7 @@ static int test_source_figure(void) {
 }
 
 static int test_transitions_count(void) {
-  ASSERT(data_link_timer_recovery.transitions_len == 92, "transitions count");
+  ASSERT(data_link_timer_recovery.transitions_len == 94, "transitions count");
   return 0;
 }
 
@@ -473,7 +473,7 @@ static int test_t13_sabm_received_yes(void) {
   ASSERT_STREQ(t->on, "SABM_received", "on");
   ASSERT_STREQ(t->next, "Connected", "next");
   ASSERT_STREQ(t->guard, "vs_eq_va", "guard");
-  ASSERT(t->actions_len == 5, "actions count");
+  ASSERT(t->actions_len == 10, "actions count");
   ASSERT_STREQ(t->actions[0].verb, "F := P", "actions[0].verb");
   ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
   ASSERT_STREQ(t->actions[1].verb, "set_version_2_0", "actions[1].verb");
@@ -486,6 +486,16 @@ static int test_t13_sabm_received_yes(void) {
   ASSERT_STREQ(t->actions[4].verb, "DL-ERROR Indication (F)",
                "actions[4].verb");
   ASSERT(t->actions[4].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "Stop T1", "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_PROCESSING, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "Stop T3", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_PROCESSING, "actions[6].kind");
+  ASSERT_STREQ(t->actions[7].verb, "V(s) := 0", "actions[7].verb");
+  ASSERT(t->actions[7].kind == AX25SDL_KIND_PROCESSING, "actions[7].kind");
+  ASSERT_STREQ(t->actions[8].verb, "V(a) := 0", "actions[8].verb");
+  ASSERT(t->actions[8].kind == AX25SDL_KIND_PROCESSING, "actions[8].kind");
+  ASSERT_STREQ(t->actions[9].verb, "V(r) := 0", "actions[9].verb");
+  ASSERT(t->actions[9].kind == AX25SDL_KIND_PROCESSING, "actions[9].kind");
   return 0;
 }
 
@@ -545,7 +555,7 @@ static int test_t14_sabme_received_yes(void) {
   ASSERT_STREQ(t->on, "SABME_received", "on");
   ASSERT_STREQ(t->next, "Connected", "next");
   ASSERT_STREQ(t->guard, "vs_eq_va", "guard");
-  ASSERT(t->actions_len == 5, "actions count");
+  ASSERT(t->actions_len == 10, "actions count");
   ASSERT_STREQ(t->actions[0].verb, "F := P", "actions[0].verb");
   ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
   ASSERT_STREQ(t->actions[1].verb, "Set Version 2.2", "actions[1].verb");
@@ -558,6 +568,16 @@ static int test_t14_sabme_received_yes(void) {
   ASSERT_STREQ(t->actions[4].verb, "DL-ERROR Indication (F)",
                "actions[4].verb");
   ASSERT(t->actions[4].kind == AX25SDL_KIND_SIGNAL_UPPER, "actions[4].kind");
+  ASSERT_STREQ(t->actions[5].verb, "Stop T1", "actions[5].verb");
+  ASSERT(t->actions[5].kind == AX25SDL_KIND_PROCESSING, "actions[5].kind");
+  ASSERT_STREQ(t->actions[6].verb, "Stop T3", "actions[6].verb");
+  ASSERT(t->actions[6].kind == AX25SDL_KIND_PROCESSING, "actions[6].kind");
+  ASSERT_STREQ(t->actions[7].verb, "V(s) := 0", "actions[7].verb");
+  ASSERT(t->actions[7].kind == AX25SDL_KIND_PROCESSING, "actions[7].kind");
+  ASSERT_STREQ(t->actions[8].verb, "V(a) := 0", "actions[8].verb");
+  ASSERT(t->actions[8].kind == AX25SDL_KIND_PROCESSING, "actions[8].kind");
+  ASSERT_STREQ(t->actions[9].verb, "V(r) := 0", "actions[9].verb");
+  ASSERT(t->actions[9].kind == AX25SDL_KIND_PROCESSING, "actions[9].kind");
   return 0;
 }
 
@@ -929,21 +949,46 @@ static int test_t18_rr_received_no_no_yes(void) {
   return 0;
 }
 
-static int test_t18_rr_received_no_no_no(void) {
+static int test_t18_rr_received_no_no_no_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_timer_recovery.transitions_len; i++) {
     if (strcmp(data_link_timer_recovery.transitions[i].id,
-               "t18_rr_received_no_no_no") == 0) {
+               "t18_rr_received_no_no_no_yes") == 0) {
       t = &data_link_timer_recovery.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t18_rr_received_no_no_no not found");
+  ASSERT(t != NULL, "t18_rr_received_no_no_no_yes not found");
   ASSERT_STREQ(t->on, "RR_received", "on");
-  ASSERT_STREQ(t->next, "TimerRecovery", "next");
+  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
   ASSERT_STREQ(t->guard,
                "not response_and_F_eq_1 and not command_and_P_eq_1 and not "
-               "va_le_nr_le_vs",
+               "va_le_nr_le_vs and version_2_2",
+               "guard");
+  ASSERT(t->actions_len == 2, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "clear_peer_receiver_busy",
+               "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "N(r) Recovery", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SUBROUTINE, "actions[1].kind");
+  return 0;
+}
+
+static int test_t18_rr_received_no_no_no_no(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < data_link_timer_recovery.transitions_len; i++) {
+    if (strcmp(data_link_timer_recovery.transitions[i].id,
+               "t18_rr_received_no_no_no_no") == 0) {
+      t = &data_link_timer_recovery.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t18_rr_received_no_no_no_no not found");
+  ASSERT_STREQ(t->on, "RR_received", "on");
+  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
+  ASSERT_STREQ(t->guard,
+               "not response_and_F_eq_1 and not command_and_P_eq_1 and not "
+               "va_le_nr_le_vs and not version_2_2",
                "guard");
   ASSERT(t->actions_len == 2, "actions count");
   ASSERT_STREQ(t->actions[0].verb, "clear_peer_receiver_busy",
@@ -1176,21 +1221,45 @@ static int test_t19_rnr_received_no_no_yes(void) {
   return 0;
 }
 
-static int test_t19_rnr_received_no_no_no(void) {
+static int test_t19_rnr_received_no_no_no_yes(void) {
   const TransitionSpec *t = NULL;
   for (size_t i = 0; i < data_link_timer_recovery.transitions_len; i++) {
     if (strcmp(data_link_timer_recovery.transitions[i].id,
-               "t19_rnr_received_no_no_no") == 0) {
+               "t19_rnr_received_no_no_no_yes") == 0) {
       t = &data_link_timer_recovery.transitions[i];
       break;
     }
   }
-  ASSERT(t != NULL, "t19_rnr_received_no_no_no not found");
+  ASSERT(t != NULL, "t19_rnr_received_no_no_no_yes not found");
   ASSERT_STREQ(t->on, "RNR_received", "on");
-  ASSERT_STREQ(t->next, "TimerRecovery", "next");
+  ASSERT_STREQ(t->next, "AwaitingV22Connection", "next");
   ASSERT_STREQ(t->guard,
                "not response_and_F_eq_1 and not command_and_P_eq_1 and not "
-               "va_le_nr_le_vs",
+               "va_le_nr_le_vs and version_2_2",
+               "guard");
+  ASSERT(t->actions_len == 2, "actions count");
+  ASSERT_STREQ(t->actions[0].verb, "set_peer_receiver_busy", "actions[0].verb");
+  ASSERT(t->actions[0].kind == AX25SDL_KIND_PROCESSING, "actions[0].kind");
+  ASSERT_STREQ(t->actions[1].verb, "N(r) Recovery", "actions[1].verb");
+  ASSERT(t->actions[1].kind == AX25SDL_KIND_SUBROUTINE, "actions[1].kind");
+  return 0;
+}
+
+static int test_t19_rnr_received_no_no_no_no(void) {
+  const TransitionSpec *t = NULL;
+  for (size_t i = 0; i < data_link_timer_recovery.transitions_len; i++) {
+    if (strcmp(data_link_timer_recovery.transitions[i].id,
+               "t19_rnr_received_no_no_no_no") == 0) {
+      t = &data_link_timer_recovery.transitions[i];
+      break;
+    }
+  }
+  ASSERT(t != NULL, "t19_rnr_received_no_no_no_no not found");
+  ASSERT_STREQ(t->on, "RNR_received", "on");
+  ASSERT_STREQ(t->next, "AwaitingConnection", "next");
+  ASSERT_STREQ(t->guard,
+               "not response_and_F_eq_1 and not command_and_P_eq_1 and not "
+               "va_le_nr_le_vs and not version_2_2",
                "guard");
   ASSERT(t->actions_len == 2, "actions count");
   ASSERT_STREQ(t->actions[0].verb, "set_peer_receiver_busy", "actions[0].verb");
@@ -2698,7 +2767,8 @@ int main(void) {
   rc |= test_t18_rr_received_no_yes_no_yes();
   rc |= test_t18_rr_received_no_yes_no_no();
   rc |= test_t18_rr_received_no_no_yes();
-  rc |= test_t18_rr_received_no_no_no();
+  rc |= test_t18_rr_received_no_no_no_yes();
+  rc |= test_t18_rr_received_no_no_no_no();
   rc |= test_t19_rnr_received_yes_yes_yes();
   rc |= test_t19_rnr_received_yes_yes_no();
   rc |= test_t19_rnr_received_yes_no_yes();
@@ -2707,7 +2777,8 @@ int main(void) {
   rc |= test_t19_rnr_received_no_yes_no_yes();
   rc |= test_t19_rnr_received_no_yes_no_no();
   rc |= test_t19_rnr_received_no_no_yes();
-  rc |= test_t19_rnr_received_no_no_no();
+  rc |= test_t19_rnr_received_no_no_no_yes();
+  rc |= test_t19_rnr_received_no_no_no_no();
   rc |= test_t20_lm_seize_confirm_yes();
   rc |= test_t20_lm_seize_confirm_no();
   rc |= test_t21_t1_expiry_yes_yes_yes();
