@@ -39,7 +39,7 @@ public static class Lockstep
         Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
         {
             var s = scenarios[idx];
-            if (resultsFile?.Done(s.Name, "lockstep") is { } done)
+            if (resultsFile?.Done(s.Name, "lockstep", MeaningName(meaning)) is { } done)
             {
                 results[idx] = GridRecords.LockstepRow(done);
                 Interlocked.Increment(ref skipped);
@@ -53,7 +53,7 @@ public static class Lockstep
                 {
                     row = new LockstepRow(Array.Empty<LockstepDiff>(), 0, false, $"{ex.GetType().Name}: {ex.Message}", 0);
                 }
-                resultsFile?.Append(GridRecords.Lockstep(s.Name, cellIndex is not null && cellIndex.TryGetValue(s.Name, out var i) ? i : idx, row));
+                resultsFile?.Append(GridRecords.Lockstep(s.Name, cellIndex is not null && cellIndex.TryGetValue(s.Name, out var i) ? i : idx, MeaningName(meaning), row));
                 if (row.Error.Length == 0 && row.Diffs.Count == 0)
                 {
                     var dir = Path.Combine(work, s.Name);
@@ -119,6 +119,9 @@ public static class Lockstep
         Console.WriteLine(sb.ToString());
         return same == scenarios.Count ? 0 : 1;
     }
+
+    /// <summary>The meaning's module name, as the results file records it.</summary>
+    public static string MeaningName(string meaning) => meaning.EndsWith(".tla", StringComparison.Ordinal) ? Path.GetFileNameWithoutExtension(meaning) : meaning;
 
     private static LockstepRow One(Scenario s, Tlc tlc, string work, int iterate)
     {

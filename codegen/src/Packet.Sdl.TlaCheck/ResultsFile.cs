@@ -12,7 +12,8 @@ namespace Packet.Sdl.TlaCheck;
 /// <c>--resume</c> the cells already recorded with a verdict are skipped; a
 /// cell recorded without one (TLC timed out or failed, the run crashed) is
 /// run again and its new line supersedes the old. Every line carries
-/// <c>cell</c> (the name), <c>mode</c> (<c>cross</c> or <c>lockstep</c>) and
+/// <c>cell</c> (the name), <c>mode</c> (<c>cross</c> or <c>lockstep</c>), <c>meaning</c> (the
+/// <c>--meaning</c> module) and
 /// <c>done</c> (false when there was no verdict).
 /// </summary>
 public sealed class ResultsFile : IDisposable
@@ -66,12 +67,15 @@ public sealed class ResultsFile : IDisposable
         return file;
     }
 
-    /// <summary>The latest record for <paramref name="cell"/> when it has a verdict.</summary>
-    public JsonObject? Done(string cell, string mode)
+    /// <summary>
+    /// The latest record for <paramref name="cell"/> when it has a verdict from a run of the
+    /// same mode with the same meaning (a cell run with another meaning runs again).
+    /// </summary>
+    public JsonObject? Done(string cell, string mode, string meaning)
     {
         lock (_gate)
         {
-            return _records.TryGetValue(cell, out var o) && (string?)o["mode"] == mode && (bool?)o["done"] == true ? o : null;
+            return _records.TryGetValue(cell, out var o) && (string?)o["mode"] == mode && (string?)o["meaning"] == meaning && (bool?)o["done"] == true ? o : null;
         }
     }
 

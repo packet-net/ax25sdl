@@ -249,7 +249,7 @@ var skipped = 0;
 Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
 {
     var s = scenarios[idx];
-    if (resultsFile?.Done(s.Name, "cross") is { } done)
+    if (resultsFile?.Done(s.Name, "cross", Lockstep.MeaningName(meaning)) is { } done)
     {
         results[idx] = GridRecords.Row(done);
         Interlocked.Increment(ref skipped);
@@ -264,7 +264,7 @@ Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = 
         {
             row = new Row("", $"error: {ex.GetType().Name}: {ex.Message}", false, "the run failed", new HashSet<string>(), new HashSet<string>(), TlcKind: "error");
         }
-        resultsFile?.Append(GridRecords.Cross(s.Name, cellIndex[s.Name], row));
+        resultsFile?.Append(GridRecords.Cross(s.Name, cellIndex[s.Name], Lockstep.MeaningName(meaning), row));
         if (row.Agree)
         {
             var dir = Path.Combine(work, s.Name);

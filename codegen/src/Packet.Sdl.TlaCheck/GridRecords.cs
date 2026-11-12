@@ -23,7 +23,7 @@ internal static class GridRecords
     /// subroutine paths), and the transitions only one tool fired (on an
     /// agreeing clean cell, none).
     /// </summary>
-    public static JsonObject Cross(string cell, int index, Row r)
+    public static JsonObject Cross(string cell, int index, string meaning, Row r)
     {
         var tlcTransitions = r.TlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
         return new JsonObject
@@ -31,6 +31,7 @@ internal static class GridRecords
             ["cell"] = cell,
             ["index"] = index,
             ["mode"] = "cross",
+            ["meaning"] = meaning,
             ["done"] = r.TlcKind is not ("error" or "timeout") && r.ExplorerKind.Length > 0,
             ["agree"] = r.Agree,
             ["explorerKind"] = r.ExplorerKind,
@@ -61,11 +62,12 @@ internal static class GridRecords
     }
 
     /// <summary>A lockstep cell.</summary>
-    public static JsonObject Lockstep(string cell, int index, LockstepRow r) => new()
+    public static JsonObject Lockstep(string cell, int index, string meaning, LockstepRow r) => new()
     {
         ["cell"] = cell,
         ["index"] = index,
         ["mode"] = "lockstep",
+        ["meaning"] = meaning,
         ["done"] = r.Error.Length == 0,
         ["result"] = r.Error.Length > 0 ? "error" : r.Diffs.Count == 0 ? "same" : "differ",
         ["states"] = r.States,
