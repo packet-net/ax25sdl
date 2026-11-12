@@ -18,7 +18,9 @@
 (*     with their labels, LM requests), in order;                          *)
 (*   - every fixed field of MeaningInterface.md except q, the next state   *)
 (*     included;                                                           *)
-(*   - the length of q (its entries are each meaning's own).               *)
+(*   - how the dispatch changed the length of q (its entries are each      *)
+(*     meaning's own; a difference set aside can leave the lengths apart,  *)
+(*     so the change is compared, not the length).                         *)
 (* Not compared: tid, arms, and fields private to a meaning.               *)
 (*                                                                         *)
 (* A difference fails the dispatch with an error that starts               *)
@@ -77,8 +79,11 @@ LsEvent(e) ==
     \o (IF e.data # "" THEN " data=" \o e.data ELSE "")
 
 Dispatch(m, e) ==
-    LET ca == RA!Dispatch(m, e)
-        cb == RB!Dispatch(LsFrom(m.lsB, m), e)
+    LET mb == LsFrom(m.lsB, m)
+        ca == RA!Dispatch(m, e)
+        cb == RB!Dispatch(mb, e)
+        qa == Len(MA!Persist(ca).q) - Len(m.q)
+        qb == Len(MB!Persist(cb).q) - Len(mb.q)
         ea == ca.err # ""
         eb == cb.err # ""
         pa == MA!Persist(ca)
@@ -87,14 +92,15 @@ Dispatch(m, e) ==
         comps == IF ea # eb THEN <<"error">>
                  ELSE IF ea THEN <<>>
                  ELSE (IF ca.fx # cb.fx THEN <<"fx">> ELSE <<>>) \o fields
-                      \o (IF Len(pa.q) # Len(pb.q) THEN <<"q length">> ELSE <<>>)
+                      \o (IF qa # qb THEN <<"q length">> ELSE <<>>)
         sig == m.st \o " / " \o e.ev \o " / " \o LsJoin(comps, ", ")
         show(f) == f \o ": A " \o ToString(pa[f]) \o ", B " \o ToString(pb[f])
         detail ==
             IF ea # eb THEN "error: A " \o (IF ea THEN ca.err ELSE "none") \o "; B " \o (IF eb THEN cb.err ELSE "none")
             ELSE LsJoin((IF ca.fx # cb.fx THEN <<"fx: A " \o ToString(ca.fx) \o ", B " \o ToString(cb.fx)>> ELSE <<>>)
                         \o [i \in 1..Len(fields) |-> show(fields[i])]
-                        \o (IF Len(pa.q) # Len(pb.q) THEN <<"q length: A " \o ToString(Len(pa.q)) \o ", B " \o ToString(Len(pb.q))>> ELSE <<>>),
+                        \o (IF qa # qb THEN <<"q length: A " \o ToString(Len(m.q)) \o " to " \o ToString(Len(pa.q))
+                                               \o ", B " \o ToString(Len(mb.q)) \o " to " \o ToString(Len(pb.q))>> ELSE <<>>),
                         "; ")
         both == ca @@ [lsB |-> cb]
     IN  IF comps = <<>> THEN both

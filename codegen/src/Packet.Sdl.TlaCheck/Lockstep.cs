@@ -43,7 +43,7 @@ public static class Lockstep
         for (var i = 0; i < scenarios.Count; i++)
         {
             var r = results[i];
-            var text = r.Error.Length > 0 ? "error: " + r.Error
+            var text = r.Error.Length > 0 ? string.Concat(r.Diffs.Select(d => $"`{d.Signature}` ({d.Steps.Count} steps)<br>")) + "error: " + r.Error
                 : r.Diffs.Count == 0 ? $"same, {r.States} states"
                 : string.Join("<br>", r.Diffs.Select(d => $"`{d.Signature}` ({d.Steps.Count} steps)")) + (r.Exhausted ? "<br>(more not looked for)" : "");
             sb.Append(CultureInfo.InvariantCulture, $"| {scenarios[i].Name} | {scenarios[i].Tables} | {text} |\n");
@@ -91,7 +91,7 @@ public static class Lockstep
                 if (Directory.Exists(Path.Combine(dir, junk))) Directory.Delete(Path.Combine(dir, junk), recursive: true);
             if (r.Kind == "clean") return new LockstepRow(diffs, states, false, "", seconds);
             var d = Difference(r, dir);
-            if (d is null) return new LockstepRow(diffs, states, false, r.Kind + ": " + r.Message, seconds);
+            if (d is null) return new LockstepRow(diffs, states, false, (diffs.Count > 0 ? $"after {diffs.Count} difference(s), " : "") + r.Kind + ": " + r.Message, seconds);
             if (known.Contains(d.Signature, StringComparer.Ordinal))
                 return new LockstepRow(diffs, states, false, "difference " + d.Signature + " found again after it was set aside", seconds);
             diffs.Add(d);

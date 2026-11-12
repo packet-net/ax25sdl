@@ -346,7 +346,13 @@ public sealed class Tlc
                 break;
             case Phase.Lockstep:
                 // Only the lockstep check; other violations end a path but are not reported.
-                sb.Append("INIT Init\nNEXT Next\nINVARIANT LockstepAgree\nCONSTRAINT LockstepGo\nVIEW View\n");
+                // The row's state invariants become constraints too: a state that breaks one is not
+                // explored further, as the safety search would have stopped there.
+                sb.Append("INIT Init\nNEXT Next\nINVARIANT LockstepAgree\nCONSTRAINT LockstepGo");
+                if (On(Invariants.DefinedState)) sb.Append(" DefinedState");
+                if (On(Invariants.SequenceSanity)) sb.Append(" SequenceSanity");
+                if (On(Invariants.AckCoherence)) sb.Append(" AckCoherence");
+                sb.Append("\nVIEW View\n");
                 break;
             case Phase.Quiescence:
                 sb.Append("SPECIFICATION Spec\nPROPERTY ").Append(OneShotFair(o) ? "QuiescenceLiveL3" : "QuiescenceLive").Append('\n');
