@@ -530,7 +530,7 @@ public static class Scenarios
         // checks on any table set, so each has a deliberately broken table to
         // prove it can fire, in both tools.
         Add("seeded-ack", "seeded (AckCoherence)", TableSetKind.AckBroken, o => o with { FramesAb = 1 }, Fails(Invariants.AckCoherence, Station.A, 4));
-        Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, Fails(Invariants.Quiescence, steps: 9));
+        Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, Fails(Invariants.Quiescence));
         // The release quiescence rule: B acknowledges A's DISC but stays
         // Connected, so the link ends with one end Disconnected and the other
         // not. Both tools must call that stuck, not released.
@@ -618,11 +618,11 @@ public static class Scenarios
         Add("t3-h1-k1", "#91", TableSetKind.Current, o => o with
         {
             FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true,
-        }, Fails(Invariants.Quiescence, steps: 9));
+        }, Fails(Invariants.Quiescence));
         Add("t3-reconnect-cold", "ax25spec#167 (fault-free with T3)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A, T3 = true,
-        }, Fails(Invariants.Quiescence, steps: 9));
+        }, Fails(Invariants.Quiescence));
         Add("seeded-t3-dead", "seeded (give-up settles with T3)", TableSetKind.T3Dead, o => o with
         {
             FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true, T3 = true,
@@ -702,7 +702,7 @@ public static class Scenarios
         Add("fe-ab1-ctl", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, Fails(Invariants.ResetLoss, steps: 4));
         Add("fe-a2-k1-info", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, Fails(Invariants.ResetLoss, steps: 6));
         Add("fe-iresp", "frame-error control", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with { FramesAb = 1 }, Clean());
-        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, Fails(Invariants.Quiescence, steps: 9));
+        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, Fails(Invariants.Quiescence));
         Add("fe-tr-b3", "ax25spec#50", TableSetKind.Current, o => Fe(o, FrameErrors.N1 | FrameErrors.IResponse) with
         {
             FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop,
@@ -718,7 +718,7 @@ public static class Scenarios
         Add("t3-reconnect-cold-mod128", "ax25spec#167 (fault-free with T3, modulo 128)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
-        }, Fails(Invariants.Quiescence, steps: 9));
+        }, Fails(Invariants.Quiescence));
 
         // From the review of batch 6: rows the first cut recorded as not fired.
         Add("tr-rej", "#91 (H1)", TableSetKind.Current, o => o with { FramesAb = 1, FramesBa = 3, K = 2, Budget = 3, Faults = FaultKinds.Drop }, Fails(Invariants.Deadlock, steps: 17));
