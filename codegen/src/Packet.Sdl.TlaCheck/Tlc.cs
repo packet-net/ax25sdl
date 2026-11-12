@@ -172,6 +172,12 @@ public sealed class Tlc
             ReleaseBy.Both => new[] { "A", "B" },
             _ => Array.Empty<string>(),
         };
+        var abandonAt = o.Abandon switch
+        {
+            ReleaseBy.A => new[] { "A" },
+            ReleaseBy.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var reconnectAt = o.Reconnect switch
         {
             ReconnectBy.A => new[] { "A" },
@@ -201,6 +207,7 @@ public sealed class Tlc
         if (On(Invariants.BusyIndication)) stepChecks.Add("BusyIndication");
         if (On(Invariants.UnitData)) stepChecks.Add("UnitData");
         if (On(Invariants.FrameError)) stepChecks.Add("FrameError");
+        if (On(Invariants.DisconnectKept)) stepChecks.Add("DisconnectKept");
         var injectAt = o.Inject switch
         {
             FlowControlAt.A => new[] { "A" },
@@ -245,6 +252,7 @@ public sealed class Tlc
         C("FlowAt", Set(flowAt));
         C("ReleaseAt", Set(releaseAt));
         C("ReleaseEarly", Bool(o.ReleaseEarly));
+        C("AbandonAt", Set(abandonAt));
         C("ReconnectAt", Set(reconnectAt));
         C("DataBeforeConfirm", Bool(o.DataBeforeConfirm));
         C("AcceptGiveUp", Bool(o.AcceptGiveUp));

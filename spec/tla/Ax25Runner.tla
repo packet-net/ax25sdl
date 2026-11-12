@@ -19,6 +19,14 @@
 (* nothing else: st (the Data Link state, a page name), err (the error,    *)
 (* "" for none), tid (the transition that fired) and arms (every table row *)
 (* the dispatch ran, for coverage).                                        *)
+(*                                                                         *)
+(* Saves (the figures' Save symbol, Saves in the tables) are runner policy *)
+(* too, and need nothing from a meaning: SavedIn says which inputs a state *)
+(* holds instead of dispatching, ReleaseIndex which held input is consumed *)
+(* next after a transition has entered a state (pinned semantic 19 in      *)
+(* docs/explorer.md). The held inputs themselves are not part of the       *)
+(* station record: the harness keeps them beside it and dispatches each    *)
+(* released one through Dispatch, exactly as a fresh input.                *)
 (***************************************************************************)
 EXTENDS Ax25DataLinkTables
 
@@ -187,6 +195,28 @@ DispatchState(c, e) ==
              sel == SelectGuard(c, e, [j \in 1..Len(ts) |-> ts[j].guard])
          IN  IF sel.err # "" THEN Fail(c, "state " \o c.st \o ", event '" \o e.ev \o "': " \o sel.err)
              ELSE Goto(RunActions(c, e, ts[sel.i].actions, ts[sel.i].loops, 1), ts[sel.i].next, ts[sel.i].id)
+
+(***************************************************************************)
+(* Saves (Dispatch's save and ReplayHeld)                                  *)
+(***************************************************************************)
+
+\* State st saves event ev: an input that arrives there causes nothing and
+\* is held, after any already held. An explicit save takes precedence over
+\* the page's "all other" column, so a harness that routes unhandled inputs
+\* there asks this first.
+SavedIn(st, ev) == st \in DOMAIN Saves /\ \E i \in 1..Len(Saves[st]) : Saves[st][i] = ev
+
+\* After every transition (into the same state included): the position of
+\* the first held input, from the head, that state st does not save, or 0
+\* when it saves them all. That input is consumed next, as if it had just
+\* arrived, and the scan repeats in the state its transition enters; inputs
+\* still saved keep their place and order.
+ReleaseIndex(st, held) ==
+    LET free == {i \in 1..Len(held) : ~SavedIn(st, held[i].ev)}
+    IN  IF free = {} THEN 0 ELSE CHOOSE i \in free : \A j \in free : i <= j
+
+\* The held inputs without the one at position i.
+Unheld(held, i) == SubSeq(held, 1, i - 1) \o SubSeq(held, i + 1, Len(held))
 
 (***************************************************************************)
 (* Around the table (Dispatch)                                             *)

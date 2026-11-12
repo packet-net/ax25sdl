@@ -31,6 +31,8 @@ public enum MoveKind
     Release,
     /// <summary>DL_CONNECT_request from the station's layer 3 on a live or waiting link (<see cref="ExplorerOptions.Reconnect"/>).</summary>
     Reconnect,
+    /// <summary>DL_DISCONNECT_request from the station's layer 3 while its own connect is still being set up (<see cref="ExplorerOptions.Abandon"/>).</summary>
+    Abandon,
     /// <summary>The station enters its local busy condition (<see cref="ExplorerOptions.LocalBusy"/>): own receiver busy, RNR response.</summary>
     BusyOn,
     /// <summary>The station leaves its local busy condition: own receiver busy cleared, RR command.</summary>
@@ -74,6 +76,13 @@ public sealed record StepRecord(
     string SummaryA,
     string SummaryB)
 {
+    /// <summary>
+    /// The transitions that consumed inputs released from a save after the
+    /// step's own transition (pinned semantic 19), in order, each as
+    /// <c>State/transition</c> (the state it fired in).
+    /// </summary>
+    public IReadOnlyList<string> Replayed { get; init; } = Array.Empty<string>();
+
     public string Render()
     {
         var sb = new StringBuilder();
@@ -82,6 +91,7 @@ public sealed record StepRecord(
         {
             sb.Append("\n       transition: ").Append(Transition);
             sb.Append("\n       effects: ").Append(Effects.Count == 0 ? "(none)" : string.Join("; ", Effects));
+            if (Replayed.Count > 0) sb.Append("\n       replayed: ").Append(string.Join("; ", Replayed));
         }
         sb.Append("\n       A: ").Append(SummaryA);
         sb.Append("\n       B: ").Append(SummaryB);
@@ -135,6 +145,12 @@ public sealed class Stepper
             throw new ArgumentException("the orderly release is for the table-driven peer only (the v2.0 stub has no data phase to complete)", nameof(options));
         if (_o.ReleaseEarly && _o.Release == ReleaseBy.None)
             throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
+        if (_o.Abandon == ReleaseBy.Both && _o.Peer != PeerKind.Tables)
+            throw new ArgumentException("with the v2.0 stub as B only station A can abandon its connect (--abandon A)", nameof(options));
+        if (_o.Abandon != ReleaseBy.None && _o.DataAfterConfirm)
+            throw new ArgumentException("abandoning a connect is for scenarios whose data is submitted up front: a layer 3 that abandons its connect never offers data after a confirm, so that data could never be delivered", nameof(options));
+        if (_o.Abandon != ReleaseBy.None && _o.Seed == SeedKind.Connected && _o.Reconnect == ReconnectBy.None)
+            throw new ArgumentException("abandoning a connect needs one to abandon: a connect-phase seed or a reconnect (--reconnect)", nameof(options));
         if (_o.Reconnect != ReconnectBy.None && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
         if (_o.LocalBusy != FlowControlAt.None && _o.Peer != PeerKind.Tables)
@@ -258,6 +274,8 @@ public sealed class Stepper
         // A layer 3 still waiting for the answer to its DL_CONNECT_request
         // (Reconnect) is never at rest.
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        // Nor one whose DL_DISCONNECT_request was consumed and not answered.
+        if (s.DisconnectPendingA || s.DisconnectPendingB) return false;
         if (!ReportsMatch(s)) return false;
         if (!UnitDataAccounted(s)) return false;
         // The reset rule: no rest counts after a reset the injected error
@@ -280,10 +298,14 @@ public sealed class Stepper
     /// </summary>
     private bool PlainRest(SystemState s)
     {
-        if (_o.Release != ReleaseBy.None)
+        // A station that abandoned its connect (Abandon) wants the link down
+        // too, so its path rests as a released one; a v2.0 stub as B is then
+        // at rest once it is disconnected.
+        if (_o.Release != ReleaseBy.None || s.AbandonedA || s.AbandonedB)
         {
-            return (s.ReleasedA || s.ReleasedB)
+            return (s.ReleasedA || s.ReleasedB || s.AbandonedA || s.AbandonedB)
                 && s.A.State == "Disconnected" && s.B.State == "Disconnected"
+                && (s.StubPeer is null || !s.StubPeer.Connected)
                 && s.ToA.Count == 0 && s.ToB.Count == 0
                 && s.A.QueueEntries.Count == 0 && s.B.QueueEntries.Count == 0
                 && !s.SeizeOwedA && !s.SeizeOwedB;
@@ -316,7 +338,7 @@ public sealed class Stepper
         if (_o.FrameErrors == FrameErrors.None || AllDelivered(s)) return false;
         if (s.ResetA != Honest && s.ResetB != Honest) return false;
         if (s.ResetA == Unjustified || s.ResetB == Unjustified) return false;
-        if (s.ReconnectPendingA || s.ReconnectPendingB || !ReportsMatch(s) || !UnitDataAccounted(s)) return false;
+        if (s.ReconnectPendingA || s.ReconnectPendingB || s.DisconnectPendingA || s.DisconnectPendingB || !ReportsMatch(s) || !UnitDataAccounted(s)) return false;
         if (s.DeliveredAtB < _submittedA.Length && s.ToldA != 2) return false;
         if (s.DeliveredAtA < _submittedB.Length && s.ToldB != 2) return false;
         return PlainRest(s);
@@ -379,6 +401,8 @@ public sealed class Stepper
         if (s.GaveUpA != Honest && s.GaveUpB != Honest) return false;
         if (s.GaveUpA == Unjustified || s.GaveUpB == Unjustified) return false;
         if (s.ReconnectPendingA || s.ReconnectPendingB) return false;
+        // Nor one whose DL_DISCONNECT_request was consumed and not answered.
+        if (s.DisconnectPendingA || s.DisconnectPendingB) return false;
         if (!ReportsMatch(s)) return false;
         // A station still up counts only if nothing its peer sent after giving
         // up reached it: one that received the DM and stayed up is not settled.
@@ -417,6 +441,13 @@ public sealed class Stepper
     };
 
     private bool Releases(Station station) => _o.Release switch
+    {
+        ReleaseBy.Both => true,
+        ReleaseBy.A => station == Station.A,
+        _ => false,
+    };
+
+    private bool Abandons(Station station) => _o.Abandon switch
     {
         ReleaseBy.Both => true,
         ReleaseBy.A => station == Station.A,
@@ -533,6 +564,10 @@ public sealed class Stepper
             // Layer 3 resets a live or waiting link, under the same gate.
             if (ReconnectReady(s, station))
                 moves.Add(new Move(MoveKind.Reconnect, station));
+
+            // Layer 3 abandons its own connect while it is being set up.
+            if (AbandonReady(s, station))
+                moves.Add(new Move(MoveKind.Abandon, station));
 
             // The local busy condition: entered once on an established link,
             // left whenever it still holds.
@@ -754,6 +789,20 @@ public sealed class Stepper
         && (_o.ReleaseEarly ? IsLinkState(s.Machine(station).State) : IsDataState(s.Machine(station).State))
         && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
 
+    /// <summary>
+    /// The abandon gate (<see cref="ExplorerOptions.Abandon"/>): once per
+    /// station, while it is being set up (AwaitingConnection or
+    /// AwaitingV22Connection), and only while its layer 3 has asked to
+    /// connect and not heard back: station A from a connect-phase seed until
+    /// its first link report, any station after a reconnect until that is
+    /// answered. A connect the data link started itself (a reset) is not
+    /// layer 3's to abandon.
+    /// </summary>
+    private bool AbandonReady(SystemState s, Station station) =>
+        Abandons(station) && !s.Abandoned(station)
+        && s.Machine(station).State is "AwaitingConnection" or "AwaitingV22Connection"
+        && (s.ReconnectPending(station) || (station == Station.A && _o.Seed != SeedKind.Connected && s.ReportA == 0));
+
     private bool ReconnectReady(SystemState s, Station station) =>
         Reconnects(station) && !s.Reconnected(station) && IsLinkState(s.Machine(station).State)
         && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
@@ -812,7 +861,44 @@ public sealed class Stepper
     /// interpreter then reports as a missing arm.
     /// </summary>
     private string UpperEvent(DataLinkMachine m, string primitive) =>
-        Handles(m, primitive) || !Handles(m, "all_other_primitives__from_upper_layer") ? primitive : "all_other_primitives__from_upper_layer";
+        Handles(m, primitive) || m.IsSavedHere(primitive) || !Handles(m, "all_other_primitives__from_upper_layer") ? primitive : "all_other_primitives__from_upper_layer";
+
+    /// <summary>
+    /// The route a released held input takes in the state it is released
+    /// into (pinned semantic 19(c)): exactly a fresh input's. Its own arm when
+    /// the page has one, else the page's catch-all for its kind (pinned
+    /// semantic 5): a received frame's (as <see cref="FrameEvent"/>), an
+    /// upper-layer primitive's, or the lower-layer one for anything else.
+    /// With no catch-all, the input itself, which the interpreter then
+    /// reports as a missing arm.
+    /// </summary>
+    private EventInput RouteReleased(string state, EventInput held)
+    {
+        if (!_eventsByState.TryGetValue(state, out var events) || events.Contains(held.Event)) return held;
+        string? routed;
+        if (held.Event.EndsWith("_received", StringComparison.Ordinal) && held.Command is not null)
+        {
+            var type = held.Event[..^"_received".Length];
+            routed = CatchAllForFrame(events, held.Command.Value, type is "I" or "RR" or "RNR" or "REJ" or "SREJ");
+        }
+        else if (held.Event.StartsWith("DL_", StringComparison.Ordinal))
+        {
+            routed = events.Contains("all_other_primitives__from_upper_layer") ? "all_other_primitives__from_upper_layer" : null;
+        }
+        else
+        {
+            routed = events.Contains("all_other_primitives__from_lower_layer") ? "all_other_primitives__from_lower_layer" : null;
+        }
+        return routed is null ? held : held with { Event = routed };
+    }
+
+    private static string? CatchAllForFrame(HashSet<string> events, bool command, bool iOrSupervisory)
+    {
+        if (command && events.Contains("all_other_commands")) return "all_other_commands";
+        if (command && iOrSupervisory && events.Contains("i_or_s_command_received")) return "i_or_s_command_received";
+        if (events.Contains("all_other_primitives__from_lower_layer")) return "all_other_primitives__from_lower_layer";
+        return null;
+    }
 
     /// <summary>
     /// A pop is enabled only when it changes something: a window-full or
@@ -850,11 +936,9 @@ public sealed class Stepper
     {
         if (!_eventsByState.TryGetValue(m.State, out var events)) return null;
         var direct = frame.Type + "_received";
-        if (events.Contains(direct)) return direct;
-        if (frame.Command && events.Contains("all_other_commands")) return "all_other_commands";
-        if (frame.Command && frame.IsIOrSupervisory && events.Contains("i_or_s_command_received")) return "i_or_s_command_received";
-        if (events.Contains("all_other_primitives__from_lower_layer")) return "all_other_primitives__from_lower_layer";
-        return null;
+        // An explicit save takes precedence over the catch-all (pinned 19).
+        if (events.Contains(direct) || m.IsSavedHere(direct)) return direct;
+        return CatchAllForFrame(events, frame.Command, frame.IsIOrSupervisory);
     }
 
     private string? SeizeConfirmEvent(DataLinkMachine m)
@@ -1025,10 +1109,18 @@ public sealed class Stepper
             }
             case MoveKind.Release:
             {
-                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DISCONNECT_request")), "DL_DISCONNECT_request (layer 3 releases the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number);
+                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DISCONNECT_request")), "DL_DISCONNECT_request (layer 3 releases the link: everything is delivered)", incoming, s.Budget, clearOwed: false, number, primitive: "DL_DISCONNECT_request");
                 var next = station == Station.A
                     ? outcome.Next with { ReleasedA = true }
                     : outcome.Next with { ReleasedB = true };
+                return outcome with { Next = next };
+            }
+            case MoveKind.Abandon:
+            {
+                var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DISCONNECT_request")), "DL_DISCONNECT_request (layer 3 abandons its connect while it is being set up)", incoming, s.Budget, clearOwed: false, number, primitive: "DL_DISCONNECT_request");
+                var next = station == Station.A
+                    ? outcome.Next with { AbandonedA = true }
+                    : outcome.Next with { AbandonedB = true };
                 return outcome with { Next = next };
             }
             case MoveKind.Reconnect:
@@ -1195,7 +1287,8 @@ public sealed class Stepper
     /// the frame (reported as a MachineError).
     /// </summary>
     private StepOutcome Inject(SystemState s, Station station, EventInput? input, string action,
-        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null, FrameErrors corrupt = FrameErrors.None)
+        IReadOnlyList<Frame> newIncoming, int newBudget, bool clearOwed, int number, string? frameType = null, FrameErrors corrupt = FrameErrors.None,
+        string? primitive = null)
     {
         var peer = SystemState.Peer(station);
         var pre = s.Machine(station);
@@ -1217,7 +1310,8 @@ public sealed class Stepper
             {
                 try
                 {
-                    result = m.Dispatch(input);
+                    // Saves (pinned semantic 19): a released input is routed as a fresh one would be.
+                    result = m.Dispatch(input, RouteReleased);
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -1246,9 +1340,48 @@ public sealed class Stepper
             : null;
         var injectedInSequence = injectedDeliverable;
 
+        // Saves (pinned semantic 19): the transitions this dispatch ran that
+        // consumed an input, in order: the step's own (unless the input was
+        // held), then one per released held input, each with the state it
+        // fired in and whether the input was layer 3's DL-DISCONNECT Request.
+        var consumed = new List<(DispatchResult R, string From, bool Request)>();
         if (result is not null)
         {
-            foreach (var effect in result.Effects)
+            if (result.TransitionId != DataLinkMachine.SaveTransitionId)
+                consumed.Add((result, pre.State, (primitive ?? input!.Event) == "DL_DISCONNECT_request"));
+            var from = result.NextState;
+            foreach (var r in result.Replayed)
+            {
+                consumed.Add((r, from, r.Input?.Event == "DL_DISCONNECT_request"));
+                from = r.NextState;
+            }
+        }
+
+        // DisconnectKept: a consumed DL-DISCONNECT Request takes the station to
+        // Disconnected or Awaiting Release, or it is lost.
+        if (violation is null && On(Invariants.DisconnectKept))
+        {
+            foreach (var (r, from, request) in consumed)
+            {
+                if (!request || r.NextState is "Disconnected" or "AwaitingRelease") continue;
+                violation = new Violation(Invariants.DisconnectKept, station,
+                    $"station {station}'s layer 3 DL_DISCONNECT_request was consumed by {from}/{r.TransitionId}{(ReferenceEquals(r, result) ? "" : " (released from a save)")}, which leaves the station in {r.NextState}: the disconnect is lost");
+                break;
+            }
+        }
+
+        // The disconnect answer rule: a consumed DL-DISCONNECT Request is
+        // pending until DL_DISCONNECT_confirm or DL_DISCONNECT_indication.
+        var disconnectPending = s.DisconnectPending(station);
+        foreach (var (r, _, request) in consumed)
+        {
+            if (request) disconnectPending = true;
+            if (r.Effects.Any(e => e is UpperEffect { Primitive: "DL_DISCONNECT_confirm" or "DL_DISCONNECT_indication" })) disconnectPending = false;
+        }
+
+        if (result is not null)
+        {
+            foreach (var effect in result.AllEffects)
             {
                 effectsText.Add(effect.Render());
                 switch (effect)
@@ -1448,6 +1581,8 @@ public sealed class Stepper
             LinkUpB = station == Station.B ? linkUp : s.LinkUpB,
             ReconnectPendingA = station == Station.A ? reconnectPending : s.ReconnectPendingA,
             ReconnectPendingB = station == Station.B ? reconnectPending : s.ReconnectPendingB,
+            DisconnectPendingA = station == Station.A ? disconnectPending : s.DisconnectPendingA,
+            DisconnectPendingB = station == Station.B ? disconnectPending : s.DisconnectPendingB,
             ReportA = station == Station.A ? report : s.ReportA,
             ReportB = station == Station.B ? report : s.ReportB,
             LossesA = station == Station.A ? losses : s.LossesA,
@@ -1463,7 +1598,10 @@ public sealed class Stepper
         };
 
         var record = new StepRecord(number, station.ToString(), action, result?.TransitionId, effectsText,
-            SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+            SummaryOf(next, Station.A), SummaryOf(next, Station.B))
+        {
+            Replayed = consumed.Where(c => !ReferenceEquals(c.R, result)).Select(c => c.From + "/" + c.R.TransitionId).ToList(),
+        };
         return new StepOutcome(next, record, violation);
     }
 

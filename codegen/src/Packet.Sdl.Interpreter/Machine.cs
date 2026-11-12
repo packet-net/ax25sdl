@@ -311,7 +311,21 @@ public sealed class DataLinkMachine
     /// violation), a guard consults an event field the step didn't supply,
     /// or an action verb has no defined semantics.
     /// </exception>
-    public DispatchResult Dispatch(EventInput input)
+    public DispatchResult Dispatch(EventInput input) => Dispatch(input, releaseRoute: null);
+
+    /// <summary>
+    /// <see cref="Dispatch(EventInput)"/> for a caller that routes unhandled
+    /// inputs to a page's "all other" column (the two-station explorer,
+    /// pinned semantic 5). A released held input is handled exactly as a
+    /// fresh one would be (pinned 19(c)), so before each one is consumed it
+    /// passes through <paramref name="releaseRoute"/> (the state it is
+    /// released into, and the input as it was held), and the input that
+    /// comes back is the one dispatched. <see cref="DispatchResult.Input"/>
+    /// and <see cref="DispatchResult.Event"/> of a replay stay the held
+    /// input. With no route, a released input with no arm raises, as a fresh
+    /// one does.
+    /// </summary>
+    public DispatchResult Dispatch(EventInput input, Func<string, EventInput, EventInput>? releaseRoute)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -325,7 +339,7 @@ public sealed class DataLinkMachine
         }
 
         var result = DispatchInput(input) with { Event = input.Event, Input = input };
-        var replayed = ReplayHeld();
+        var replayed = ReplayHeld(releaseRoute);
         return replayed.Count == 0 ? result : result with { Replayed = replayed };
     }
 
@@ -337,9 +351,10 @@ public sealed class DataLinkMachine
     /// state. Inputs a state still saves keep their place and order. A
     /// released input goes through exactly the path a fresh input takes
     /// (<see cref="DispatchInput"/>), so it is handled as a fresh one would
-    /// be, catch-all routing aside (the machine does none; pinned 19(c)).
+    /// be: the machine does no catch-all routing itself, and a caller that
+    /// does passes its route (pinned 19(c)).
     /// </summary>
-    private List<DispatchResult> ReplayHeld()
+    private List<DispatchResult> ReplayHeld(Func<string, EventInput, EventInput>? route)
     {
         var replayed = new List<DispatchResult>();
         while (true)
@@ -352,7 +367,7 @@ public sealed class DataLinkMachine
             _held.RemoveAt(index);
             try
             {
-                replayed.Add(DispatchInput(input) with { Event = input.Event, Input = input });
+                replayed.Add(DispatchInput(route is null ? input : route(State, input)) with { Event = input.Event, Input = input });
             }
             catch (InvalidOperationException ex)
             {

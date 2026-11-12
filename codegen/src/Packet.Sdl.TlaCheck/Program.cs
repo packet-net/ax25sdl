@@ -95,6 +95,10 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.ResetWrongCode => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code"),
     TableSetKind.InjectedDelivered => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-delivered"),
     TableSetKind.InjectedUndelivered => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-undelivered"),
+    TableSetKind.DisconnectSwallowed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-swallowed"),
+    TableSetKind.DisconnectReleasedEarly => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-released-early"),
+    TableSetKind.DisconnectUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-unconfirmed"),
+    TableSetKind.DisconnectSilent => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -326,6 +330,10 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.ResetWrongCode => "seeded reset-wrong-code",
     TableSetKind.InjectedDelivered => "seeded injected-delivered",
     TableSetKind.InjectedUndelivered => "seeded injected-undelivered",
+    TableSetKind.DisconnectSwallowed => "seeded disconnect-swallowed",
+    TableSetKind.DisconnectReleasedEarly => "seeded disconnect-released-early",
+    TableSetKind.DisconnectUnconfirmed => "seeded disconnect-unconfirmed",
+    TableSetKind.DisconnectSilent => "seeded disconnect-silent",
     _ => "seeded livelock",
 };
 

@@ -182,8 +182,18 @@ public enum Invariants
     /// </summary>
     ResetLoss = 65536,
 
+    /// <summary>
+    /// A DL-DISCONNECT Request from layer 3 is never lost (packet-net/ax25sdl#97,
+    /// pinned semantic 19): when a transition consumes it, fresh or released
+    /// from a save, that transition takes the station to Disconnected or
+    /// Awaiting Release. A request that reaches an "all other" column, or an
+    /// arm that leaves the station where it was, is a lost disconnect. A
+    /// request a state saves is not consumed, so holding it is not a loss.
+    /// </summary>
+    DisconnectKept = 131072,
+
     /// <summary>Everything except <see cref="SelectiveProgress"/>.</summary>
-    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication | UnitData | FrameError,
+    Default = DefinedState | SequenceSanity | Delivery | RejectCoherence | AckCoherence | Quiescence | Deadlock | FlowOffDelivery | BusyTracksFlow | PeerBusyHold | BusyIndication | UnitData | FrameError | DisconnectKept,
 }
 
 /// <summary>
@@ -324,11 +334,29 @@ public sealed record ExplorerOptions
     /// With <see cref="Release"/>: the release may also come while the link
     /// is still being set up (AwaitingConnection, AwaitingV22Connection), not
     /// only on an established link. Figures C4.2 and C4.6 draw a Save
-    /// (Requeue) for DL-DISCONNECT Request there, which codegen does not emit
-    /// yet (packet-net/ax25sdl#97), so the generated tables route it to the
-    /// page's upper-layer catch-all, which drops it. Off by default.
+    /// (Requeue) for DL-DISCONNECT Request there, so the request is held and
+    /// replayed once the station reaches a state that does not save it
+    /// (pinned semantic 19). Off by default.
     /// </summary>
     public bool ReleaseEarly { get; init; }
+
+    /// <summary>
+    /// Layer 3 abandons its own connect: the layer 3 of each station named
+    /// here may issue DL_DISCONNECT_request once while the link is being set
+    /// up (AwaitingConnection or AwaitingV22Connection), and only while it
+    /// has asked to connect and not yet heard back: station A from the
+    /// Disconnected and AwaitingV22Connection seeds until its first link
+    /// report, or any station after a reconnect (<see cref="Reconnect"/>)
+    /// until that is answered. Figures C4.2 and C4.6 save the request, so it
+    /// is held until the connect succeeds (then DISC) or fails (then
+    /// DL-DISCONNECT Confirm in Disconnected). The move is optional: a path
+    /// on which the link comes up first rests as usual. Once a station has
+    /// abandoned, quiescence means both stations Disconnected (a v2.0 stub
+    /// peer disconnected), and every DL_DISCONNECT_request consumed must have
+    /// been answered with DL_DISCONNECT_confirm or DL_DISCONNECT_indication.
+    /// Station A may abandon with the v2.0 stub as B. Off by default.
+    /// </summary>
+    public ReleaseBy Abandon { get; init; } = ReleaseBy.None;
 
     /// <summary>
     /// Layer 3 resets the link: the layer 3 of each station named here issues

@@ -136,4 +136,41 @@ public class SaveTests
         copy.HeldInputs.Should().BeEmpty();
         machine.HeldInputs.Should().ContainSingle("the original is untouched");
     }
+
+    [Fact]
+    public void A_Release_Route_Is_Applied_Before_The_Held_Input_Is_Consumed()
+    {
+        // The explorer's route (pinned semantic 19(c)): a released input goes
+        // where a fresh one would. Here the route sends it to Connected's
+        // upper-layer catch-all, so the request is consumed there and the
+        // station stays up; the replay still reports the input as held.
+        var machine = AwaitingConnection();
+        machine.Dispatch(new EventInput("DL_DISCONNECT_request", Data: "held"));
+        var seen = new List<(string State, string Event)>();
+
+        var result = machine.Dispatch(new EventInput("UA_received", Pf: true), (state, held) =>
+        {
+            seen.Add((state, held.Event));
+            return held with { Event = "all_other_primitives__from_upper_layer" };
+        });
+
+        seen.Should().Equal(("Connected", "DL_DISCONNECT_request"));
+        result.Replayed.Should().ContainSingle();
+        result.Replayed[0].TransitionId.Should().Be("t08_all_other_primitives__from_upper_layer");
+        result.Replayed[0].Event.Should().Be("DL_DISCONNECT_request");
+        result.Replayed[0].Input!.Data.Should().Be("held");
+        machine.State.Should().Be("Connected");
+    }
+
+    [Fact]
+    public void A_Trace_Step_Without_Replayed_Fails_When_A_Held_Input_Is_Replayed()
+    {
+        // traces/seeded-replay-undeclared.trace.yaml is a strict xfail; this
+        // pins why it fails, so the rule cannot be switched off unnoticed.
+        var trace = TraceLoader.Load(Path.Combine(RepoRoot(), "traces", "seeded-replay-undeclared.trace.yaml"));
+        var result = TraceRunner.Run(trace, Tables.Value);
+
+        result.Passed.Should().BeFalse();
+        result.Message.Should().Contain("declares no `replayed:`").And.Contain("DL_DISCONNECT_request via t01_dl_disconnect_request");
+    }
 }

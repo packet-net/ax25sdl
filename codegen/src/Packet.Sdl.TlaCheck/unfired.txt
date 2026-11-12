@@ -46,8 +46,7 @@ Connected/t03_i_frame_pops_off_queue_no_yes
 TimerRecovery/t03_i_frame_pops_off_queue_yes
 TimerRecovery/t03_i_frame_pops_off_queue_no_yes
 
-group layer3-misuse: harness: inputs a well-behaved layer 3 never sends (a release of a link that is down or already going down, primitives a page has no arm for); missing: a misbehaving layer 3
-Disconnected/t01_dl_disconnect_request
+group layer3-misuse: harness: inputs a well-behaved layer 3 never sends (a release of a link that is already going down, primitives a page has no arm for); missing: a misbehaving layer 3. AwaitingRelease's DL-DISCONNECT arm would also take a second held request replayed after the first (pinned semantic 19(c)), but each layer 3 issues one
 Disconnected/t04_all_other_primitives__from_upper_layer
 Connected/t08_all_other_primitives__from_upper_layer
 TimerRecovery/t26_all_other_primitives__from_upper_layer
