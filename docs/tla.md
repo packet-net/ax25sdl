@@ -19,7 +19,12 @@ dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --help
 | File | Written by | What it is |
 | --- | --- | --- |
 | `spec/tla/Ax25DataLinkTables.tla` | generated (`--tla`) | The tables as constant TLA+ data: `Pages[state][event]` is that page's transitions on that event in file order, `Subroutines[name]` its paths. Each has its guard (`Is(atom)` / `Not(atom)` conjuncts), loop regions, action chain (`Box(kind, verb)`) and next state. |
-| `spec/tla/Ax25Semantics.tla` | hand | What each verb and guard atom means, and a runner for the table data. A port of the reference interpreter (`Machine.cs`). |
+| `spec/tla/Ax25Runner.tla` | hand | How a table is run: guard selection, loop regions, subroutine calls and their bindings, the next state, and the frame around one dispatch. It reaches every verb, atom and signal through constant operators, the meaning interface. A port of the reference interpreter's `Dispatch`, `ExecuteActions`, `RunLoop` and `InvokeSubroutine` (`Machine.cs`). |
+| `spec/tla/MeaningInterface.md` | hand | The interface a meaning module implements, written to be handed to an independent author (see "Selecting a meaning" below). |
+| `spec/tla/Ax25Meaning.tla` | hand | The default meaning: what each verb, guard atom and signal does. A port of `Machine.cs`, arm by arm. Its own choices are in `docs/tla-meaning-policies.md`, which is withheld from an independent author. |
+| `spec/tla/Ax25MeaningTemplate.tla` | hand | A skeleton meaning that parses, every verb and atom unbound. |
+| `spec/tla/Ax25Values.tla` | hand | The value shapes that cross the interface: events, frames, effects, the error convention, the two maps the harness reads. |
+| `spec/tla/Ax25Semantics.tla` | hand | The meaning switch: instantiates the runner with the meaning its `EXTENDS` line names. |
 | `codegen/src/Packet.Sdl.TlaCheck/TwoStation.tla` | hand | The harness: two stations, the channel, the v2.0 stub peer, the moves, the invariants. A port of the explorer's `Stepper.cs`. |
 | `codegen/src/Packet.Sdl.TlaCheck/` | hand | Runs the explorer and TLC on the same scenario and compares them. |
 | `codegen/src/Packet.Sdl.TlaCheck/fixtures/` | script, documented | Twenty-one deliberately broken table sets that fail acknowledgement coherence, quiescence, the release rest, the give-up rule's settled state (with and without T3), the reconnect answer rule, the link report rule, the peer-busy hold, busy delivery, the busy indication (answering a poll and polling), the keepalive rule, the UI rules (delivery, refusal, the poll's answer, every datagram sent) and the frame-error rules (the error reported, also on a catch-all; a reset loss only when layer 3 was told; no rest and no reset loss after an unjustified reset), which no real defect does (see its README). |
@@ -30,12 +35,12 @@ dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --help
 
 **Why the tables are data, not operators.** The other six backends emit the tables as data for a hand-written runtime; this one does the same. Emitting each transition as a TLA+ operator was tried first. TLC's start-up level analysis (`SpecProcessor.processConstantDefns`) unfolds every operator application site separately, and with a subroutine call reachable from every action box it spent about 15 seconds per run before exploring a single state. As data, TLC starts in about a second.
 
-**What is hand-written, and why.** The catalogues (`actions.yaml`, `predicates.yaml`, `events.yaml`) name verbs, atoms and events but do not say what they do; the only definition is the interpreter's switch. So `Ax25Semantics.tla` restates it, verb by verb and atom by atom, with the same policies (pinned semantics 1, 3 and 4 of `docs/explorer.md`). Nothing protocol-specific is in the generated module.
+**What is hand-written, and why.** The catalogues (`actions.yaml`, `predicates.yaml`, `events.yaml`) name verbs, atoms and events but do not say what they do; the only definition is the interpreter's switch. So `Ax25Meaning.tla` restates it, verb by verb and atom by atom, with the same policies (pinned semantics 1, 3 and 4 of `docs/explorer.md`), and `Ax25Runner.tla` runs the table data as the interpreter does. Nothing protocol-specific is in the generated module.
 
 **How independent the two checkers are.** Less than "two tools" suggests, and on purpose, so that a disagreement means a bug rather than a different reading. Shared or mirrored between them:
 
 - the input: the same JSON tables (TlaCheck renders the TLA+ from the scenario's JSON afresh for each run rather than reading the committed `spec/tla` module; the drift test is what ties the committed module to that same render);
-- the meaning of every verb and atom: `Ax25Semantics.tla` is a port of `Machine.cs`, written by reading it;
+- the meaning of every verb and atom: `Ax25Meaning.tla` is a port of `Machine.cs`, written by reading it (the split below is there so that a second meaning, written from the spec text alone, can be checked against it);
 - the harness: `TwoStation.tla` is a port of `Stepper.cs`, written by reading it;
 - the move set and the move order, chosen to match so both searches meet the same first violation;
 - every invariant definition, including the per-step checks and their order;
@@ -46,6 +51,28 @@ dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --help
 - the depth-bound handling (a TLC state constraint chosen to cut where the explorer's bound cuts).
 
 Truly independent: the exploration engine (TLC's breadth-first search, state hashing, deadlock detection and liveness checking, against the explorer's own), and the code that runs the tables and the verbs, which is a separate implementation in a separate language though still a port of the same reading. So the cross-check finds bugs in either implementation or either search; it cannot find a shared misreading of a verb or a shared mistake in an invariant's definition.
+
+## Selecting a meaning
+
+The semantics are two modules with a fixed interface between them, so that the meaning of the verbs and atoms can be replaced without touching how the tables are run (ax25spec#116 Phase 2: an independent meaning, written from the spec text, checked against this one).
+
+- `Ax25Runner.tla` declares the meaning as constant operators (`Begin`, `Arrive`, `AtomError`, `AtomValue`, `Processing`, `SignalUpper`, `SignalLower`, `InternalOut`, `Preempts`, `Preempt`, `AfterTransition`) and never names a meaning module. It owns guard selection and its order, loop regions, the subroutine binding map and the next state, and touches no meaning data.
+- A meaning module `EXTENDS Ax25Values` and defines those operators plus `NewMachine` and `Persist` for the harness. `spec/tla/MeaningInterface.md` is the whole interface, worded so that a meaning can be written from it, `Ax25Values.tla`, `Ax25Runner.tla`, the tables, the catalogues and the spec text alone: the event record, the station record's fixed fields (named as the spec names them) and who reads, seeds or writes each, the harness checks that bind a meaning, the context fields the runner and the harness own, each operator's contract, the runner policies, and the reserved names.
+- `docs/tla-meaning-policies.md` lists what the default meaning chose where the interface leaves the choice open, its own fields and scratch, and notes for the lockstep step. It is withheld from an independent author and is the triage checklist when two meanings disagree.
+- `Ax25Semantics.tla` is the switch: `EXTENDS Ax25Meaning` followed by an unnamed `INSTANCE Ax25Runner`, which binds each constant to the meaning's operator of the same name. The harness extends it unchanged.
+- `TlaCheck --meaning NAME` selects another meaning: a module in `spec/tla`, or a path to a `.tla` file. It copies the module into each model directory and rewrites that one `EXTENDS` line; the default is `Ax25Meaning`.
+
+**The fixed fields are checked at start-up.** The harness seeds and writes some station fields with `EXCEPT`, which TLC accepts on a field the record lacks, so a meaning that named a fixed field differently would run on silently (a review found Acknowledge Pending renamed changing `busy-a-enq` from 222 to 217 states with no error). `Ax25Values.FixedFields` is the one list of those fields, and an `ASSUME` in `TwoStation.tla` stops TLC before any state is explored if `NewMachine` or `Persist` lacks one; TlaCheck reports it as the row's error. Manual check, from the repository root:
+
+```sh
+sed -e 's/MODULE Ax25Meaning /MODULE AckRenamed /' -e 's/\back\b/ackPend/g' spec/tla/Ax25Meaning.tla > /tmp/AckRenamed.tla
+dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --meaning /tmp/AckRenamed.tla --only d42
+# DISAGREE d42: ... TLC error: meaning interface: NewMachine lacks the fixed station field(s) {"ack"} | ...
+```
+
+Why this switch. TLC handles an `INSTANCE` with operator substitutions without any start-up cost (the level analysis that made the tables data, above, is not involved: the tables are still constants, evaluated once). It is not free while exploring: on `busy-both-trq` the safety search takes about 7% longer than with the old single module (12.8 s against 12.0 s), because every runner operator is evaluated under the substitution. A plain `EXTENDS` chain from the runner to a meaning named on its own `EXTENDS` line costs nothing, but then the runner names a meaning, the interface is a convention rather than a declaration that SANY checks for arity, and running two meanings side by side would need a generated copy of the runner per meaning. With the constants, a lockstep check of two meanings in one TLC run is two instances of the same runner: `RA == INSTANCE Ax25Runner WITH Begin <- MA!Begin, ...` and the same for `MB`, with `MA == INSTANCE Ax25Meaning` and `MB` the other meaning.
+
+The split changes no behaviour: the operators are the old module's, moved, with two exceptions that compute the same thing. The runner stages Enquiry Response's F parameter by calling `Processing` with "F := 1" or "F := 0" instead of writing the pending F register itself, and the queue pop for `I_frame_pops_off_queue` is the meaning's `Arrive` (it ran right after the timer expiry before, and still does). Every calibration row has the same verdict and the same state count as before.
 
 ## How TLC reproduces the explorer
 

@@ -23,6 +23,9 @@ deadlock), and the same number of distinct states (clean runs).
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
   --timeout S       seconds per TLC run (default 600)
+  --meaning M       the meaning module the runner is instantiated with: a
+                    module name in spec/tla or a path to a .tla file
+                    (default Ax25Meaning; see docs/tla.md)
 
 A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
@@ -40,6 +43,7 @@ var grid = false;
 var gridFlow = false;
 int parallel = 1, workers = 1, timeout = 600;
 var heap = "2g";
+var meaning = Tlc.DefaultMeaning;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -57,6 +61,7 @@ for (var i = 0; i < args.Length; i++)
         case "--workers": workers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--heap": heap = Next(); break;
         case "--timeout": timeout = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+        case "--meaning": meaning = Next(); break;
         default: Console.Error.WriteLine($"unknown option {args[i]}\n\n{usage}"); return 1;
     }
 }
@@ -105,9 +110,18 @@ if (jar is null || !File.Exists(jar))
     return 1;
 }
 
+var harness = Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "TwoStation.tla");
+var tlaDir = Path.Combine(root, "spec", "tla");
+if (meaning.EndsWith(".tla", StringComparison.Ordinal)) meaning = Path.GetFullPath(meaning);
+if (Tlc.CheckMeaning(tlaDir, meaning, harness) is { } badMeaning)
+{
+    Console.Error.WriteLine(badMeaning);
+    return 1;
+}
 var tlc = new Tlc(jar,
-    Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "TwoStation.tla"),
-    Path.Combine(root, "spec", "tla", "Ax25Semantics.tla"),
+    harness,
+    tlaDir,
+    meaning,
     workers, heap, TimeSpan.FromSeconds(timeout));
 
 var results = new ConcurrentDictionary<int, Row>();
