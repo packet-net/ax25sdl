@@ -517,7 +517,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.CounterexampleLength.Should().Be(2);
 
         var lenient = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false));
-        lenient.Outcome.Should().Be(Outcome.NoViolation, "the figc4.2 T1 retry sends SABM and the v2.0 peer accepts it; A stays at modulo 128 (never reassigned by the tables, the #54 blind spot), which this abstract frame model cannot see");
+        lenient.Outcome.Should().Be(Outcome.NoViolation, "the figc4.2 T1 retry sends SABM and the v2.0 peer accepts it; A stays at modulo 128 (figc4.2's UA arm draws no Set Version box: the initiator side of #54, which ax25sdl#123 does not change), which this abstract frame model cannot see");
     }
 
     [Fact]
