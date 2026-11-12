@@ -40,7 +40,7 @@ What persists between dispatches, and so is part of the model's state. `NewMachi
 
 ### Fixed fields
 
-The harness reads, seeds or writes these, so their names, types and meanings are fixed.
+The harness reads, seeds or writes these, so their names, types and meanings are fixed. The list is `FixedFields` in `Ax25Values.tla`, and the harness checks it at start-up: a meaning whose `NewMachine` or `Persist` lacks one of them stops TLC before any state is explored, with "meaning interface: NewMachine lacks the fixed station field(s) ..." naming the missing fields.
 
 | Field | AX.25 name | Type |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ Fixed by `Ax25Runner.tla`; a meaning cannot change them.
 
 A meaning must not define any of these (the instantiation would not parse):
 
-- From `Ax25Values.tla`: `None Frm NoFrm FrameFx UpperFx LmFx Event Has Get Put Del Fail`, and every operator of `Integers`, `Sequences`, `FiniteSets` and `TLC`.
+- From `Ax25Values.tla`: `None Frm NoFrm FrameFx UpperFx LmFx Event Has Get Put Del FixedFields Fail`, and every operator of `Integers`, `Sequences`, `FiniteSets` and `TLC`.
 - From `Ax25Runner.tla`: `MaxLoopIterations EvalTerms SelectGuard SubroutineBindings SubroutineFor BeforeCall ProcessingCallsSubroutine DataLinkStates Handles Invoke Act RunRange RunLoop RunActions CallSubroutine Goto DispatchState Prepare Settle Dispatch`.
 - From `Ax25DataLinkTables.tla`: `Box Is Not Loop Pages Saves Subroutines` and every `Page_*` name.
 - From the harness `TwoStation.tla`, which extends the result: any name it defines (its constants, variables and operators). A clash there is reported by SANY when the harness is parsed.

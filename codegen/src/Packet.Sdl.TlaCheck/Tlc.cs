@@ -486,7 +486,9 @@ public sealed class Tlc
         else kind = "error";
 
         var message = kind == "error"
-            ? string.Join(" | ", text.Split('\n').Where(l => l.StartsWith("Error", StringComparison.Ordinal) || l.Contains("Exception", StringComparison.Ordinal)).Take(4))
+            // The harness's start-up check of the meaning interface names the missing fields; put it first.
+            ? string.Join(" | ", text.Split('\n').Where(l => l.Contains("meaning interface:", StringComparison.Ordinal)).Select(l => l.Trim().Trim('"'))
+                .Concat(text.Split('\n').Where(l => l.StartsWith("Error", StringComparison.Ordinal) || l.Contains("Exception", StringComparison.Ordinal))).Take(4))
             : "";
         return new TlcResult(kind, invariant, generated, distinct, depth, trace, elapsed, message);
     }

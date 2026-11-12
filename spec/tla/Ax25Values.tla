@@ -43,6 +43,14 @@ Get(map, key) == (CHOOSE pr \in map : pr[1] = key)[2]
 Put(map, key, val) == {pr \in map : pr[1] # key} \cup {<<key, val>>}
 Del(map, key) == {pr \in map : pr[1] # key}
 
+\* The fixed station fields: the station record fields the harness reads,
+\* seeds or writes (spec/tla/MeaningInterface.md, "Fixed fields"). Every
+\* meaning's station record has at least these; TwoStation.tla checks it at
+\* start-up. This is the one list; the interface's table mirrors it.
+FixedFields ==
+    {"st", "vs", "vr", "va", "rc", "mod", "k", "n2", "v22", "srej", "l3", "own", "ack", "srejx",
+     "t1", "t3", "q", "saved"}
+
 \* Record an error on a dispatch context; the first one wins and every later
 \* step passes through.
 Fail(c, msg) == IF c.err = "" THEN [c EXCEPT !.err = msg] ELSE c

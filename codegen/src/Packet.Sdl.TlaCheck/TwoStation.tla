@@ -79,6 +79,18 @@ DataStates == {"Connected", "TimerRecovery"}
 LinkStates == {"AwaitingConnection", "AwaitingV22Connection", "Connected", "TimerRecovery"}
 KnownStates == {"Disconnected", "AwaitingConnection", "AwaitingV22Connection", "Connected", "AwaitingRelease", "TimerRecovery"}
 
+\* The meaning's station record must have every fixed field (Ax25Values
+\* FixedFields), as NewMachine builds it and as Persist gives it back: the
+\* harness seeds and writes some of them with EXCEPT, which TLC would
+\* otherwise accept on a missing field and run on silently.
+ASSUME \A st \in KnownStates :
+    LET made == DOMAIN NewMachine(st)
+        kept == DOMAIN Persist(Begin(NewMachine(st), Event("I_frame_pops_off_queue")))
+    IN  /\ Assert(FixedFields \subseteq made,
+                  "meaning interface: NewMachine lacks the fixed station field(s) " \o ToString(FixedFields \ made))
+        /\ Assert(FixedFields \subseteq kept,
+                  "meaning interface: Persist(Begin(...)) lacks the fixed station field(s) " \o ToString(FixedFields \ kept))
+
 NoViol == [kind |-> "none", at |-> "", msg |-> ""]
 Viol(kind, s, msg) == [kind |-> kind, at |-> s, msg |-> msg]
 NoStep == [move |-> "", at |-> "", frame |-> NoFrm, tid |-> "", arms |-> {}, tick |-> 0, lossy |-> ""]

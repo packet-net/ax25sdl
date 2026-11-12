@@ -62,6 +62,14 @@ The semantics are two modules with a fixed interface between them, so that the m
 - `Ax25Semantics.tla` is the switch: `EXTENDS Ax25Meaning` followed by an unnamed `INSTANCE Ax25Runner`, which binds each constant to the meaning's operator of the same name. The harness extends it unchanged.
 - `TlaCheck --meaning NAME` selects another meaning: a module in `spec/tla`, or a path to a `.tla` file. It copies the module into each model directory and rewrites that one `EXTENDS` line; the default is `Ax25Meaning`.
 
+**The fixed fields are checked at start-up.** The harness seeds and writes some station fields with `EXCEPT`, which TLC accepts on a field the record lacks, so a meaning that named a fixed field differently would run on silently (a review found Acknowledge Pending renamed changing `busy-a-enq` from 222 to 217 states with no error). `Ax25Values.FixedFields` is the one list of those fields, and an `ASSUME` in `TwoStation.tla` stops TLC before any state is explored if `NewMachine` or `Persist` lacks one; TlaCheck reports it as the row's error. Manual check, from the repository root:
+
+```sh
+sed -e 's/MODULE Ax25Meaning /MODULE AckRenamed /' -e 's/\back\b/ackPend/g' spec/tla/Ax25Meaning.tla > /tmp/AckRenamed.tla
+dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --meaning /tmp/AckRenamed.tla --only d42
+# DISAGREE d42: ... TLC error: meaning interface: NewMachine lacks the fixed station field(s) {"ack"} | ...
+```
+
 Why this switch. TLC handles an `INSTANCE` with operator substitutions without any start-up cost (the level analysis that made the tables data, above, is not involved: the tables are still constants, evaluated once). It is not free while exploring: on `busy-both-trq` the safety search takes about 7% longer than with the old single module (12.8 s against 12.0 s), because every runner operator is evaluated under the substitution. A plain `EXTENDS` chain from the runner to a meaning named on its own `EXTENDS` line costs nothing, but then the runner names a meaning, the interface is a convention rather than a declaration that SANY checks for arity, and running two meanings side by side would need a generated copy of the runner per meaning. With the constants, a lockstep check of two meanings in one TLC run is two instances of the same runner: `RA == INSTANCE Ax25Runner WITH Begin <- MA!Begin, ...` and the same for `MB`, with `MA == INSTANCE Ax25Meaning` and `MB` the other meaning.
 
 The split changes no behaviour: the operators are the old module's, moved, with two exceptions that compute the same thing. The runner stages Enquiry Response's F parameter by calling `Processing` with "F := 1" or "F := 0" instead of writing the pending F register itself, and the queue pop for `I_frame_pops_off_queue` is the meaning's `Arrive` (it ran right after the timer expiry before, and still does). Every calibration row has the same verdict and the same state count as before.
