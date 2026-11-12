@@ -385,8 +385,11 @@ public sealed record ExplorerOptions
     /// <summary>
     /// With <see cref="Reconnect"/>, connected seed only: each reconnecting
     /// station's layer 3 submits one more frame (<c>a{FramesAb}</c> at A,
-    /// <c>b{FramesBa}</c> at B) once its reset is confirmed (DL_CONNECT_confirm,
-    /// link up), so data crosses the link after the reset. The reconnect gate
+    /// <c>b{FramesBa}</c> at B) once its reconnect has been answered and its
+    /// last link report is up (normally the DL_CONNECT_confirm; strictly, a
+    /// later DL_CONNECT_indication after a DL_DISCONNECT_indication answer
+    /// would do too) with the station in a data state, so data crosses the
+    /// link after the reset. The reconnect gate
     /// still waits only for the frames submitted at the seed; quiescence
     /// requires the new frame delivered too. Off by default.
     /// </summary>

@@ -2736,7 +2736,7 @@ public class CalibrationTests(ITestOutputHelper output)
     // ax25spec#169 (packet-net/ax25sdl#119): A sends a0; B's T3 (only B's,
     // so #167 does not end the run with A in Timer Recovery) takes B to Timer
     // Recovery holding V(r) = 1 with V(s) = V(a); A's layer 3 resets the link
-    // and, once confirmed, submits a1. With #169's reset box B takes a1 in
+    // and, once that is answered with the link up, submits a1. With #169's reset box B takes a1 in
     // sequence. Without it B keeps V(r) = 1, discards a1 (N(s) = 0) and
     // answers N(r) = 1, which acknowledges at A a frame B never delivered.
     private static ExplorerOptions Reset169(string dir) => new()
@@ -2764,6 +2764,23 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation.Station.Should().Be(Station.A);
         result.CounterexampleLength.Should().Be(15);
         result.Trace.Select(t => t.Transition).Should().Contain("t13_sabm_received_yes");
+    }
+
+    [Fact]
+    public void With_Data_Both_Ways_The_Reset_Box_Zeroes_V_s_And_V_a_Too()
+    {
+        // reconnect-tr-data-ba: B also sends b0 before the reset, so its V(s)
+        // and V(a) are 1 when the SABM arrives; the box zeroes them. Without
+        // it (reverted-169-ba) both stay 1 against A's reset V(r) = 0 and the
+        // link never rests. Leaving out V(s) or V(a) alone is caught too
+        // (AckCoherence or SequenceSanity at B, checked by mutation).
+        var clean = Run(Reset169(Fixtures.CurrentDir) with { FramesBa = 1 });
+        clean.Outcome.Should().Be(Outcome.NoViolation);
+        clean.StatesExplored.Should().Be(170);
+        var reverted = Run(Reset169(Fixtures.Reverted169Dir) with { FramesBa = 1 });
+        reverted.Outcome.Should().Be(Outcome.Violation);
+        reverted.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        reverted.CounterexampleLength.Should().Be(9);
     }
 
     [Fact]

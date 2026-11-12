@@ -78,7 +78,8 @@ public enum TableSetKind
 /// A row's expected verdict, as TlaCheck enforces it: the kind (<c>clean</c>,
 /// <c>bound</c>, or an <see cref="Invariants"/> name), and where the row
 /// states them, the station, the counterexample length (the explorer's
-/// steps, as its calibration test pins them) and the number of distinct
+/// steps; for a few rows, such as d38-*, d42-rc-off, d47-rc-on and
+/// d40-pre40-rej-eq-vs, TlaCheck is the only place that pins it) and the number of distinct
 /// states. <see cref="Label"/> is the text a reader sees.
 /// </summary>
 public sealed record Expectation(string Kind, Station? At = null, int? Steps = null, long? States = null, string? Note = null)
@@ -529,7 +530,7 @@ public static class Scenarios
         // checks on any table set, so each has a deliberately broken table to
         // prove it can fire, in both tools.
         Add("seeded-ack", "seeded (AckCoherence)", TableSetKind.AckBroken, o => o with { FramesAb = 1 }, Fails(Invariants.AckCoherence, Station.A, 4));
-        Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, Fails(Invariants.Quiescence));
+        Add("seeded-livelock", "seeded (Quiescence)", TableSetKind.Livelock, o => o with { FramesAb = 1 }, Fails(Invariants.Quiescence, steps: 9));
         // The release quiescence rule: B acknowledges A's DISC but stays
         // Connected, so the link ends with one end Disconnected and the other
         // not. Both tools must call that stuck, not released.
@@ -617,11 +618,11 @@ public static class Scenarios
         Add("t3-h1-k1", "#91", TableSetKind.Current, o => o with
         {
             FramesAb = 1, FramesBa = 2, K = 1, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true,
-        }, Fails(Invariants.Quiescence));
+        }, Fails(Invariants.Quiescence, steps: 9));
         Add("t3-reconnect-cold", "ax25spec#167 (fault-free with T3)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.A, T3 = true,
-        }, Fails(Invariants.Quiescence));
+        }, Fails(Invariants.Quiescence, steps: 9));
         Add("seeded-t3-dead", "seeded (give-up settles with T3)", TableSetKind.T3Dead, o => o with
         {
             FramesAb = 0, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, Release = ReleaseBy.A, AcceptGiveUp = true, T3 = true,
@@ -701,7 +702,7 @@ public static class Scenarios
         Add("fe-ab1-ctl", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, FramesBa = 1 }, Fails(Invariants.ResetLoss, steps: 4));
         Add("fe-a2-k1-info", "reset-loss control", TableSetKind.Current, o => Fe(o, FrameErrors.InfoNotPermitted) with { FramesAb = 2, K = 1 }, Fails(Invariants.ResetLoss, steps: 6));
         Add("fe-iresp", "frame-error control", TableSetKind.Current, o => Fe(o, FrameErrors.IResponse) with { FramesAb = 1 }, Clean());
-        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, Fails(Invariants.Quiescence));
+        Add("fe-t3-tr", "ax25spec#167 (shows through #114)", TableSetKind.Current, o => Fe(o, FE3) with { FramesAb = 0, T3 = true }, Fails(Invariants.Quiescence, steps: 9));
         Add("fe-tr-b3", "ax25spec#50", TableSetKind.Current, o => Fe(o, FrameErrors.N1 | FrameErrors.IResponse) with
         {
             FramesAb = 1, FramesBa = 1, Budget = 3, Faults = FaultKinds.Drop,
@@ -717,7 +718,7 @@ public static class Scenarios
         Add("t3-reconnect-cold-mod128", "ax25spec#167 (fault-free with T3, modulo 128)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, T3 = true, Reconnect = ReconnectBy.A,
-        }, Fails(Invariants.Quiescence));
+        }, Fails(Invariants.Quiescence, steps: 9));
 
         // From the review of batch 6: rows the first cut recorded as not fired.
         Add("tr-rej", "#91 (H1)", TableSetKind.Current, o => o with { FramesAb = 1, FramesBa = 3, K = 2, Budget = 3, Faults = FaultKinds.Drop }, Fails(Invariants.Deadlock, steps: 17));
@@ -827,7 +828,7 @@ public static class Scenarios
         // reset the link (Stop T1, Stop T3, V(s), V(a), V(r) := 0). A sends
         // one frame; once it is delivered B's T3 (only B's, so A stays in
         // Connected and #167 stays out of the way) takes B to Timer Recovery
-        // holding V(r) = 1, A's layer 3 resets the link and, once confirmed,
+        // holding V(r) = 1, A's layer 3 resets the link and, once that is answered with the link up,
         // submits one more frame (DataAfterReconnect). With the reset box B
         // takes it in sequence; without it B still holds V(r) = 1, discards
         // the frame as out of sequence and answers N(r) = 1, which
@@ -838,6 +839,13 @@ public static class Scenarios
         };
         Add("reconnect-tr-data", "ax25spec#169 fixed", TableSetKind.Current, R169, Clean(45));
         Add("reverted-169", "ax25spec#169 reverted", TableSetKind.Reverted169, R169, Fails(Invariants.AckCoherence, Station.A, 15));
+        // The rows above prove only V(r) := 0: B has sent nothing, so its V(s)
+        // and V(a) are 0 when the reset arrives. With B sending b0 before the
+        // reconnect they are 1, and leaving any one of V(s), V(a), V(r)
+        // unreset fails the row. Stop T1 and Stop T3 are not caught by any
+        // row (a T1 left running only costs an extra poll): a documented gap.
+        Add("reconnect-tr-data-ba", "ax25spec#169 fixed (V(s), V(a))", TableSetKind.Current, o => R169(o) with { FramesBa = 1 }, Clean(170));
+        Add("reverted-169-ba", "ax25spec#169 reverted", TableSetKind.Reverted169, o => R169(o) with { FramesBa = 1 }, Fails(Invariants.Quiescence, steps: 9));
 
         return list;
     }

@@ -31,7 +31,7 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --reconnect A|both     that station's layer 3 (or either's) issues DL_CONNECT_request once, on a live or waiting
                          link, when everything both sides submitted is delivered, and must then get its confirm
   --data-after-reconnect with --reconnect (connected seed): each reconnecting station's layer 3 submits one more
-                         frame once its reset is confirmed, so data crosses the link after the reset
+                         frame once its reconnect is answered and the link is reported up, so data crosses the link after the reset
   --accept-give-up       the give-up rule: a station that exhausts N2 after enough losses since its last progress
                          has given up honestly, and a settled honest give-up with everything delivered is quiescent
                          (one that lost data is a give-up-loss violation; an unjustified give-up never rests)

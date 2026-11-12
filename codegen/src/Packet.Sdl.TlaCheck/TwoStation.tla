@@ -37,7 +37,7 @@ CONSTANTS
     LongBusy,          \* with BusyAt: the busy period may outlast the peer's retries (no T1 hold)
     T3Moves,           \* model T3 expiry (idle keepalive), the keepalive rest rule and the stricter give-up settle
     T3At,              \* with T3Moves: the stations whose T3 may expire, subset of {"A", "B"}
-    DataAfterReconnect, \* with ReconnectAt, connected seed: a reconnecting layer 3 submits one more frame once its reset is confirmed
+    DataAfterReconnect, \* with ReconnectAt, connected seed: a reconnecting layer 3 submits one more frame once its reconnect is answered and the link reported up
     UnitDataAt,        \* stations whose layer 3 sends one UI datagram, once, in any state, subset of {"A", "B"}
     UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
     FrameErrors,       \* corrupted forms a frame may arrive in, subset of {"control", "info", "length", "n1", "iresp"}
@@ -69,7 +69,8 @@ Other(s) == IF s = "A" THEN "B" ELSE "A"
 
 \* The frames each station's layer 3 submits at the seed or by its first
 \* moves, and with DataAfterReconnect the one more a reconnecting station
-\* submits once its reset is confirmed (Stepper.SeedFrames).
+\* submits once its reconnect is answered and the link reported up
+\* (Stepper.SeedFrames).
 SeedFrames(s) == IF s = "A" THEN FramesAB ELSE FramesBA
 AfterReconnect(s) == IF DataAfterReconnect /\ s \in ReconnectAt THEN 1 ELSE 0
 
@@ -636,7 +637,8 @@ PopChanges(S, s) ==
            IN  c.err # "" \/ (\E i \in 1..Len(c.fx) : c.fx[i].kind = "frame") \/ Persist(c) # m
 
 \* Layer 3 holds data and its link is up (DataAfterConfirm), or its reset
-\* was confirmed and it has its one more frame (DataAfterReconnect).
+\* was answered, its last link report is up, and it has its one more frame
+\* (DataAfterReconnect).
 SubmitReady(S, s) ==
     \/ DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < Len(Submitted(s))
     \/ /\ DataAfterReconnect /\ Table(s) /\ S.offered[s] = 0 /\ SeedFrames(s) < Len(Submitted(s))

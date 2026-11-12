@@ -184,7 +184,7 @@ public sealed class Stepper
         foreach (var (state, page) in tables.States)
             _eventsByState[state] = new HashSet<string>(page.Transitions.Select(t => t.On), StringComparer.Ordinal);
         // With DataAfterReconnect a reconnecting station has one more frame,
-        // submitted once its reset is confirmed.
+        // submitted once its reconnect is answered and the link reported up.
         _submittedA = Enumerable.Range(0, _o.FramesAb + (_o.DataAfterReconnect && Reconnects(Station.A) ? 1 : 0)).Select(i => "a" + Inv(i)).ToArray();
         _submittedB = Enumerable.Range(0, _o.FramesBa + (_o.DataAfterReconnect && Reconnects(Station.B) ? 1 : 0)).Select(i => "b" + Inv(i)).ToArray();
     }
