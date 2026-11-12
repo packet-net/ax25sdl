@@ -49,7 +49,22 @@ public static class Lockstep
             sb.Append(CultureInfo.InvariantCulture, $"| {scenarios[i].Name} | {scenarios[i].Tables} | {text} |\n");
         }
 
-        // Each distinct difference once, with its shortest first counterexample.
+        // Every row's own differences, in the order found, each with its counterexample.
+        sb.Append("\n## Each row's differences\n");
+        for (var i = 0; i < scenarios.Count; i++)
+        {
+            var r = results[i];
+            if (r.Diffs.Count == 0) continue;
+            sb.Append(CultureInfo.InvariantCulture, $"\n### {scenarios[i].Name}\n");
+            for (var n = 0; n < r.Diffs.Count; n++)
+            {
+                var d = r.Diffs[n];
+                sb.Append(CultureInfo.InvariantCulture, $"\n{n + 1}. `{d.Signature}`, {d.Steps.Count} steps: {string.Join("; ", d.Steps.Select((st, j) => $"{j + 1}. {st}"))}\n\n   `{d.Detail}`\n");
+            }
+        }
+
+        // Each distinct signature once, with its shortest first counterexample.
+        sb.Append("\n## Each signature\n");
         var bySig = new SortedDictionary<string, List<(string Row, LockstepDiff Diff)>>(StringComparer.Ordinal);
         for (var i = 0; i < scenarios.Count; i++)
             foreach (var d in results[i].Diffs)
@@ -86,9 +101,6 @@ public static class Lockstep
             seconds += r.Elapsed.TotalSeconds;
             states = r.Distinct;
             File.Copy(Path.Combine(dir, "tlc_Lockstep.out"), Path.Combine(dir, $"tlc_Lockstep_{run}.out"), overwrite: true);
-            // TLC's fingerprint and queue files are not read again; on a shared runner they fill the disk.
-            foreach (var junk in new[] { "meta_Lockstep", "jtmp" })
-                if (Directory.Exists(Path.Combine(dir, junk))) Directory.Delete(Path.Combine(dir, junk), recursive: true);
             if (r.Kind == "clean") return new LockstepRow(diffs, states, false, "", seconds);
             var d = Difference(r, dir);
             if (d is null) return new LockstepRow(diffs, states, false, (diffs.Count > 0 ? $"after {diffs.Count} difference(s), " : "") + r.Kind + ": " + r.Message, seconds);
@@ -108,7 +120,10 @@ public static class Lockstep
             var msg = r.Trace[^1].Field("violMsg");
             var m = Sig.Match(msg);
             if (!m.Success) return null;
-            var steps = r.Trace.Skip(1).Select(t => $"{t.Field("move")} at {t.Field("at")}: {t.Field("tid")}").ToList();
+            // The last step is the dispatch that differed: it failed, so it has no transition of its own.
+            var moves = r.Trace.Skip(1).ToList();
+            var steps = moves.Select((t, i) => $"{t.Field("move")} at {t.Field("at")}: "
+                + (i == moves.Count - 1 ? "(the dispatch on which the meanings differ)" : t.Field("tid").Length > 0 ? t.Field("tid") : "(no transition)")).ToList();
             return new LockstepDiff(m.Groups[1].Value, steps, msg);
         }
         // A difference while seeding stops TLC in its initial state (Seeded's Assert).

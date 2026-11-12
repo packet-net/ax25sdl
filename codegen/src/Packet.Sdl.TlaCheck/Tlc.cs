@@ -418,11 +418,25 @@ public sealed class Tlc
             try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             p.WaitForExit();
             File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), stdout.Result + stderr.Result);
+            Tidy(meta, tmp);
+            if (phase == Phase.Coverage) File.Delete(Path.Combine(workDir, "states.dump"));
             return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s");
         }
         var text = stdout.Result + stderr.Result;
         File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
+        Tidy(meta, tmp);
         return Parse(text, sw.Elapsed);
+    }
+
+    /// <summary>
+    /// TLC's fingerprint and queue files and its extracted standard modules are not read
+    /// again once a run is over; on a shared self-hosted runner, kept for every row, they
+    /// fill the disk. (A Coverage run's states.dump is deleted by <see cref="ReadArms"/>.)
+    /// </summary>
+    private static void Tidy(params string[] dirs)
+    {
+        foreach (var d in dirs)
+            if (Directory.Exists(d)) Directory.Delete(d, recursive: true);
     }
 
     private static readonly Regex Quoted = new(@"""((?:[^""\\]|\\.)*)""");

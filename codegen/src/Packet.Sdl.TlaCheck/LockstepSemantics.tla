@@ -7,12 +7,15 @@
 (*                                                                         *)
 (* The runner is instanced twice: RA with the default meaning (MA), which  *)
 (* drives the system, and RB with the other (MB), which shadows it. The    *)
-(* station record is MA's with one extra field, lsB, holding MB's record.  *)
-(* Every dispatch runs through both. Before it, MB's fixed fields other    *)
-(* than q are set from MA's: they are equal after every dispatch that      *)
-(* agreed, so this only carries over what the harness wrote itself (the    *)
-(* seed, the local busy condition). After it, an observable projection of  *)
-(* the two results is compared:                                            *)
+(* station record is MA's with one extra field, lsB, holding MB's record   *)
+(* without the fixed fields other than q (MB's queue and private fields).  *)
+(* Every dispatch runs through both; MB's record is rebuilt with the fixed *)
+(* fields taken from MA's. They are equal after every dispatch that agreed, *)
+(* so this only carries over what the harness wrote itself (the seed, the  *)
+(* local busy condition), and lsB never holds a stale copy of them (which  *)
+(* would make the harness's whole-record comparisons see changes that are  *)
+(* not there). After it, an observable projection of the two results is    *)
+(* compared:                                                               *)
 (*   - the error flag (did the dispatch fail), and if neither failed       *)
 (*   - the effects fx (frames with all their fields, primitives to layer 3 *)
 (*     with their labels, LM requests), in order;                          *)
@@ -21,6 +24,11 @@
 (*   - how the dispatch changed the length of q (its entries are each      *)
 (*     meaning's own; a difference set aside can leave the lengths apart,  *)
 (*     so the change is compared, not the length).                         *)
+(*   - on I_frame_pops_off_queue, whether the pop is a move: the harness   *)
+(*     takes a pop only when it fails, sends a frame or changes the record *)
+(*     (PopChanges), and on the combined record that test is the union of *)
+(*     both meanings' tests; comparing them reports any disagreement, so   *)
+(*     the gate the search follows is MA's unless they differ.             *)
 (* Not compared: tid, arms, and fields private to a meaning.               *)
 (*                                                                         *)
 (* A difference fails the dispatch with an error that starts               *)
@@ -64,11 +72,17 @@ ASSUME {LsFields[i] : i \in 1..Len(LsFields)} = FixedFields \ {"q"}
 LsCopied == FixedFields \ {"q"}
 
 \* MB's record (or context) r with the fixed fields other than q taken from a.
-LsFrom(r, a) == [f \in DOMAIN r |-> IF f \in LsCopied THEN a[f] ELSE r[f]]
+LsFrom(r, a) == [f \in DOMAIN r \cup LsCopied |-> IF f \in LsCopied THEN a[f] ELSE r[f]]
+\* What lsB keeps of MB's record: everything but the fixed fields LsFrom fills in.
+LsStrip(r) == [f \in DOMAIN r \ LsCopied |-> r[f]]
 
-NewMachine(st) == MA!NewMachine(st) @@ [lsB |-> MB!NewMachine(st)]
+NewMachine(st) == MA!NewMachine(st) @@ [lsB |-> LsStrip(MB!NewMachine(st))]
 Begin(m, e) == MA!Begin(m, e) @@ [lsB |-> MB!Begin(LsFrom(m.lsB, m), e)]
-Persist(c) == MA!Persist(c) @@ [lsB |-> MB!Persist(c.lsB)]
+Persist(c) == MA!Persist(c) @@ [lsB |-> LsStrip(MB!Persist(c.lsB))]
+
+\* A pop that is not a move (TwoStation.tla's PopChanges, for one meaning):
+\* it did not fail, sent no frame and left the record as it was.
+LsStill(c, p, before) == c.err = "" /\ (\A i \in 1..Len(c.fx) : c.fx[i].kind # "frame") /\ p = before
 
 RECURSIVE LsJoin(_, _)
 LsJoin(s, sep) == IF s = <<>> THEN "" ELSE IF Len(s) = 1 THEN Head(s) ELSE Head(s) \o sep \o LsJoin(Tail(s), sep)
@@ -77,6 +91,9 @@ LsEvent(e) ==
     e.ev \o (IF e.pf # None THEN " pf=" \o ToString(e.pf) ELSE "") \o (IF e.cmd # None THEN " cmd=" \o ToString(e.cmd) ELSE "")
     \o (IF e.nr # None THEN " nr=" \o ToString(e.nr) ELSE "") \o (IF e.ns # None THEN " ns=" \o ToString(e.ns) ELSE "")
     \o (IF e.data # "" THEN " data=" \o e.data ELSE "")
+
+\* The transition a dispatch took, for the report.
+LsTook(c) == IF c.err # "" THEN "(failed)" ELSE IF c.tid = "" THEN "(none)" ELSE c.tid
 
 Dispatch(m, e) ==
     LET mb == LsFrom(m.lsB, m)
@@ -89,7 +106,12 @@ Dispatch(m, e) ==
         pa == MA!Persist(ca)
         pb == MB!Persist(cb)
         fields == SelectSeq(LsFields, LAMBDA f : pa[f] # pb[f])
+        pop == e.ev = "I_frame_pops_off_queue"
+        stillA == LsStill(ca, pa, [f \in DOMAIN m \ {"lsB"} |-> m[f]])
+        stillB == LsStill(cb, pb, mb)
+        popMove == pop /\ stillA # stillB
         comps == IF ea # eb THEN <<"error">>
+                 ELSE IF popMove THEN <<"pop move">>
                  ELSE IF ea THEN <<>>
                  ELSE (IF ca.fx # cb.fx THEN <<"fx">> ELSE <<>>) \o fields
                       \o (IF qa # qb THEN <<"q length">> ELSE <<>>)
@@ -97,6 +119,9 @@ Dispatch(m, e) ==
         show(f) == f \o ": A " \o ToString(pa[f]) \o ", B " \o ToString(pb[f])
         detail ==
             IF ea # eb THEN "error: A " \o (IF ea THEN ca.err ELSE "none") \o "; B " \o (IF eb THEN cb.err ELSE "none")
+            ELSE IF popMove THEN "pop move: the pop changes nothing for " \o (IF stillA THEN "A" ELSE "B") \o " but is a move for "
+                 \o (IF stillA THEN "B" ELSE "A") \o "; fx: A " \o ToString(ca.fx) \o ", B " \o ToString(cb.fx)
+                 \o "; q length: A " \o ToString(Len(m.q)) \o " to " \o ToString(Len(pa.q)) \o ", B " \o ToString(Len(mb.q)) \o " to " \o ToString(Len(pb.q))
             ELSE LsJoin((IF ca.fx # cb.fx THEN <<"fx: A " \o ToString(ca.fx) \o ", B " \o ToString(cb.fx)>> ELSE <<>>)
                         \o [i \in 1..Len(fields) |-> show(fields[i])]
                         \o (IF qa # qb THEN <<"q length: A " \o ToString(Len(m.q)) \o " to " \o ToString(Len(pa.q))
@@ -106,7 +131,7 @@ Dispatch(m, e) ==
     IN  IF comps = <<>> THEN both
         ELSE IF sig \in LockstepKnown THEN ca @@ [lsB |-> LsFrom(cb, ca)]
         ELSE [both EXCEPT !.err = "lockstep{" \o sig \o "}: in " \o m.st \o " on " \o LsEvent(e)
-                                  \o " (A took " \o ca.tid \o ", B took " \o cb.tid \o "): " \o detail]
+                                  \o " (A took " \o LsTook(ca) \o ", B took " \o LsTook(cb) \o "): " \o detail]
 
 \* A harness message that reports a lockstep difference (it may be wrapped,
 \* as a replayed save's is).
