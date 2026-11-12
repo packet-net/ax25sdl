@@ -16,6 +16,8 @@ public class Reassembler_ReassemblingData_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => Reassembler_ReassemblingData.Transitions.Count.Should().Be(7);
 
+    [Fact] public void SavesAreAsTranscribed() => Reassembler_ReassemblingData.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
+
     [Fact] public void t01_tr210_expiry()
     {
         var t = Reassembler_ReassemblingData.Transitions.Single(x => x.Id == "t01_tr210_expiry");

@@ -59,6 +59,14 @@ public static class CEmitter
             EmitLoopsStatic(sb, prefix + "_loops", t.Loops);
         }
 
+        if (page.Saves.Count > 0)
+        {
+            sb.Append("static const char *const ").Append(symbol).Append("_saves[] = {\n");
+            foreach (var ev in page.Saves)
+                sb.Append("    ").Append(CStringLiteral(ev)).Append(",\n");
+            sb.Append("};\n\n");
+        }
+
         sb.Append("static const TransitionSpec ").Append(symbol).Append("_transitions[] = {\n");
         foreach (var t in page.Transitions)
         {
@@ -85,6 +93,7 @@ public static class CEmitter
           .Append(", .url = ").Append(CStringLiteral(page.SourceUrl ?? "")).Append(" },\n");
         sb.Append("    .transitions = ").Append(symbol).Append("_transitions,\n");
         sb.Append("    .transitions_len = ").Append(page.Transitions.Count.ToString(CultureInfo.InvariantCulture)).Append(",\n");
+        EmitListField(sb, "saves", symbol + "_saves", page.Saves.Count);
         sb.Append("};\n");
 
         return new Emission(fileName, sb.ToString());

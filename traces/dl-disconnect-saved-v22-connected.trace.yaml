@@ -1,0 +1,44 @@
+# Save (Requeue) in Awaiting V2.2 Connection: a DL-DISCONNECT Request held
+# while the SABME is outstanding is acted on once the v2.2 link comes up.
+#
+# C1.2 and ITU-T Z.101 clause 11.7 as in dl-disconnect-saved-until-connected.
+# §6.3.1 (UA ends the connection attempt); §6.3.4 (DISC P=1 on release).
+scenario: dl-disconnect-saved-v22-connected
+description: >
+  Awaiting V2.2 Connection with a SABME outstanding (figc4.6). Layer 3 asks
+  to disconnect: figc4.6 saves it. UA F=1 confirms the connection (figc4.6
+  t12, which also asks the management data link to negotiate) and Connected
+  consumes the held request: DISC P=1, Awaiting Release.
+citations:
+  - "ax.25.2.2.4_Oct_25.md C1.2 (SDL Symbol Definition: the save symbol)"
+  - "ITU-T Z.101 clause 11.7 (Save)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.4 (Link Disconnection)"
+  - "figc4.6 save + t12, figc4.4 t01"
+initial:
+  state: AwaitingV22Connection
+  variables: { modulo: 128, k: 32, version_2_2: true, layer_3_initiated: true, rc: 1 }
+  timers: { t1: running }
+steps:
+  - name: layer 3 asks to disconnect while the SABME is outstanding
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: save
+      state: AwaitingV22Connection
+      effects: []
+      held: [DL_DISCONNECT_request]
+
+  - name: UA F=1 brings the link up and the held request is acted on
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t12_ua_received_yes_yes
+      replayed:
+        - event: DL_DISCONNECT_request
+          transition: t01_dl_disconnect_request
+          state: AwaitingRelease
+          effects:
+            - { frame: DISC, command: true, pf: true }
+      held: []
+      state: AwaitingRelease
+      variables: { rc: 0 }
+      timers: { t1: running, t3: stopped }

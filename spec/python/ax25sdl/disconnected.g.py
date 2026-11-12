@@ -269,4 +269,5 @@ DATA_LINK_DISCONNECTED = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

@@ -45,4 +45,5 @@ DUPLEX_PHY_RECEIVING = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

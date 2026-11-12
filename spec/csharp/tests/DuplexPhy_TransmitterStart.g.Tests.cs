@@ -16,6 +16,8 @@ public class DuplexPhy_TransmitterStart_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DuplexPhy_TransmitterStart.Transitions.Count.Should().Be(3);
 
+    [Fact] public void SavesAreAsTranscribed() => DuplexPhy_TransmitterStart.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
+
     [Fact] public void t01_t105_expiry_yes()
     {
         var t = DuplexPhy_TransmitterStart.Transitions.Single(x => x.Id == "t01_t105_expiry_yes");

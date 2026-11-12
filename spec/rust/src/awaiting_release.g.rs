@@ -369,6 +369,7 @@ pub static DATA_LINK_AWAITING_RELEASE: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

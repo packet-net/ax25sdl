@@ -27,6 +27,10 @@ The SDL sources live in the [`packethacking/ax25spec`](https://github.com/packet
 | Rust crate | crates.io (publishable; not yet published) | `ax25sdl` (`no_std`-capable) | [`spec/rust/`](spec/rust/) |
 | C / Python / JSON | _not externally packaged_ | codegen output for in-tree consumers | per-backend dirs |
 
+### Saves
+
+Each state also carries the inputs it **saves** (the figures' Save symbol, "Requeue"; `save:` in the yaml): C# `DataLink_AwaitingConnection.Saves` (`IReadOnlyList<Ax25Event>`), Go `StatePage.Saves`, TypeScript `StatePage.saves`, Rust `StatePage::saves`, C `StatePage.saves` / `saves_len`, Python `StatePage.saves`, JSON `"saves"`. A saved input has no transition in that state. A runtime must not treat it as unhandled: hold it in arrival order, and each time the machine enters a state (the same state included) consume the first held input that state does not save. An explicit save beats the page's "all other" column. Today four exist: DL-DISCONNECT Request in Awaiting Connection and Awaiting V2.2 Connection, and MDL-NEGOTIATE Request and XID Command in Management Data Link Negotiating. The full semantics are in [`docs/golden-traces.md`](docs/golden-traces.md#saves).
+
 Tagging `v*` on `main` fires [`.github/workflows/publish.yml`](.github/workflows/publish.yml) — NuGet + npm publish from the same tag, version taken from the tag stripped of its leading `v`.
 
 ## Discipline

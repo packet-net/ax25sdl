@@ -243,6 +243,7 @@ pub static SIMPLEX_PHY_TRANSMITTING: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

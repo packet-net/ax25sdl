@@ -24,6 +24,7 @@ public static class Resolver
             SourceFigure = page.Source.Figure,
             SourceUrl    = page.Source.Url,
             Transitions  = page.Transitions!.Select(t => ResolveTransition(t, decisionsById)).ToList(),
+            Saves        = page.Save is null ? Array.Empty<string>() : page.Save.ToList(),
         };
     }
 

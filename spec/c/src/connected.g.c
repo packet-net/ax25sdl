@@ -1629,4 +1629,6 @@ const StatePage data_link_connected = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.4", .url = ""},
     .transitions = data_link_connected_transitions,
     .transitions_len = 68,
+    .saves = NULL,
+    .saves_len = 0,
 };

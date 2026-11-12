@@ -38,4 +38,5 @@ var DuplexPhyReceiverReady = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

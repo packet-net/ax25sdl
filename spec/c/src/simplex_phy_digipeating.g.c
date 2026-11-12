@@ -101,4 +101,6 @@ const StatePage simplex_phy_digipeating = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc2a.6", .url = ""},
     .transitions = simplex_phy_digipeating_transitions,
     .transitions_len = 4,
+    .saves = NULL,
+    .saves_len = 0,
 };

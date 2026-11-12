@@ -345,4 +345,5 @@ var DataLinkAwaitingConnection = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{"DL_DISCONNECT_request"},
 }

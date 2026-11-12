@@ -81,10 +81,19 @@ public static class PythonEmitter
             sb.Append("        ),\n");
         }
         sb.Append("    ),\n");
+        sb.Append("    saves=").Append(FormatSaves(page.Saves)).Append(",\n");
         sb.Append(")\n");
 
         return new Emission(fileName, sb.ToString());
     }
+
+    /// <summary>Python tuple literal for a state's saves: <c>()</c>, <c>("A",)</c>, <c>("A", "B")</c>.</summary>
+    private static string FormatSaves(IReadOnlyList<string> saves) => saves.Count switch
+    {
+        0 => "()",
+        1 => "(" + PyStringLiteral(saves[0]) + ",)",
+        _ => "(" + string.Join(", ", saves.Select(PyStringLiteral)) + ")",
+    };
 
     /// <summary>
     /// Emit a pytest test file asserting every transition's shape

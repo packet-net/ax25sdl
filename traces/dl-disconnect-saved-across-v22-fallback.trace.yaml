@@ -1,0 +1,61 @@
+# Save (Requeue) across two saving states: a DL-DISCONNECT Request held in
+# Awaiting V2.2 Connection stays held when the machine moves to Awaiting
+# Connection (which saves it too), and is acted on once the link comes up.
+#
+# C1.2: the input is saved "until the state machine ... has reached a new
+# and different state"; SDL (ITU-T Z.101 clause 11.7): the save is attached
+# to a state, and a signal stays in the input port while each state it
+# meets saves it. Awaiting Connection is new and different but saves the request
+# as well, so it keeps waiting (pinned delegated semantic in
+# docs/golden-traces.md, "Saves").
+# §6.3.1 (UA ends the connection attempt); §6.3.4 (DISC P=1 on release).
+scenario: dl-disconnect-saved-across-v22-fallback
+description: >
+  Awaiting V2.2 Connection with a SABME outstanding (figc4.6). Layer 3 asks
+  to disconnect: figc4.6 saves it. The peer answers DM F=0, which figc4.6
+  draws as a move to Awaiting Connection (t11 No); figc4.2 saves the request
+  too, so it is still held. UA F=1 brings the link up and Connected
+  consumes the request: DISC P=1, Awaiting Release.
+citations:
+  - "ax.25.2.2.4_Oct_25.md C1.2 (SDL Symbol Definition: the save symbol)"
+  - "ITU-T Z.101 clause 11.7 (Save)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.4 (Link Disconnection)"
+  - "figc4.6 save + t11, figc4.2 save + t04, figc4.4 t01"
+initial:
+  state: AwaitingV22Connection
+  variables: { modulo: 128, k: 32, version_2_2: true, layer_3_initiated: true, rc: 1 }
+  timers: { t1: running }
+steps:
+  - name: layer 3 asks to disconnect while the SABME is outstanding
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: save
+      state: AwaitingV22Connection
+      effects: []
+      held: [DL_DISCONNECT_request]
+
+  - name: DM F=0 moves the machine to Awaiting Connection, which also saves the request
+    inject: { event: DM_received, pf: false }
+    expect:
+      transition: t11_dm_received_no
+      state: AwaitingConnection
+      effects: []
+      replayed: []
+      held: [DL_DISCONNECT_request]
+
+  - name: UA F=1 brings the link up and the held request is acted on
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t04_ua_received_yes_yes
+      effects:
+        - { dl: DL_CONNECT_confirm }
+      replayed:
+        - event: DL_DISCONNECT_request
+          transition: t01_dl_disconnect_request
+          state: AwaitingRelease
+          effects:
+            - { frame: DISC, command: true, pf: true }
+      held: []
+      state: AwaitingRelease
+      timers: { t1: running, t3: stopped }

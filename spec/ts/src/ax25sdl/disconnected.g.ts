@@ -263,4 +263,5 @@ export const DataLinkDisconnected: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

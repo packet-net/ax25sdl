@@ -261,4 +261,5 @@ var DataLinkDisconnected = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

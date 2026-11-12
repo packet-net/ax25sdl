@@ -71,6 +71,12 @@ steps:
       variables: { rc: 1, layer_3_initiated: true }   # optional subset
       timers: { t1: running, t3: stopped }            # optional subset
       queue: []                           # optional: full queue contents, head first
+      held: []                            # optional: inputs held by a save, head first (see "Saves")
+      replayed:                           # exhaustive: held inputs this step released, in order; absent = none
+        - event: DL_DISCONNECT_request    #   required: the replayed input
+          transition: t01_dl_disconnect_request   # optional
+          state: AwaitingRelease          #   optional: the state it entered
+          effects: [...]                  #   optional, exhaustive: that transition's own effects
 ```
 
 Rules of thumb:
@@ -174,6 +180,19 @@ raise it rather than encoding around it:
   Enquery"` → `Transmit_Enquiry`, …) — the JSON carries the figures'
   verbatim call labels, which don't always match the subroutine page's
   declared name.
+
+## Saves
+
+The figures draw a Save symbol ("Requeue") for an input a state does not handle but must not lose: DL-DISCONNECT Request in Awaiting Connection (figc4.2) and Awaiting V2.2 Connection (figc4.6), and MDL-NEGOTIATE Request and XID Command in the Management Data Link's Negotiating state (figc5.2). The yaml records them as a page-level `save:` list, every backend emits it per state (`Saves` / `saves`), and the interpreter honours it.
+
+The semantics are SDL's own. AX.25 2.2 section C1.2: "The save symbol is used to indicate that a particular input event does not cause operations to be done in the present state. Instead, that particular input event is 'saved' until the state machine (triggered by other events) has reached a new and different state." SDL makes it precise. Save itself is ITU-T Z.101 (Basic SDL-2010) clause 11.7; only its abstract grammar is public, so its prose was not checked, and the semantics below are as the SDL Forum's Z.100 reference states them: saved signals "are retained in the input port in the order of their arrival", "the effect of the save is valid only for the state to which the save is attached", and "in the following state, signal instances that have been saved are treated as normal signal instances". The asterisk input (the figures' "all other" columns) and the implicit transition are shorthands, in ITU-T Z.103 (Shorthand SDL-2010; Z.100 generally): an asterisk input covers only the signals the state neither inputs nor saves, and only a signal with no input, asterisk input or save at all takes the implicit transition (it is consumed and discarded). So:
+
+- **Saving.** An input the current state saves causes nothing: no effects, no state change, no timer or queue change. It joins the held inputs after any already held. The step reports transition `save` and the input appears in `held:`.
+- **Release.** Every transition ends by entering a state, the same state included. On entry the held inputs are scanned from the head and the first one that state does not save is consumed, exactly as if it had just arrived; that transition enters a state in turn, so the scan repeats until every input still held is saved by the current state. A held input can therefore survive any number of state changes, and inputs keep their arrival order.
+- **Precedence.** An explicit save beats the page's catch-all (the asterisk rule, Z.103). A caller that routes an unhandled input to an "all other" column must first ask the machine (`DataLinkMachine.IsSavedHere`).
+- **Reporting.** `DispatchResult.Effects` is the triggering transition's own effects; each released input is a `DispatchResult` in `Replayed`, in order, carrying the consumed input (`Input`, with its parameters), and `AllEffects` concatenates them. Traces assert the two separately (`effects:` and `replayed:`); a step without `replayed:` asserts that nothing was replayed.
+
+The pinned delegated semantics for saves (what the figures and C1.2 leave open) are number 19 in [`docs/explorer.md`](explorer.md#pinned-delegated-semantics). The Management Data Link saves are emitted and loaded like the Data Link ones, but the interpreter models the Data Link only, so they have no golden trace yet. The two-station explorer and the TLA+ harness do not route through saves yet (packet-net/ax25sdl#97, a later PR); the TLA+ tables module carries them as an unused `Saves` constant.
 
 ## Adding a trace
 

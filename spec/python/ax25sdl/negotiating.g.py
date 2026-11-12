@@ -107,4 +107,5 @@ MANAGEMENT_DATA_LINK_NEGOTIATING = StatePage(
             loops=(),
         ),
     ),
+    saves=("MDL_NEGOTIATE_request", "XID_command_received"),
 )

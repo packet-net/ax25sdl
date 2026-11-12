@@ -16,6 +16,8 @@ public class DataLink_AwaitingConnection_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DataLink_AwaitingConnection.Transitions.Count.Should().Be(24);
 
+    [Fact] public void SavesAreAsTranscribed() => DataLink_AwaitingConnection.Saves.Should().Equal(new Ax25Event[] { Ax25Event.DLDISCONNECTRequest });
+
     [Fact] public void t02_disc_received()
     {
         var t = DataLink_AwaitingConnection.Transitions.Single(x => x.Id == "t02_disc_received");

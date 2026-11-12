@@ -148,6 +148,14 @@ export interface StatePage {
   readonly state: string;
   readonly source: SdlSource;
   readonly transitions: readonly TransitionSpec[];
+  /**
+   * Events this state saves (the figure's Save symbol, "Requeue"), in page
+   * order. A saved event has no transition here: keep it in the input queue,
+   * in arrival order, and each time the machine enters a state (a nextstate
+   * back into the same state included) consume the first queued event that
+   * state does not save (ITU-T Z.100 save semantics). Empty for most states.
+   */
+  readonly saves: readonly Ax25Event[];
 }
 
 /** One generated subroutine page (figc4.7). */

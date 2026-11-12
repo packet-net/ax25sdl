@@ -56,6 +56,9 @@ public static class GoEmitter
             sb.Append("\t\t},\n");
         }
         sb.Append("\t},\n");
+        sb.Append("\tSaves: []string{");
+        sb.Append(string.Join(", ", page.Saves.Select(GoStringLiteral)));
+        sb.Append("},\n");
         sb.Append("}\n");
 
         return new Emission(fileName, sb.ToString());

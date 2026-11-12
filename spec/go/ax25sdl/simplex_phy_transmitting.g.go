@@ -148,4 +148,5 @@ var SimplexPhyTransmitting = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

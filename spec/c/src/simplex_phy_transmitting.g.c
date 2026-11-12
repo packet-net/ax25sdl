@@ -214,4 +214,6 @@ const StatePage simplex_phy_transmitting = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc2a.5", .url = ""},
     .transitions = simplex_phy_transmitting_transitions,
     .transitions_len = 9,
+    .saves = NULL,
+    .saves_len = 0,
 };

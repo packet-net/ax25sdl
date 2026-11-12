@@ -16,6 +16,8 @@ public class ManagementDataLink_Negotiating_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => ManagementDataLink_Negotiating.Transitions.Count.Should().Be(6);
 
+    [Fact] public void SavesAreAsTranscribed() => ManagementDataLink_Negotiating.Saves.Should().Equal(new Ax25Event[] { Ax25Event.MDLNEGOTIATERequest, Ax25Event.XIDCommandReceived });
+
     [Fact] public void t02_tm201_expiry_yes()
     {
         var t = ManagementDataLink_Negotiating.Transitions.Single(x => x.Id == "t02_tm201_expiry_yes");

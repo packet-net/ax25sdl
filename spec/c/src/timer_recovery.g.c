@@ -2222,4 +2222,6 @@ const StatePage data_link_timer_recovery = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.5", .url = ""},
     .transitions = data_link_timer_recovery_transitions,
     .transitions_len = 92,
+    .saves = NULL,
+    .saves_len = 0,
 };

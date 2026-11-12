@@ -118,4 +118,5 @@ export const SimplexPhyReady: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

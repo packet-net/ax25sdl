@@ -127,4 +127,13 @@ public static class SimplexPhy_TransmitterStart
             UndefinedBranches: null,
             OnLabel: "T105 Expiry"),
     };
+
+    /// <summary>
+    /// Inputs this state saves (the figure's Save symbol, "Requeue"), in page order.
+    /// A saved input has no transition here: keep it in the input queue, in arrival
+    /// order, and each time the machine enters a state (a nextstate back into the
+    /// same state included) consume the first queued input that state does not save
+    /// (ITU-T Z.100 save semantics). Empty for most states.
+    /// </summary>
+    public static IReadOnlyList<Ax25Event> Saves { get; } = System.Array.Empty<Ax25Event>();
 }

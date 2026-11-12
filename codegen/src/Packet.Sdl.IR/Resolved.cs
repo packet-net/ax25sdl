@@ -59,6 +59,12 @@ public sealed class ResolvedPage
     public string SourceFigure { get; init; } = "";
     public string? SourceUrl { get; init; }
     public IReadOnlyList<ResolvedTransition> Transitions { get; init; } = Array.Empty<ResolvedTransition>();
+    /// <summary>Inputs this state saves (the figure's Save symbol, "Requeue"),
+    /// as event ids in the order the page lists them. A saved input is not
+    /// consumed in this state: it stays in the input queue, in arrival order,
+    /// until the machine enters a state that does not save it (ITU-T Z.100
+    /// save semantics; docs/golden-traces.md). Empty for most states.</summary>
+    public IReadOnlyList<string> Saves { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>One resolved transition on a state-machine page.</summary>

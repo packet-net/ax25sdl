@@ -152,6 +152,23 @@ public static class Validation
             if (string.IsNullOrWhiteSpace(d.Predicate)) errors.Add($"{loc}: decision `{d.Id}` missing `predicate`");
         }
 
+        // Saves (the figure's Save symbol). Z.100 forbids a signal from being
+        // both an input and a save of the same state, so a saved event must
+        // not also appear as a transition's `on:` here.
+        if (page.Save is not null)
+        {
+            var saved = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var ev in page.Save)
+            {
+                if (string.IsNullOrWhiteSpace(ev)) { errors.Add($"{loc}: empty `save:` entry"); continue; }
+                if (!saved.Add(ev)) errors.Add($"{loc}: `save:` lists `{ev}` twice");
+                if (events.Count > 0 && !events.Contains(ev))
+                    errors.Add($"{loc}: `save:` references unknown event `{ev}`. Add it to /spec-sdl/events.yaml.");
+                if (page.Transitions.Any(t => string.Equals(t.On, ev, StringComparison.Ordinal)))
+                    errors.Add($"{loc}: `{ev}` is both saved and an input of this state; Z.100 allows one or the other");
+            }
+        }
+
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var t in page.Transitions)
         {

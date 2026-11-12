@@ -49,6 +49,7 @@ pub static DUPLEX_PHY_RECEIVER_READY: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

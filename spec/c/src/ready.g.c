@@ -113,4 +113,6 @@ const StatePage management_data_link_ready = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc5.1", .url = ""},
     .transitions = management_data_link_ready_transitions,
     .transitions_len = 4,
+    .saves = NULL,
+    .saves_len = 0,
 };

@@ -361,4 +361,6 @@ const StatePage data_link_disconnected = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.1", .url = ""},
     .transitions = data_link_disconnected_transitions,
     .transitions_len = 17,
+    .saves = NULL,
+    .saves_len = 0,
 };

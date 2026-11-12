@@ -150,4 +150,5 @@ export const SimplexPhyTransmitting: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

@@ -61,6 +61,7 @@ public static class JsonEmitter
             ["state"] = page.State,
             ["source"] = BuildSource(page.SourceSpec, page.SourceFigure, page.SourceUrl),
             ["transitions"] = BuildTransitions(page),
+            ["saves"] = new JsonArray(page.Saves.Select(e => (JsonNode)JsonValue.Create(e)!).ToArray()),
         };
 
         return new Emission(fileName, Serialise(node));
@@ -302,6 +303,13 @@ public static class JsonEmitter
                 {
                     ["type"] = "array",
                     ["items"] = new JsonObject { ["$ref"] = "#/$defs/transitionSpec" },
+                },
+                ["saves"] = new JsonObject
+                {
+                    ["description"] = "Events this state saves (the figure's Save symbol, \"Requeue\"), in page order. A saved event has no transition here: it stays in the input queue, in arrival order, and each time the machine enters a state (a nextstate back into the same state included) the first queued event that state does not save is consumed (ITU-T Z.100 save semantics). Optional so pages emitted before saves existed still validate; current codegen always emits it.",
+                    ["type"] = "array",
+                    ["items"] = new JsonObject { ["type"] = "string" },
+                    ["uniqueItems"] = true,
                 },
             },
         };

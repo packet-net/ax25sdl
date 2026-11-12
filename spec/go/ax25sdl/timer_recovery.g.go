@@ -1506,4 +1506,5 @@ var DataLinkTimerRecovery = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

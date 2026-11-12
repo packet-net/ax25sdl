@@ -124,6 +124,15 @@ type StatePage struct {
 	State       string
 	Source      SdlSource
 	Transitions []TransitionSpec
+	// Saves lists the events this state saves (the figure's Save symbol,
+	// "Requeue"), in the order the page lists them. A saved event has no
+	// transition here: it stays in the input queue, in arrival order, and
+	// is consumed in the first later state that does not save it. Each
+	// time the machine enters a state (a nextstate back into the same
+	// state included), scan the queue from the head and consume the first
+	// event that state does not save (ITU-T Z.100 save semantics). Empty
+	// for most states.
+	Saves []string
 }
 
 // SubroutinesPage is one generated subroutine page (figc4.7).

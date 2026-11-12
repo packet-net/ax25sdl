@@ -16,6 +16,8 @@ public class DataLink_Connected_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DataLink_Connected.Transitions.Count.Should().Be(68);
 
+    [Fact] public void SavesAreAsTranscribed() => DataLink_Connected.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
+
     [Fact] public void t01_dl_disconnect_request()
     {
         var t = DataLink_Connected.Transitions.Single(x => x.Id == "t01_dl_disconnect_request");

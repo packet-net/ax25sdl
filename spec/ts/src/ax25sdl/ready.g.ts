@@ -81,4 +81,5 @@ export const ManagementDataLinkReady: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

@@ -94,4 +94,5 @@ export const DuplexPhyTransmitting: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

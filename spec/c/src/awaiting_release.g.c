@@ -386,4 +386,6 @@ const StatePage data_link_awaiting_release = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.3", .url = ""},
     .transitions = data_link_awaiting_release_transitions,
     .transitions_len = 20,
+    .saves = NULL,
+    .saves_len = 0,
 };

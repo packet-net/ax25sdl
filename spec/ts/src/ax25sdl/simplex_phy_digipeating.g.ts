@@ -73,4 +73,5 @@ export const SimplexPhyDigipeating: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

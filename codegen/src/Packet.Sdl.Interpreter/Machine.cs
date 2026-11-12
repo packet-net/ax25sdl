@@ -34,7 +34,29 @@ public sealed record EventInput(
     IReadOnlyDictionary<string, bool>? Atoms = null);
 
 /// <summary>The outcome of dispatching one event.</summary>
-public sealed record DispatchResult(string TransitionId, string NextState, IReadOnlyList<Effect> Effects);
+/// <remarks>
+/// When the event is saved in the current state, <see cref="TransitionId"/>
+/// is <see cref="DataLinkMachine.SaveTransitionId"/>, the state is unchanged
+/// and there are no effects. When the transition enters a state that
+/// releases held (saved) inputs, each one consumed is reported, in order, in
+/// <see cref="Replayed"/>; <see cref="Effects"/> stays the triggering
+/// transition's own effects and <see cref="AllEffects"/> concatenates them.
+/// </remarks>
+public sealed record DispatchResult(string TransitionId, string NextState, IReadOnlyList<Effect> Effects)
+{
+    /// <summary>The event this result answers (set by the machine; empty on a hand-built result).</summary>
+    public string Event { get; init; } = "";
+
+    /// <summary>The input this result answers, with its parameters (set by the machine; null on a hand-built result).</summary>
+    public EventInput? Input { get; init; }
+
+    /// <summary>Held inputs consumed after this transition entered its next state, in the order they were consumed (docs/golden-traces.md, "Saves").</summary>
+    public IReadOnlyList<DispatchResult> Replayed { get; init; } = Array.Empty<DispatchResult>();
+
+    /// <summary>This transition's effects followed by every replayed transition's, in order.</summary>
+    public IReadOnlyList<Effect> AllEffects =>
+        Replayed.Count == 0 ? Effects : Effects.Concat(Replayed.SelectMany(r => r.Effects)).ToList();
+}
 
 /// <summary>
 /// One I-frame queue entry. A fresh frame from layer 3 carries its payload
@@ -109,9 +131,29 @@ public sealed class DataLinkMachine
     public TimerStatus T3 { get; private set; } = TimerStatus.Stopped;
 
     private readonly List<QueueEntry> _queue = new();
+    private readonly List<EventInput> _held = new();
     private readonly Dictionary<int, string> _savedIFrames = new();
     private readonly Dictionary<int, string> _retained = new();
     private readonly Dictionary<string, string> _symbolic = new(StringComparer.Ordinal);
+
+    /// <summary>Transition id reported when the current state saves the injected event (the figure's Save symbol): nothing happens and the event is held.</summary>
+    public const string SaveTransitionId = "save";
+
+    /// <summary>
+    /// Inputs held by a save, head first, in arrival order (the SDL input
+    /// queue's saved signals). Each is consumed in the first state entered
+    /// that does not save it.
+    /// </summary>
+    public IReadOnlyList<EventInput> HeldInputs => _held;
+
+    /// <summary>
+    /// True when the current state saves <paramref name="eventName"/>. A
+    /// caller that routes unhandled inputs to a page's "all other" column
+    /// must ask this first: an asterisk input covers only the signals a
+    /// state neither inputs nor saves, so an explicit save takes precedence
+    /// (asterisk input: ITU-T Z.103 / Z.100; docs/golden-traces.md, "Saves").
+    /// </summary>
+    public bool IsSavedHere(string eventName) => _tables.States[State].IsSaved(eventName);
 
     /// <summary>Transition id reported for the pinned old-frame re-emission path (see <see cref="RetransmitOldFrame"/>).</summary>
     public const string RetransmitTransitionId = "pinned:retransmit_old_i_frame";
@@ -171,6 +213,7 @@ public sealed class DataLinkMachine
         AcknowledgePending = other.AcknowledgePending;
         T1 = other.T1; T3 = other.T3;
         _queue = new List<QueueEntry>(other._queue);
+        _held = new List<EventInput>(other._held);
         _savedIFrames = new Dictionary<int, string>(other._savedIFrames);
         _retained = new Dictionary<int, string>(other._retained);
         _symbolic = new Dictionary<string, string>(other._symbolic, StringComparer.Ordinal);
@@ -258,6 +301,10 @@ public sealed class DataLinkMachine
     /// <summary>
     /// Inject one event: select the unique matching transition in the
     /// current state, execute its action chain, move to the next state.
+    /// If the current state saves the event it is held instead (nothing
+    /// else happens); after every transition, held inputs the new state does
+    /// not save are consumed in arrival order and reported in
+    /// <see cref="DispatchResult.Replayed"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// No transition matches, more than one matches (a table-determinism
@@ -267,6 +314,56 @@ public sealed class DataLinkMachine
     public DispatchResult Dispatch(EventInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+
+        // SDL save (figc4.2, figc4.6, figc5.2; AX.25 2.2 C1.2; save: ITU-T
+        // Z.101 clause 11.7): a saved input causes no operations in this
+        // state. It joins the held inputs, after any already held, and waits.
+        if (IsSavedHere(input.Event))
+        {
+            _held.Add(input);
+            return new DispatchResult(SaveTransitionId, State, Array.Empty<Effect>()) { Event = input.Event, Input = input };
+        }
+
+        var result = DispatchInput(input) with { Event = input.Event, Input = input };
+        var replayed = ReplayHeld();
+        return replayed.Count == 0 ? result : result with { Replayed = replayed };
+    }
+
+    /// <summary>
+    /// After a transition has entered its next state (the same state
+    /// included), scan the held inputs from the head and consume the first
+    /// one that state does not save; that consumption enters a state in turn,
+    /// so scan again, until every input still held is saved by the current
+    /// state. Inputs a state still saves keep their place and order. A
+    /// released input goes through exactly the path a fresh input takes
+    /// (<see cref="DispatchInput"/>), so it is handled as a fresh one would
+    /// be, catch-all routing aside (the machine does none; pinned 19(c)).
+    /// </summary>
+    private List<DispatchResult> ReplayHeld()
+    {
+        var replayed = new List<DispatchResult>();
+        while (true)
+        {
+            var page = _tables.States[State];
+            var index = _held.FindIndex(h => !page.IsSaved(h.Event));
+            if (index < 0) return replayed;
+
+            var input = _held[index];
+            _held.RemoveAt(index);
+            try
+            {
+                replayed.Add(DispatchInput(input) with { Event = input.Event, Input = input });
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new InvalidOperationException(
+                    $"replaying saved input `{input.Event}` on entering {State}: {ex.Message}", ex);
+            }
+        }
+    }
+
+    private DispatchResult DispatchInput(EventInput input)
+    {
         _event = input;
         _frameType = FrameTypeFromEvent(input.Event);
         _effects = new List<Effect>();

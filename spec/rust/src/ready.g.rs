@@ -145,6 +145,7 @@ pub static MANAGEMENT_DATA_LINK_READY: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

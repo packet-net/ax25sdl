@@ -170,6 +170,10 @@ pub static MANAGEMENT_DATA_LINK_NEGOTIATING: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[
+        Ax25Event::MDLNEGOTIATERequest,
+        Ax25Event::XIDCommandReceived,
+    ],
 };
 
 #[cfg(test)]

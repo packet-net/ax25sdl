@@ -298,4 +298,6 @@ const StatePage simplex_phy_transmitter_suppression = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc2a.3", .url = ""},
     .transitions = simplex_phy_transmitter_suppression_transitions,
     .transitions_len = 13,
+    .saves = NULL,
+    .saves_len = 0,
 };

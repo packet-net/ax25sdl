@@ -52,4 +52,5 @@ var SimplexPhyReceiverStart = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

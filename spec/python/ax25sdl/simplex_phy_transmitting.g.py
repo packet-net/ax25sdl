@@ -156,4 +156,5 @@ SIMPLEX_PHY_TRANSMITTING = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

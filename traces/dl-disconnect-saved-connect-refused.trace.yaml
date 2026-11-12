@@ -1,0 +1,56 @@
+# Save (Requeue), failure path: a DL-DISCONNECT Request held while the link
+# is being set up is consumed in Disconnected when the peer refuses.
+#
+# C1.2 and ITU-T Z.101 clause 11.7 as in dl-disconnect-saved-until-connected.
+# §6.3.1: "When the originating TNC receives a DM response to its SABM(E)
+# frame, it cancels its T1 timer and does not enter the information-transfer
+# state."
+# In Disconnected a DL-DISCONNECT Request has nothing to release, and figc4.1
+# answers it with DL-DISCONNECT Confirm (t01).
+scenario: dl-disconnect-saved-connect-refused
+description: >
+  Disconnected -> DL_CONNECT_request (SABM P=1, Awaiting Connection);
+  DL_DISCONNECT_request is saved by figc4.2 and held. The peer answers DM
+  F=1: T1 stops, layer 3 gets DL_DISCONNECT_indication and the machine is
+  Disconnected, which does not save the request, so it is consumed there and
+  answered with DL_DISCONNECT_confirm (figc4.1 t01). No frame goes out.
+citations:
+  - "ax.25.2.2.4_Oct_25.md C1.2 (SDL Symbol Definition: the save symbol)"
+  - "ITU-T Z.101 clause 11.7 (Save)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "figc4.1 t03 + t01, figc4.2 save + t03"
+initial:
+  state: Disconnected
+  variables: { modulo: 8, k: 4 }
+steps:
+  - name: layer 3 asks for a connection
+    inject: { event: DL_CONNECT_request }
+    expect:
+      transition: t03_dl_connect_request
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+
+  - name: layer 3 asks to disconnect while the SABM is outstanding
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: save
+      state: AwaitingConnection
+      effects: []
+      held: [DL_DISCONNECT_request]
+
+  - name: the peer refuses with DM F=1 and the held request is answered
+    inject: { event: DM_received, pf: true }
+    expect:
+      transition: t03_dm_received_yes
+      effects:
+        - { dl: DL_DISCONNECT_indication }
+      replayed:
+        - event: DL_DISCONNECT_request
+          transition: t01_dl_disconnect_request
+          state: Disconnected
+          effects:
+            - { dl: DL_DISCONNECT_confirm }
+      held: []
+      state: Disconnected
+      timers: { t1: stopped }

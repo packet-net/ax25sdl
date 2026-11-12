@@ -48,4 +48,5 @@ var DuplexPhyTransmitterStart = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

@@ -10,6 +10,7 @@ import {
   DataLinkConnected,
   DataLinkDisconnected,
   DataLinkSubroutines,
+  ManagementDataLinkNegotiating,
 } from "./index.js";
 import type { StatePage, ActionKind, Ax25Guard } from "./index.js";
 
@@ -110,5 +111,24 @@ describe("closed-set runtime arrays", () => {
   it("the derived union accepts a member of the array", () => {
     const first: Ax25Guard = AX25_GUARDS[0];
     expect(AX25_GUARDS).toContain(first);
+  });
+});
+
+// The figures' Save symbol ("Requeue"): a saved event has no transition in
+// its state and must be held, not treated as unhandled (ax25sdl#97).
+describe("saves", () => {
+  it("carries the four saves the figures draw", () => {
+    expect(DataLinkAwaitingConnection.saves).toEqual(["DL_DISCONNECT_request"]);
+    expect(DataLinkAwaitingV22Connection.saves).toEqual(["DL_DISCONNECT_request"]);
+    expect(ManagementDataLinkNegotiating.saves).toEqual(["MDL_NEGOTIATE_request", "XID_command_received"]);
+    expect(DataLinkConnected.saves).toEqual([]);
+  });
+
+  it("never saves an event the same state also takes as an input", () => {
+    for (const page of [DataLinkAwaitingConnection, DataLinkAwaitingV22Connection, ManagementDataLinkNegotiating]) {
+      for (const saved of page.saves) {
+        expect(page.transitions.some((t) => t.on === saved)).toBe(false);
+      }
+    }
   });
 });

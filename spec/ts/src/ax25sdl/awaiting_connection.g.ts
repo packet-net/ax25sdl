@@ -347,4 +347,5 @@ export const DataLinkAwaitingConnection: StatePage = {
       loops: [],
     },
   ],
+  saves: ["DL_DISCONNECT_request"],
 };

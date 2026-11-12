@@ -1,0 +1,90 @@
+# Save (Requeue): a DL-DISCONNECT Request issued while the link is still
+# being set up is held, survives a SABM retry, and is acted on once the link
+# comes up.
+#
+# C1.2: "The save symbol is used to indicate that a particular input event
+# does not cause operations to be done in the present state. Instead, that
+# particular input event is 'saved' until the state machine (triggered by
+# other events) has reached a new and different state."
+# SDL save (ITU-T Z.101 clause 11.7; semantics as the SDL Forum's Z.100
+# reference states them): saved signals stay in the input port in arrival
+# order, and in the following state they are treated as normal signals.
+# §6.3.1: on T1 expiry "the originating TNC resends the SABM frame and starts
+# T1 running again"; UA ends the attempt.
+# §6.3.4: "either TNC may indicate a request to disconnect the link by
+# transmitting a DISC command frame and starting timer T1."
+scenario: dl-disconnect-saved-until-connected
+description: >
+  Disconnected -> DL_CONNECT_request (SABM P=1, Awaiting Connection). Layer 3
+  then asks to disconnect: figc4.2 saves DL-DISCONNECT Request, so nothing
+  happens and the request is held. A T1 expiry re-sends SABM and re-enters
+  Awaiting Connection, which still saves it, so it stays held. UA F=1 brings
+  the link up (DL_CONNECT_confirm, Connected); Connected does not save the
+  request, so it is consumed there: DISC P=1 and Awaiting Release (figc4.4
+  t01). UA F=1 then completes the release.
+citations:
+  - "ax.25.2.2.4_Oct_25.md C1.2 (SDL Symbol Definition: the save symbol)"
+  - "ITU-T Z.101 clause 11.7 (Save)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.1 (AX.25 Link Connection Establishment)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.4 (Link Disconnection)"
+  - "figc4.1 t03, figc4.2 save + T1 retry + t04, figc4.4 t01, figc4.3 t03"
+initial:
+  state: Disconnected
+  variables: { modulo: 8, k: 4 }
+steps:
+  - name: layer 3 asks for a connection
+    inject: { event: DL_CONNECT_request }
+    expect:
+      transition: t03_dl_connect_request
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+      timers: { t1: running }
+      held: []
+
+  - name: layer 3 asks to disconnect while the SABM is outstanding
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: save
+      state: AwaitingConnection
+      effects: []
+      held: [DL_DISCONNECT_request]
+      replayed: []
+      timers: { t1: running }
+
+  - name: T1 expires and the SABM is retried; the request is still held
+    inject: { event: T1_expiry }
+    expect:
+      state: AwaitingConnection
+      effects:
+        - { frame: SABM, command: true, pf: true }
+      held: [DL_DISCONNECT_request]
+      replayed: []
+      variables: { rc: 2 }
+      timers: { t1: running }
+
+  - name: UA F=1 brings the link up and the held request is acted on
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t04_ua_received_yes_yes
+      effects:
+        - { dl: DL_CONNECT_confirm }
+      replayed:
+        - event: DL_DISCONNECT_request
+          transition: t01_dl_disconnect_request
+          state: AwaitingRelease
+          effects:
+            - { frame: DISC, command: true, pf: true }
+      held: []
+      state: AwaitingRelease
+      variables: { rc: 0 }
+      timers: { t1: running, t3: stopped }
+
+  - name: peer acknowledges the DISC with UA F=1
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t03_ua_received_yes
+      state: Disconnected
+      effects:
+        - { dl: DL_DISCONNECT_confirm }
+      held: []

@@ -13,7 +13,12 @@ public sealed record TableSet(
     IReadOnlyDictionary<string, SubroutineTable> Subroutines);
 
 /// <summary>One state page (one <c>*.g.json</c> of kind <c>state</c>).</summary>
-public sealed record StateTable(string State, string Figure, IReadOnlyList<TransitionRow> Transitions);
+/// <param name="Saves">Events the state saves (the figure's Save symbol), in page order; empty when none, or when the page predates saves.</param>
+public sealed record StateTable(string State, string Figure, IReadOnlyList<TransitionRow> Transitions, IReadOnlyList<string> Saves)
+{
+    /// <summary>True when this state saves <paramref name="eventName"/>.</summary>
+    public bool IsSaved(string eventName) => Saves.Contains(eventName, StringComparer.Ordinal);
+}
 
 /// <summary>
 /// One transition row. <see cref="Guard"/> is the composed guard string
@@ -130,7 +135,16 @@ public static class TableLoader
                 Loops: ReadLoops(t)));
         }
 
-        return new StateTable(state, figure, transitions);
+        // `saves` is absent from tables emitted before saves existed (the
+        // explorer's pre-fix fixtures); that reads as "saves nothing".
+        var saves = new List<string>();
+        if (root.TryGetProperty("saves", out var savesElement))
+        {
+            foreach (var e in savesElement.EnumerateArray())
+                saves.Add(e.GetString() ?? throw new InvalidDataException($"{pagePath}: null entry in saves"));
+        }
+
+        return new StateTable(state, figure, transitions, saves);
     }
 
     private static IEnumerable<SubroutineTable> ReadSubroutinesPage(JsonElement root, string pagePath)

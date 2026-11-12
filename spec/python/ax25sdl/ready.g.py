@@ -87,4 +87,5 @@ MANAGEMENT_DATA_LINK_READY = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

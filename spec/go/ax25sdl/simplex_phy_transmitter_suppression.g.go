@@ -190,4 +190,5 @@ var SimplexPhyTransmitterSuppression = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

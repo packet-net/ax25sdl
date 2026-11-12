@@ -20,6 +20,10 @@ public sealed class CsharpStateModel
     public string? SourceUrl { get; init; }
     public string SourceUrlLiteral { get; init; } = "null";
     public List<CsharpTransitionModel> Transitions { get; init; } = new();
+    /// <summary>C# initialiser for the state's <c>Saves</c>: a read-only wrapper that cannot be cast back to an array, or the shared empty array.</summary>
+    public string SavesInitializer { get; init; } = "";
+    /// <summary>C# array expression for the conformance test's expected saves.</summary>
+    public string SavesExpected { get; init; } = "";
 
     public static CsharpStateModel From(ResolvedPage page)
     {
@@ -36,6 +40,12 @@ public sealed class CsharpStateModel
             SourceUrl        = page.SourceUrl,
             SourceUrlLiteral = page.SourceUrl is null ? "null" : CsharpEmitter.CSharpStringLiteral(page.SourceUrl),
             Transitions      = page.Transitions.Select(CsharpTransitionModel.From).ToList(),
+            SavesInitializer = page.Saves.Count == 0
+                ? "System.Array.Empty<Ax25Event>()"
+                : "System.Array.AsReadOnly(new Ax25Event[] { " + string.Join(", ", page.Saves.Select(CsharpEmitter.EventEnumLiteral)) + " })",
+            SavesExpected = page.Saves.Count == 0
+                ? "System.Array.Empty<Ax25Event>()"
+                : "new Ax25Event[] { " + string.Join(", ", page.Saves.Select(CsharpEmitter.EventEnumLiteral)) + " }",
         };
     }
 }
