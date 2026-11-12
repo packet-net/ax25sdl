@@ -39,7 +39,9 @@ CONSTANTS
     UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
     FrameErrors,       \* corrupted forms a frame may arrive in, subset of {"control", "info", "length", "n1", "iresp"}
     InjectAt,          \* stations that put one injected frame on the air, once, subset of {"A", "B"}
-    InjectForm,        \* its form: "rej-poll", "srej-command", "srej-poll", "ua-f0", "frmr" (or "none")
+    InjectForm,        \* its form: "rej-poll", "srej-command", "srej-poll", "ua-f0", "frmr", "i-frame", "i-poll",
+                       \* "i-poll-ahead", "i-poll-stale" (or "none")
+    InjectThen,        \* a second injected frame the same station puts on the air after the first (or "none")
     FlowRounds,        \* FLOW_OFF-then-FLOW_ON rounds per flow-controlling station
     FlowOffAfter,      \* frames a station must have delivered before its FLOW_OFF
     StepChecks,        \* the per-step invariants switched on (see below)
@@ -65,6 +67,11 @@ Submitted(s) ==
 
 \* The label of each station's UI datagram (Stepper.UiLabel).
 UiLabel(s) == IF s = "A" THEN "ua0" ELSE "ub0"
+
+\* The payload label of a station's injected I frame number n, 0 the first
+\* (Stepper.InjectedLabel), and the set of them (Stepper.IsInjectedLabel).
+InjLabel(s, n) == (IF s = "A" THEN "xa" ELSE "xb") \o ToString(n)
+InjLabels == {"xa0", "xa1", "xb0", "xb1"}
 
 StubB == Peer # "tables"
 DataStates == {"Connected", "TimerRecovery"}
@@ -217,6 +224,17 @@ Route(s, m, fx, acc, flowOff, i) ==
                     IN  [acc EXCEPT !.out = Append(@, fe.frame),
                                     !.v = IF vr = NoViol /\ BusyAt # {} /\ "BusyIndication" \in StepChecks
                                           THEN BusyIndication(s, m, fe.frame) ELSE vr]
+                \* An injected I frame's payload: once, by the dispatch of that
+                \* frame received in sequence (acc.inj), and no delivery count.
+                ELSE IF fe.kind = "dl" /\ fe.prim = "DL_DATA_indication" /\ fe.detail \in InjLabels THEN
+                    LET vf == IF acc.v = NoViol /\ "FlowOffDelivery" \in StepChecks /\ flowOff
+                              THEN Viol("FlowOffDelivery", s, "station " \o s \o " delivered '" \o fe.detail \o "' upward while its layer 3 has flow off")
+                              ELSE acc.v
+                        ok == fe.detail = acc.inj
+                    IN  [acc EXCEPT !.inj = IF ok THEN "" ELSE @,
+                                    !.v = IF ~ok /\ vf = NoViol /\ "Delivery" \in StepChecks
+                                          THEN Viol("Delivery", s, "station " \o s \o " delivered the injected payload '" \o fe.detail \o "' upward other than once, in the dispatch that accepts that I frame in sequence")
+                                          ELSE vf]
                 ELSE IF fe.kind = "dl" /\ fe.prim = "DL_DATA_indication" THEN
                     LET vf == IF acc.v = NoViol /\ "FlowOffDelivery" \in StepChecks /\ flowOff
                               THEN Viol("FlowOffDelivery", s, "station " \o s \o " delivered '" \o fe.detail \o "' upward while its layer 3 has flow off")
@@ -274,10 +292,14 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         m == IF ran THEN Persist(c) ELSE pre
         \* With a local busy condition modelled, a station whose own receiver
         \* was busy delivers nothing either (the flow-off delivery check).
+        injIn == IF e.ev = "I_received" /\ e.cmd = 1 /\ e.data \in InjLabels /\ e.ns = pre.vr THEN e.data ELSE ""
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
                     pend |-> S.pend[s], rep |-> S.rep[s], told |-> S.told[s],
-                    tell |-> {"DL-ERROR Indication (F)"} \cup (IF e.fe # "" THEN {ErrCode(e.fe)} ELSE {}), v |-> v1],
+                    tell |-> {"DL-ERROR Indication (F)"} \cup (IF e.fe # "" THEN {ErrCode(e.fe)} ELSE {}), v |-> v1,
+                    \* The injected payload this dispatch may deliver: its own,
+                    \* received in sequence (Stepper: injectedDeliverable).
+                    inj |-> injIn],
                    S.off[s] \/ (BusyAt # {} /\ pre.own), 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -309,7 +331,13 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         rst == IF FrameErrors # {} /\ ok /\ pre.st \in DataStates /\ e.ev # "DL_CONNECT_request"
                   /\ \E i \in 1..Len(c.fx) : c.fx[i].kind = "frame" /\ c.fx[i].frame.type \in {"SABM", "SABME"}
                THEN Max(S.rs[s], IF e.fe # "" THEN 1 ELSE 2) ELSE S.rs[s]
+        \* The injected payload is delivered exactly when the frame is
+        \* accepted (V(r) moves past its N(s)) in this dispatch.
+        injv == IF ok /\ injIn # "" /\ "Delivery" \in StepChecks /\ (m.vr # pre.vr) # (r.inj = "")
+                THEN Viol("Delivery", s, "station " \o s \o " handled the injected I frame '" \o injIn \o "' in sequence, but did not deliver exactly what it accepted")
+                ELSE NoViol
         v2 == IF r.v # NoViol THEN r.v
+              ELSE IF injv # NoViol THEN injv
               ELSE IF uiv # NoViol THEN uiv
               ELSE IF fev # NoViol THEN fev
               ELSE IF flowOffNow /\ "BusyTracksFlow" \in StepChecks /\ ~m.own
@@ -383,7 +411,7 @@ S0 ==
      rcn |-> [s \in Stations |-> FALSE], pend |-> [s \in Stations |-> FALSE], rep |-> [s \in Stations |-> 0],
      busy |-> [s \in Stations |-> FALSE], t3loop |-> [s \in Stations |-> FALSE], hb |-> [s \in Stations |-> FALSE],
      uis |-> [s \in Stations |-> FALSE], uid |-> [s \in Stations |-> FALSE],
-     rs |-> [s \in Stations |-> 0], told |-> [s \in Stations |-> 0], inj |-> [s \in Stations |-> FALSE],
+     rs |-> [s \in Stations |-> 0], told |-> [s \in Stations |-> 0], inj |-> [s \in Stations |-> 0],
      stub |-> [kind |-> Peer, up |-> FALSE]]
 
 Seeded(r) == IF r.viol = NoViol THEN r.sys ELSE Assert(FALSE, "seeding failed: " \o r.viol.msg)
@@ -574,36 +602,67 @@ SendUnitData(S, s) ==
 \* The injected frame's gate (Stepper.InjectReady): a REJ poll only while the
 \* receiver is in TimerRecovery, an SREJ command (P = 0 or 1) while it is in
 \* Connected or TimerRecovery, each from a sender in one of those and naming a
-\* frame outstanding at the receiver; a UA with F = 0 while the receiver
-\* waits on a connect or release page; an FRMR while the receiver is in
-\* Connected or TimerRecovery.
+\* frame outstanding at the receiver (with RejMayEqualVs also its V(s), while
+\* it is in TimerRecovery with both channels empty, and for an SREJ with
+\* nothing outstanding); a UA with F = 0 while the receiver waits on a connect
+\* or release page; an FRMR while the receiver is in Connected or
+\* TimerRecovery. The injected I frames: both stations in Connected or
+\* TimerRecovery and no I frame on the channel to the receiver; in sequence
+\* only with the receiver's V(r) the sender's V(s), the sender's queue empty
+\* and everything delivered; ahead of sequence not naming the sender's V(s)
+\* unless the sender is in TimerRecovery with both channels empty.
+InjForm(n) == IF n = 0 THEN InjectForm ELSE InjectThen
+InjCount == IF InjectThen = "none" THEN 1 ELSE 2
+IForms == {"i-frame", "i-poll", "i-poll-ahead", "i-poll-stale"}
+
 InjectReady(S, s) ==
-    /\ s \in InjectAt /\ Table(s) /\ ~S.inj[s]
+    /\ s \in InjectAt /\ Table(s) /\ S.inj[s] < InjCount
     /\ LET m == S.m[s]
            r == S.m[Other(s)]
-       IN  CASE InjectForm \in {"rej-poll", "srej-command", "srej-poll"} ->
+           form == InjForm(S.inj[s])
+           empty == S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
+       IN  CASE form \in {"rej-poll", "srej-command", "srej-poll"} ->
                     /\ m.st \in DataStates
-                    /\ IF InjectForm = "rej-poll" THEN r.st = "TimerRecovery" ELSE r.st \in DataStates
-                    /\ (m.vr - r.va) % r.mod < (r.vs - r.va) % r.mod
-             [] InjectForm = "ua-f0" -> r.st \in {"AwaitingConnection", "AwaitingV22Connection", "AwaitingRelease"}
-             [] InjectForm = "frmr" -> r.st \in DataStates
+                    /\ IF form = "rej-poll" THEN r.st = "TimerRecovery" ELSE r.st \in DataStates
+                    /\ \/ (m.vr - r.va) % r.mod < (r.vs - r.va) % r.mod
+                       \/ /\ RejMayEqualVs /\ m.vr = r.vs /\ r.st = "TimerRecovery" /\ empty
+                          /\ (form = "rej-poll" \/ r.va = r.vs)
+             [] form = "ua-f0" -> r.st \in {"AwaitingConnection", "AwaitingV22Connection", "AwaitingRelease"}
+             [] form = "frmr" -> r.st \in DataStates
+             [] form \in IForms ->
+                    /\ m.st \in DataStates /\ r.st \in DataStates
+                    /\ \A i \in 1..Len(S.ch[Other(s)]) : S.ch[Other(s)][i].type # "I"
+                    /\ CASE form \in {"i-frame", "i-poll"} -> r.vr = m.vs /\ m.q = <<>> /\ AllDelivered(S)
+                         [] form = "i-poll-ahead" -> r.vr # m.vs \/ (m.st = "TimerRecovery" /\ empty)
+                         [] OTHER -> TRUE
              [] OTHER -> FALSE
 
-\* The harness puts the station's injected frame on the air
+\* The harness puts the station's next injected frame on the air
 \* (Stepper.InjectFrame), as from another implementation.
 InjectFrame(S, s) ==
     LET m == S.m[s]
-        f == CASE InjectForm = "rej-poll" -> Frm("REJ", TRUE, TRUE, m.vr, None, "")
-               [] InjectForm = "srej-command" -> Frm("SREJ", TRUE, FALSE, m.vr, None, "")
-               [] InjectForm = "srej-poll" -> Frm("SREJ", TRUE, TRUE, m.vr, None, "")
-               [] InjectForm = "ua-f0" -> Frm("UA", FALSE, FALSE, None, None, "")
+        r == S.m[Other(s)]
+        n == S.inj[s]
+        form == InjForm(n)
+        f == CASE form = "rej-poll" -> Frm("REJ", TRUE, TRUE, m.vr, None, "")
+               [] form = "srej-command" -> Frm("SREJ", TRUE, FALSE, m.vr, None, "")
+               [] form = "srej-poll" -> Frm("SREJ", TRUE, TRUE, m.vr, None, "")
+               [] form = "ua-f0" -> Frm("UA", FALSE, FALSE, None, None, "")
+               [] form = "i-frame" -> Frm("I", TRUE, FALSE, m.vr, r.vr, InjLabel(s, n))
+               [] form = "i-poll" -> Frm("I", TRUE, TRUE, m.vr, r.vr, InjLabel(s, n))
+               [] form = "i-poll-ahead" -> Frm("I", TRUE, TRUE, m.vr, (r.vr + 1) % r.mod, InjLabel(s, n))
+               [] form = "i-poll-stale" -> Frm("I", TRUE, TRUE, m.vr, (r.vr + r.mod - 1) % r.mod, InjLabel(s, n))
                [] OTHER -> Frm("FRMR", FALSE, FALSE, None, None, "")
-    IN  [sys |-> [S EXCEPT !.ch[Other(s)] = Append(@, f), !.inj[s] = TRUE],
+    IN  [sys |-> [S EXCEPT !.ch[Other(s)] = Append(@, f), !.inj[s] = n + 1],
          viol |-> NoViol,
-         tid |-> CASE InjectForm = "rej-poll" -> "pinned:inject_rej_poll"
-                   [] InjectForm = "srej-command" -> "pinned:inject_srej_command"
-                   [] InjectForm = "srej-poll" -> "pinned:inject_srej_poll"
-                   [] InjectForm = "ua-f0" -> "pinned:inject_ua_f0"
+         tid |-> CASE form = "rej-poll" -> "pinned:inject_rej_poll"
+                   [] form = "srej-command" -> "pinned:inject_srej_command"
+                   [] form = "srej-poll" -> "pinned:inject_srej_poll"
+                   [] form = "ua-f0" -> "pinned:inject_ua_f0"
+                   [] form = "i-frame" -> "pinned:inject_i_frame"
+                   [] form = "i-poll" -> "pinned:inject_i_poll"
+                   [] form = "i-poll-ahead" -> "pinned:inject_i_poll_ahead"
+                   [] form = "i-poll-stale" -> "pinned:inject_i_poll_stale"
                    [] OTHER -> "pinned:inject_frmr",
          arms |-> {}]
 

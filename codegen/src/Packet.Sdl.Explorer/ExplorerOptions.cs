@@ -223,6 +223,30 @@ public enum InjectedFrame
     UaF0,
     /// <summary>An FRMR response (F = 0), while the receiver is in Connected or TimerRecovery.</summary>
     Frmr,
+    /// <summary>
+    /// An I command with P = 0 and N(s) = the receiver's V(r) (the next in
+    /// sequence), N(r) = the sender's V(r), carrying the injected payload
+    /// label (<c>xa0</c>, <c>xb0</c>; a second injection <c>xa1</c>). Only
+    /// while the receiver's V(r) is the sender's V(s), the sender's queue is
+    /// empty and all its submitted data has been delivered, so the frame takes
+    /// a sequence number the sender has not used and the sender has nothing
+    /// left that it could collide with.
+    /// </summary>
+    IFrame,
+    /// <summary>The same I command with P = 1.</summary>
+    IPoll,
+    /// <summary>
+    /// An I command with P = 1 and N(s) = the receiver's V(r) + 1 (out of
+    /// sequence; inside the window when k is 2 or more), N(r) = the sender's
+    /// V(r). Without SREJ only, so every arm discards it.
+    /// </summary>
+    IPollAhead,
+    /// <summary>
+    /// An I command with P = 1 and N(s) = the receiver's V(r) - 1 (outside
+    /// the window: an old number), N(r) = the sender's V(r). Without SREJ
+    /// only.
+    /// </summary>
+    IPollStale,
 }
 
 /// <summary>The form of a UI datagram on the air (<see cref="ExplorerOptions.UiForm"/>).</summary>
@@ -443,7 +467,11 @@ public sealed record ExplorerOptions
     /// receiver, from a sender in Connected or TimerRecovery; a UA with F = 0 while the
     /// receiver waits in AwaitingConnection, AwaitingV22Connection or
     /// AwaitingRelease; an FRMR while the receiver is in Connected or
-    /// TimerRecovery. No table row runs at the sender (the step log reports
+    /// TimerRecovery; an I command (see <see cref="InjectedFrame.IFrame"/>
+    /// and the forms after it) while both are in Connected or TimerRecovery,
+    /// whose payload the Delivery check requires the receiver to deliver
+    /// exactly when it accepts that frame in sequence (V(r) moves past its
+    /// N(s)), once within that dispatch, and in no other dispatch. No table row runs at the sender (the step log reports
     /// <c>pinned:inject_*</c>). Not work in flight and, like a channel fault,
     /// not a move the liveness checks may use. Table-driven peer only. Off by
     /// default.
@@ -452,6 +480,15 @@ public sealed record ExplorerOptions
 
     /// <summary>With <see cref="Inject"/>, the injected frame's form.</summary>
     public InjectedFrame InjectedFrame { get; init; } = InjectedFrame.None;
+
+    /// <summary>
+    /// With <see cref="Inject"/>, a second injected frame the same station
+    /// puts on the air after the first, once the first has left the channel
+    /// (<see cref="InjectedFrame.None"/>: only one). Used with the injected I
+    /// frames: an I frame in sequence followed by one out of sequence makes the
+    /// receiver answer with an N(r) beyond anything the sender's machine sent.
+    /// </summary>
+    public InjectedFrame InjectedThen { get; init; } = InjectedFrame.None;
 
     /// <summary>
     /// What plays station B. The v2.0 stub peers are for the connect-phase
@@ -492,7 +529,10 @@ public sealed record ExplorerOptions
     /// receiver's V(s) (a pure acknowledgement). Off by default: on a FIFO
     /// channel such a REJ can only come from a reject raised on a stale
     /// duplicate, and figc4.7's do-while loop then pushes I(V(s)), a frame that
-    /// was never sent. See docs/explorer.md.
+    /// was never sent. See docs/explorer.md. With <see cref="Inject"/> it also
+    /// widens the injection gate: the injected REJ and SREJ commands may name
+    /// the receiver's V(s), while it is in TimerRecovery with both channels
+    /// empty (and, for an SREJ, nothing outstanding).
     /// </summary>
     public bool RejMayEqualVs { get; init; }
 

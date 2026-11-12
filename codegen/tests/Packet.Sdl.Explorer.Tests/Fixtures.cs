@@ -72,6 +72,12 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which Connected reports a reset by the peer as DL-ERROR (A), not (F).</summary>
     public static string ResetWrongCodeDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code");
 
+    /// <summary>The TlaCheck seeded fixture in which Connected delivers an I frame outside the window (P = 1), and an in-sequence one with P = 1 twice.</summary>
+    public static string InjectedDeliveredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-delivered");
+
+    /// <summary>The TlaCheck seeded fixture in which Connected accepts an in-sequence I frame with P = 1 without delivering it.</summary>
+    public static string InjectedUndeliveredDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-undelivered");
+
     /// <summary>The TlaCheck seeded fixture in which an in-window RR in Connected resets the link.</summary>
     public static string RrResetsDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets");
 

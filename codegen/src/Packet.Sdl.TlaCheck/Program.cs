@@ -88,6 +88,8 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.ResetUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-unconfirmed"),
     TableSetKind.RrResets => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-rr-resets"),
     TableSetKind.ResetWrongCode => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reset-wrong-code"),
+    TableSetKind.InjectedDelivered => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-delivered"),
+    TableSetKind.InjectedUndelivered => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-injected-undelivered"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -308,6 +310,8 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.ResetUnconfirmed => "seeded reset-unconfirmed",
     TableSetKind.RrResets => "seeded rr-resets",
     TableSetKind.ResetWrongCode => "seeded reset-wrong-code",
+    TableSetKind.InjectedDelivered => "seeded injected-delivered",
+    TableSetKind.InjectedUndelivered => "seeded injected-undelivered",
     _ => "seeded livelock",
 };
 

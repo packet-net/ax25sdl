@@ -55,6 +55,10 @@ public enum TableSetKind
     RrResets,
     /// <summary>A seeded-defect fixture (fixtures/tables-reset-wrong-code): Connected reports a reset by the peer (SABM, V(s) != V(a)) as DL-ERROR (A), not (F).</summary>
     ResetWrongCode,
+    /// <summary>A seeded-defect fixture (fixtures/tables-injected-delivered): Connected delivers an I frame outside the window (P = 1), and delivers an in-sequence one with P = 1 twice.</summary>
+    InjectedDelivered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-injected-undelivered): Connected accepts an in-sequence I frame with P = 1 without delivering it.</summary>
+    InjectedUndelivered,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -629,6 +633,67 @@ public static class Scenarios
         Add("seeded-reset-wrong-code", "seeded (told by the reset's own code)", TableSetKind.ResetWrongCode, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1 }, "Deadlock, 4");
         Add("seeded-rr-resets", "seeded (unjustified reset never rests)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 1, Budget = 0 }, "Deadlock, 6");
         Add("seeded-rr-resets-loss", "seeded (unjustified reset is no reset loss)", TableSetKind.RrResets, o => Fe(o, FrameErrors.ControlField) with { FramesAb = 2, K = 1, Budget = 0 }, "Deadlock, 6");
+
+        // Coverage batch 7: injected I frames (InjectedFrame.IFrame and after),
+        // with their own N(s) and payload label, and a second injection
+        // (InjectedThen). Labels name the arm a row is there for.
+        ExplorerOptions Ip(ExplorerOptions o, FlowControlAt at, InjectedFrame f, InjectedFrame then = InjectedFrame.None) =>
+            o with { Inject = at, InjectedFrame = f, InjectedThen = then, FramesAb = 0, Budget = 0 };
+        const InjectedFrame Ahead = InjectedFrame.IPollAhead, Stale = InjectedFrame.IPollStale;
+        Add("ip-inseq", "I poll in sequence", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "clean");
+        Add("ip-stale", "I poll outside the window", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale), "clean");
+        Add("ip-busy", "figc4.4 busy I poll answered RR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { LocalBusy = FlowControlAt.B }, "BusyIndication at B, 3");
+        Add("ip-rejx", "I poll in reject exception; REJ F=1", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Ahead, Ahead) with
+        {
+            FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
+        }, "clean");
+        Add("ip-tr-inseq", "I poll in sequence, TR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop }, "clean");
+        Add("ip-tr-stale", "#91 (H1)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop }, "Deadlock, 12");
+        Add("ip-tr-busy", "I poll to a busy TR (behind ip-busy)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with
+        {
+            FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
+            Invariants = Default & ~Invariants.BusyIndication, TimerRecoveryIsQuiescent = true,
+        }, "clean");
+        Add("ip-tr-rejx", "I poll in reject exception, TR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Ahead, Ahead) with
+        {
+            FramesAb = 1, FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
+        }, "clean");
+        Add("ip-nr", "REJ F=1, N(r) beyond V(s)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
+        {
+            T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "clean");
+        Add("ip-nr-v22", "REJ F=1, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
+        {
+            Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "clean");
+        Add("ip-nr-rnr-v22", "RNR, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
+        {
+            Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
+        }, "clean");
+        // The reject-naming-vs arms: with RejMayEqualVs the injected REJ and
+        // SREJ commands may also name the receiver's V(s).
+        Add("rnv-rej", "REJ poll naming V(s)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.RejPoll) with
+        {
+            FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
+        }, "clean");
+        Add("rnv-srej", "SREJ command naming V(s)", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejCommand) with
+        {
+            FramesAb = 0, T3 = true, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "clean");
+        Add("rnv-srejp", "#91 (H1); ax25spec#164", TableSetKind.Current, o => Inj(o, FlowControlAt.B, InjectedFrame.SrejPoll) with
+        {
+            FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "Deadlock, 11");
+        Add("seeded-injected-stale", "seeded (injected payload delivered out of sequence)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, Stale), "Delivery at B, 2");
+        Add("seeded-injected-twice", "seeded (injected payload delivered twice)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
+        Add("seeded-injected-undelivered", "seeded (injected payload accepted, not delivered)", TableSetKind.InjectedUndelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
+        // From the review of batch 7: both stations inject an I frame in
+        // sequence; B's N(r) error recovery in Timer Recovery stays there
+        // (#12's errata branch) and A delivers b0 twice.
+        Add("ip-both", "ax25spec#12 (errata branch stays in TR)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
+        {
+            FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "Delivery at A, 18");
 
         return list;
     }
