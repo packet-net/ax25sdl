@@ -112,4 +112,5 @@ export const ReassemblerReady: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

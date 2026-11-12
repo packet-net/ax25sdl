@@ -118,4 +118,5 @@ REASSEMBLER_READY = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

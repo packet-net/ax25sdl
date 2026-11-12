@@ -71,4 +71,5 @@ var SimplexPhyDigipeating = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

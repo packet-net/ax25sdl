@@ -192,4 +192,5 @@ export const SimplexPhyTransmitterSuppression: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

@@ -273,4 +273,5 @@ var DataLinkAwaitingRelease = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

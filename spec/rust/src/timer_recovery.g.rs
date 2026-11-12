@@ -3858,6 +3858,7 @@ pub static DATA_LINK_TIMER_RECOVERY: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

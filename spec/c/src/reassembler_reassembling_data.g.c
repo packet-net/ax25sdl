@@ -180,4 +180,6 @@ const StatePage reassembler_reassembling_data = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc6.3", .url = ""},
     .transitions = reassembler_reassembling_data_transitions,
     .transitions_len = 7,
+    .saves = NULL,
+    .saves_len = 0,
 };

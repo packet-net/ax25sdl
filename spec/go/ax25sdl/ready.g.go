@@ -79,4 +79,5 @@ var ManagementDataLinkReady = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

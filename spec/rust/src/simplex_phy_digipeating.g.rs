@@ -107,6 +107,7 @@ pub static SIMPLEX_PHY_DIGIPEATING: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

@@ -116,4 +116,5 @@ var SimplexPhyReady = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

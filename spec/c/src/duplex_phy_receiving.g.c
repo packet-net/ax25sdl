@@ -50,4 +50,6 @@ const StatePage duplex_phy_receiving = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc2b.2", .url = ""},
     .transitions = duplex_phy_receiving_transitions,
     .transitions_len = 2,
+    .saves = NULL,
+    .saves_len = 0,
 };

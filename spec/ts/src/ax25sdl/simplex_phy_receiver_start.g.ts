@@ -54,4 +54,5 @@ export const SimplexPhyReceiverStart: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

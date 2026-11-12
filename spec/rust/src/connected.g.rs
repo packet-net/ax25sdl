@@ -2708,6 +2708,7 @@ pub static DATA_LINK_CONNECTED: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

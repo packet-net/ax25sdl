@@ -1922,6 +1922,18 @@ Pages ==
     @@ ("Disconnected" :> Page_Disconnected)
     @@ ("TimerRecovery" :> Page_TimerRecovery)
 
+\* Saves[state] is the sequence of events that page saves (the figure's Save
+\* symbol, "Requeue"), in page order. A saved event is held in the input
+\* queue until a state that does not save it is entered (ITU-T Z.100). Data
+\* only: the checkers do not consume it yet (packet-net/ax25sdl#97).
+Saves ==
+       ("AwaitingConnection" :> << "DL_DISCONNECT_request" >>)
+    @@ ("AwaitingRelease" :> << >>)
+    @@ ("AwaitingV22Connection" :> << "DL_DISCONNECT_request" >>)
+    @@ ("Connected" :> << >>)
+    @@ ("Disconnected" :> << >>)
+    @@ ("TimerRecovery" :> << >>)
+
 (***************************************************************************)
 (* Subroutines                                                             *)
 (***************************************************************************)

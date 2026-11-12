@@ -99,4 +99,5 @@ var ManagementDataLinkNegotiating = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{"MDL_NEGOTIATE_request", "XID_command_received"},
 }

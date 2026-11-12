@@ -57,4 +57,5 @@ DUPLEX_PHY_TRANSMITTER_READY = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

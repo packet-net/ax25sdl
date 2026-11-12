@@ -68,6 +68,7 @@ public static class RustEmitter
             sb.Append("        },\n");
         }
         sb.Append("    ],\n");
+        sb.Append("    saves: &[").Append(string.Join(", ", page.Saves.Select(EventEnumLiteral))).Append("],\n");
         sb.Append("};\n");
 
         // Per-transition tests (inline mod, idiomatic Rust). Mirrors the

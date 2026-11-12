@@ -408,6 +408,7 @@ pub static DATA_LINK_DISCONNECTED: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

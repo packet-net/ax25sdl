@@ -140,6 +140,7 @@ pub static SIMPLEX_PHY_READY: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

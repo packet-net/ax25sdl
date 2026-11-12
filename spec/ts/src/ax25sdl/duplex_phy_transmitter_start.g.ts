@@ -50,4 +50,5 @@ export const DuplexPhyTransmitterStart: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

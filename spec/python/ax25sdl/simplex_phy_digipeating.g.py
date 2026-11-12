@@ -79,4 +79,5 @@ SIMPLEX_PHY_DIGIPEATING = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

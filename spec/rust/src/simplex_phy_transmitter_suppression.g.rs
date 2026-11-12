@@ -331,6 +331,7 @@ pub static SIMPLEX_PHY_TRANSMITTER_SUPPRESSION: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

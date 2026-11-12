@@ -69,4 +69,6 @@ const StatePage duplex_phy_transmitter_ready = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc2b.3", .url = ""},
     .transitions = duplex_phy_transmitter_ready_transitions,
     .transitions_len = 3,
+    .saves = NULL,
+    .saves_len = 0,
 };

@@ -60,4 +60,5 @@ SIMPLEX_PHY_RECEIVER_START = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

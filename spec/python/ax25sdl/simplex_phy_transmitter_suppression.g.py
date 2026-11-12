@@ -198,4 +198,5 @@ SIMPLEX_PHY_TRANSMITTER_SUPPRESSION = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )

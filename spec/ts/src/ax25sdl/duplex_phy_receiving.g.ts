@@ -39,4 +39,5 @@ export const DuplexPhyReceiving: StatePage = {
       loops: [],
     },
   ],
+  saves: [],
 };

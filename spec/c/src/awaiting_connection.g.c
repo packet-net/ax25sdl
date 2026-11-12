@@ -132,6 +132,10 @@ static const ActionStep
         {.verb = "DM", .kind = AX25SDL_KIND_SIGNAL_LOWER},
 };
 
+static const char *const data_link_awaiting_connection_saves[] = {
+    "DL_DISCONNECT_request",
+};
+
 static const TransitionSpec data_link_awaiting_connection_transitions[] = {
     {
         .id = "t02_disc_received",
@@ -485,4 +489,6 @@ const StatePage data_link_awaiting_connection = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc4.2", .url = ""},
     .transitions = data_link_awaiting_connection_transitions,
     .transitions_len = 24,
+    .saves = data_link_awaiting_connection_saves,
+    .saves_len = 1,
 };

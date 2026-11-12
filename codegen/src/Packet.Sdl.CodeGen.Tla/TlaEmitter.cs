@@ -53,7 +53,7 @@ public static class TlaEmitter
     private sealed record Transition(string Id, string On, string GuardText, IReadOnlyList<GuardTermIR> Guard,
         IReadOnlyList<Action> Actions, string Next, IReadOnlyList<Loop> Loops);
 
-    private sealed record StatePage(string State, string Figure, IReadOnlyList<Transition> Transitions);
+    private sealed record StatePage(string State, string Figure, IReadOnlyList<Transition> Transitions, IReadOnlyList<string> Saves);
 
     private sealed record SubPath(string Id, string GuardText, IReadOnlyList<GuardTermIR> Guard,
         IReadOnlyList<Action> Actions, IReadOnlyList<Loop> Loops);
@@ -88,7 +88,8 @@ public static class TlaEmitter
                         figure,
                         root.GetProperty("transitions").EnumerateArray().Select(t => new Transition(
                             Str(t, "id"), Str(t, "on"), Str(t, "guard"), GuardExpression.Parse(Str(t, "guard")),
-                            ReadActions(t), Str(t, "next"), ReadLoops(t))).ToList()));
+                            ReadActions(t), Str(t, "next"), ReadLoops(t))).ToList(),
+                        ReadSaves(root)));
                     break;
                 case "subroutines":
                     foreach (var s in root.GetProperty("subroutines").EnumerateArray())
@@ -112,6 +113,12 @@ public static class TlaEmitter
     }
 
     private static string Str(JsonElement e, string name) => e.GetProperty(name).GetString() ?? "";
+
+    /// <summary>A page's saves; absent (tables emitted before saves existed, e.g. the explorer's pre-fix fixtures) reads as none.</summary>
+    private static List<string> ReadSaves(JsonElement page) =>
+        page.TryGetProperty("saves", out var saves)
+            ? saves.EnumerateArray().Select(e => e.GetString() ?? "").ToList()
+            : new List<string>();
 
     private static List<Action> ReadActions(JsonElement owner) =>
         owner.GetProperty("actions").EnumerateArray().Select(a => new Action(Str(a, "verb"), Str(a, "kind"))).ToList();
@@ -189,6 +196,18 @@ public static class TlaEmitter
         Line("Pages ==");
         for (var i = 0; i < states.Count; i++)
             Line($"    {(i == 0 ? "   " : "@@ ")}({Lit(states[i].State)} :> {PageOp(states[i].State)})");
+        Line();
+
+        Line("\\* Saves[state] is the sequence of events that page saves (the figure's Save");
+        Line("\\* symbol, \"Requeue\"), in page order. A saved event is held in the input");
+        Line("\\* queue until a state that does not save it is entered (ITU-T Z.100). Data");
+        Line("\\* only: the checkers do not consume it yet (packet-net/ax25sdl#97).");
+        Line("Saves ==");
+        for (var i = 0; i < states.Count; i++)
+        {
+            var saved = states[i].Saves.Count == 0 ? "<< >>" : "<< " + string.Join(", ", states[i].Saves.Select(Lit)) + " >>";
+            Line($"    {(i == 0 ? "   " : "@@ ")}({Lit(states[i].State)} :> {saved})");
+        }
         Line();
 
         Line("(***************************************************************************)");

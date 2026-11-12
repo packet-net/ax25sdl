@@ -554,6 +554,7 @@ pub static DATA_LINK_AWAITING_CONNECTION: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[Ax25Event::DLDISCONNECTRequest],
 };
 
 #[cfg(test)]

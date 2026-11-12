@@ -1126,4 +1126,5 @@ var DataLinkConnected = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

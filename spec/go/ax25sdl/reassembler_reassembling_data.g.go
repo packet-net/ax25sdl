@@ -113,4 +113,5 @@ var ReassemblerReassemblingData = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

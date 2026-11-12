@@ -91,4 +91,13 @@ public static class DuplexPhy_Transmitting
             UndefinedBranches: null,
             OnLabel: "All Other Primitives"),
     };
+
+    /// <summary>
+    /// Inputs this state saves (the figure's Save symbol, "Requeue"), in page order.
+    /// A saved input has no transition here: keep it in the input queue, in arrival
+    /// order, and each time the machine enters a state (a nextstate back into the
+    /// same state included) consume the first queued input that state does not save
+    /// (ITU-T Z.100 save semantics). Empty for most states.
+    /// </summary>
+    public static IReadOnlyList<Ax25Event> Saves { get; } = new Ax25Event[] {  };
 }

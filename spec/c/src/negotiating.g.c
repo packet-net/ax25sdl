@@ -47,6 +47,11 @@ static const ActionStep
             {.verb = "MDL_ERROR_indicate_E", .kind = AX25SDL_KIND_SIGNAL_UPPER},
 };
 
+static const char *const management_data_link_negotiating_saves[] = {
+    "MDL_NEGOTIATE_request",
+    "XID_command_received",
+};
+
 static const TransitionSpec management_data_link_negotiating_transitions[] = {
     {
         .id = "t02_tm201_expiry_yes",
@@ -144,4 +149,6 @@ const StatePage management_data_link_negotiating = {
     .source = {.spec = "ax.25.2.2.4_Oct_25", .figure = "figc5.2", .url = ""},
     .transitions = management_data_link_negotiating_transitions,
     .transitions_len = 6,
+    .saves = management_data_link_negotiating_saves,
+    .saves_len = 2,
 };

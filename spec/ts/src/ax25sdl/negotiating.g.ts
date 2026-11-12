@@ -101,4 +101,5 @@ export const ManagementDataLinkNegotiating: StatePage = {
       loops: [],
     },
   ],
+  saves: ["MDL_NEGOTIATE_request", "XID_command_received"],
 };

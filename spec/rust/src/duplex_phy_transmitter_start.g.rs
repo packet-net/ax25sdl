@@ -60,6 +60,7 @@ pub static DUPLEX_PHY_TRANSMITTER_START: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

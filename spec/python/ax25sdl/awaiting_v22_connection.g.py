@@ -374,4 +374,5 @@ DATA_LINK_AWAITING_V_22_CONNECTION = StatePage(
             loops=(),
         ),
     ),
+    saves=("DL_DISCONNECT_request",),
 )

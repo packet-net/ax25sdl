@@ -20,6 +20,8 @@ public sealed class CsharpStateModel
     public string? SourceUrl { get; init; }
     public string SourceUrlLiteral { get; init; } = "null";
     public List<CsharpTransitionModel> Transitions { get; init; } = new();
+    /// <summary>Comma-separated <c>Ax25Event</c> literals for the state's saves (empty when none).</summary>
+    public string SavesCsv { get; init; } = "";
 
     public static CsharpStateModel From(ResolvedPage page)
     {
@@ -36,6 +38,7 @@ public sealed class CsharpStateModel
             SourceUrl        = page.SourceUrl,
             SourceUrlLiteral = page.SourceUrl is null ? "null" : CsharpEmitter.CSharpStringLiteral(page.SourceUrl),
             Transitions      = page.Transitions.Select(CsharpTransitionModel.From).ToList(),
+            SavesCsv         = string.Join(", ", page.Saves.Select(CsharpEmitter.EventEnumLiteral)),
         };
     }
 }

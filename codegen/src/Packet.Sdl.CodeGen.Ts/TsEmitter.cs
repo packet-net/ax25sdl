@@ -54,6 +54,7 @@ public static class TsEmitter
             sb.Append("    },\n");
         }
         sb.Append("  ],\n");
+        sb.Append("  saves: [").Append(string.Join(", ", page.Saves.Select(TsStringLiteral))).Append("],\n");
         sb.Append("};\n");
 
         return new Emission(fileName, sb.ToString());

@@ -81,6 +81,13 @@ typedef struct {
   SdlSource source;
   const TransitionSpec *transitions;
   size_t transitions_len;
+  // Events this state saves (the figure's Save symbol, "Requeue"), in page
+  // order; NULL + 0 when none. A saved event has no transition here: keep it
+  // in the input queue, in arrival order, and each time the machine enters a
+  // state (a nextstate back into the same state included) consume the first
+  // queued event that state does not save (ITU-T Z.100 save semantics).
+  const char *const *saves;
+  size_t saves_len;
 } StatePage;
 
 // One path through a subroutine (one combination of decision outcomes).

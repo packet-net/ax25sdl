@@ -228,6 +228,7 @@ pub static REASSEMBLER_REASSEMBLING_DATA: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

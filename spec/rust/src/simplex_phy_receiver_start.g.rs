@@ -67,6 +67,7 @@ pub static SIMPLEX_PHY_RECEIVER_START: StatePage = StatePage {
             loops: &[],
         },
     ],
+    saves: &[],
 };
 
 #[cfg(test)]

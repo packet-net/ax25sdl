@@ -110,4 +110,5 @@ var ReassemblerReady = StatePage{
 			Loops:      []LoopRange{},
 		},
 	},
+	Saves: []string{},
 }

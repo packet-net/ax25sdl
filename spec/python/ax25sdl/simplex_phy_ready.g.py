@@ -124,4 +124,5 @@ SIMPLEX_PHY_READY = StatePage(
             loops=(),
         ),
     ),
+    saves=(),
 )
