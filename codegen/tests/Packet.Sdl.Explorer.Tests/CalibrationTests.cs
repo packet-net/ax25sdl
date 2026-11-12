@@ -2238,4 +2238,163 @@ public class CalibrationTests(ITestOutputHelper output)
         var c = () => Fixtures.Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false) with { Inject = FlowControlAt.A, InjectedFrame = InjectedFrame.UaF0 });
         c.Should().Throw<ArgumentException>();
     }
+
+    // ─── Coverage batch 7: injected I frames with P = 1 ──────────────
+
+    private static ExplorerOptions Ip(InjectedFrame first, InjectedFrame then = InjectedFrame.None) => new()
+    {
+        TablesDir = Fixtures.CurrentDir, Inject = FlowControlAt.A, InjectedFrame = first, InjectedThen = then, FramesAb = 0, Budget = 0,
+    };
+
+    [Theory]
+    [InlineData(InjectedFrame.IPoll, 6, "Connected/t26_i_received_yes_yes_yes_no_yes_yes")]
+    [InlineData(InjectedFrame.IPollStale, 4, "Connected/t26_i_received_yes_yes_yes_no_no_no_yes")]
+    public void An_Injected_I_Poll_In_Connected_Is_Answered_RR_F1(InjectedFrame form, int states, string arm)
+    {
+        // ip-inseq, ip-stale. In sequence the payload xa0 is delivered (not a
+        // submission, so no delivery count moves) and B's RR F=1 acknowledges
+        // a number A never used: A's N(r) error recovery resets the link, with
+        // nothing left to lose.
+        var result = Run(Ip(form));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void A_Busy_Station_In_Connected_Answers_An_I_Poll_With_RR()
+    {
+        // ip-busy, a hypothesis for a second reader: figc4.4's own-busy I
+        // frame arm with P = 1 sends RR F=1 where figc4.5's sends RNR F=1.
+        var result = Run(Ip(InjectedFrame.IPollStale) with { LocalBusy = FlowControlAt.B });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.BusyIndication);
+        result.Violation.Station.Should().Be(Station.B);
+        result.Trace[^1].Transition.Should().Be("t26_i_received_yes_yes_yes_yes_yes");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData(1, 0, 159, "Connected/t26_i_received_yes_yes_yes_no_no_yes_yes_yes")]
+    [InlineData(1, 1, 444, "TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_yes_yes")]
+    public void A_Second_I_Poll_Ahead_Meets_The_Reject_Exception(int ab, int ba, int states, string arm)
+    {
+        // ip-rejx, ip-tr-rejx: the first frame ahead of sequence draws REJ
+        // F=1 and sets the reject exception, the second meets it. The REJ F=1
+        // reaches A in Timer Recovery on some paths (figc4.5's F=1 arms).
+        var result = Run(Ip(InjectedFrame.IPollAhead, InjectedFrame.IPollAhead) with
+        {
+            FramesAb = ab, FramesBa = ba, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t23_rej_received_yes_yes_yes");
+        result.FiredTransitions.Should().Contain("TimerRecovery/t23_rej_received_yes_yes_no");
+    }
+
+    [Fact]
+    public void I_Polls_Reach_Timer_Recovery()
+    {
+        // ip-tr-inseq, ip-tr-stale (#91, H1: the I frame's N(r) acknowledges
+        // everything, Check I Frame Acknowledged stops T1 and B stays in
+        // Timer Recovery), ip-tr-busy (behind ip-busy, so with the busy check
+        // off and Timer Recovery counted at rest).
+        var o = Ip(InjectedFrame.IPoll) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop };
+        var inseq = Run(o);
+        inseq.Outcome.Should().Be(Outcome.NoViolation);
+        inseq.StatesExplored.Should().Be(79);
+        inseq.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_no_yes_yes");
+
+        var stale = Run(o with { InjectedFrame = InjectedFrame.IPollStale });
+        stale.Outcome.Should().Be(Outcome.Violation);
+        stale.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        stale.CounterexampleLength.Should().Be(12);
+        stale.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_no_no_no_yes");
+
+        var busy = Run(o with
+        {
+            InjectedFrame = InjectedFrame.IPollStale, LocalBusy = FlowControlAt.B,
+            Invariants = Invariants.Default & ~Invariants.BusyIndication, TimerRecoveryIsQuiescent = true,
+        });
+        busy.Outcome.Should().Be(Outcome.NoViolation);
+        busy.StatesExplored.Should().Be(1244);
+        busy.FiredTransitions.Should().Contain("TimerRecovery/t22_i_received_yes_yes_yes_yes_yes");
+    }
+
+    [Theory]
+    [InlineData(SeedKind.Connected, false, 363, "TimerRecovery/t23_rej_received_yes_no_no")]
+    [InlineData(SeedKind.AwaitingV22Connection, false, 532, "TimerRecovery/t23_rej_received_yes_no_yes")]
+    [InlineData(SeedKind.AwaitingV22Connection, true, 2271, "TimerRecovery/t19_rnr_received_yes_no_yes")]
+    public void An_I_Frame_In_Sequence_Puts_The_Peers_N_r_Past_V_s(SeedKind seed, bool busy, int states, string arm)
+    {
+        // ip-nr, ip-nr-v22, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
+        // its poll lost, sends an I frame in sequence that its own machine
+        // never numbered; then a frame ahead of sequence draws REJ F=1, or B's
+        // busy condition draws RNR, each with N(r) = V(s) + 1 at A. Reject
+        // coherence is off for the REJ rows: that reject is incoherent by
+        // construction.
+        var o = busy
+            ? Ip(InjectedFrame.IFrame) with { LocalBusy = FlowControlAt.B }
+            : Ip(InjectedFrame.IFrame, InjectedFrame.IPollAhead) with { Invariants = Invariants.Default & ~Invariants.RejectCoherence };
+        var result = Run(o with { Seed = seed, T3 = true, Budget = 1, Faults = FaultKinds.Drop });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Theory]
+    [InlineData(InjectedFrame.RejPoll, 1, false, "TimerRecovery/t23_rej_received_no_yes_yes_yes")]
+    [InlineData(InjectedFrame.SrejCommand, 0, true, "TimerRecovery/t24_srej_received_no_yes_no_yes")]
+    public void Reject_Commands_May_Name_V_s_With_RejMayEqualVs(InjectedFrame form, int ab, bool t3, string arm)
+    {
+        // rnv-rej, rnv-srej: the reject-naming-vs command arms.
+        var result = Run(Inj(FlowControlAt.B, form) with
+        {
+            FramesAb = ab, T3 = t3, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
+            Invariants = form == InjectedFrame.RejPoll ? Invariants.Default : Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void An_SREJ_Poll_Naming_V_s_Goes_Unanswered_And_Strands_Timer_Recovery()
+    {
+        // rnv-srejp: figc4.5 t24_srej_received_no_yes_yes_yes acknowledges
+        // everything through Check I Frame Acknowledged, which stops T1, and
+        // sends nothing for the poll (#91, H1; ax25spec#164).
+        var result = Run(Inj(FlowControlAt.B, InjectedFrame.SrejPoll) with
+        {
+            FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true, Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.CounterexampleLength.Should().Be(11);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t24_srej_received_no_yes_yes_yes");
+    }
+
+    [Theory]
+    [InlineData(InjectedFrame.IPollStale)]
+    [InlineData(InjectedFrame.IPoll)]
+    public void An_Injected_Payload_Counts_Only_When_Delivered_Once_In_Sequence(InjectedFrame form)
+    {
+        // seeded-injected-stale, seeded-injected-twice: delivering the frame
+        // outside the window, or the in-sequence one twice, is a Delivery
+        // violation, so accepting the injected label is no blanket leniency.
+        var result = Run(Ip(form) with { TablesDir = Fixtures.InjectedDeliveredDir });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Delivery);
+        result.Violation.Station.Should().Be(Station.B);
+        result.CounterexampleLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void Injected_I_Frames_Need_Their_Preconditions()
+    {
+        var a = () => Fixtures.Run(Ip(InjectedFrame.IPollAhead) with { Srej = true });
+        a.Should().Throw<ArgumentException>();
+        var b = () => Fixtures.Run(Ip(InjectedFrame.None, InjectedFrame.IPoll));
+        b.Should().Throw<ArgumentException>();
+    }
 }
