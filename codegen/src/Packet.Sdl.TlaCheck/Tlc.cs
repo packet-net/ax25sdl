@@ -54,28 +54,70 @@ public sealed class Tlc
 {
     private readonly string _jar;
     private readonly string _harness;
-    private readonly string _semantics;
+    private readonly string _tlaDir;
+    private readonly string _meaning;
     private readonly int _workers;
     private readonly string _heap;
     private readonly TimeSpan _timeout;
 
-    public Tlc(string jar, string harness, string semantics, int workers, string heap, TimeSpan timeout)
+    /// <summary>The meaning module Ax25Semantics.tla names when no other is selected.</summary>
+    public const string DefaultMeaning = "Ax25Meaning";
+
+    /// <param name="tlaDir">The hand-written modules (spec/tla): the runner, the shared values, the meanings and Ax25Semantics.tla.</param>
+    /// <param name="meaning">
+    /// The meaning module the runner is instantiated with: a module name in
+    /// <paramref name="tlaDir"/>, or a path to a .tla file elsewhere.
+    /// </param>
+    public Tlc(string jar, string harness, string tlaDir, string meaning, int workers, string heap, TimeSpan timeout)
     {
         _jar = jar;
         _harness = harness;
-        _semantics = semantics;
+        _tlaDir = tlaDir;
+        _meaning = meaning;
         _workers = workers;
         _heap = heap;
         _timeout = timeout;
     }
 
-    /// <summary>Lay out a model directory: the tables rendered from <paramref name="tablesDir"/>, the semantics, the harness.</summary>
+    /// <summary>
+    /// Lay out a model directory: the tables rendered from <paramref name="tablesDir"/>, the
+    /// hand-written modules, the selected meaning and the harness. The meaning is selected by
+    /// rewriting the one EXTENDS line of Ax25Semantics.tla, so TLC sees the same modules as
+    /// for the default, under another name, with no runtime indirection.
+    /// </summary>
     public void Prepare(string workDir, string tablesDir)
     {
         Directory.CreateDirectory(workDir);
         File.WriteAllText(Path.Combine(workDir, TlaEmitter.FileName), TlaEmitter.EmitFromJsonDir(tablesDir));
-        File.Copy(_semantics, Path.Combine(workDir, Path.GetFileName(_semantics)), overwrite: true);
+        foreach (var file in Directory.GetFiles(_tlaDir, "*.tla"))
+        {
+            var name = Path.GetFileName(file);
+            if (name is TlaEmitter.FileName or SemanticsFile) continue;
+            File.Copy(file, Path.Combine(workDir, name), overwrite: true);
+        }
+        var module = _meaning;
+        if (_meaning.EndsWith(".tla", StringComparison.Ordinal))
+        {
+            module = Path.GetFileNameWithoutExtension(_meaning);
+            File.Copy(_meaning, Path.Combine(workDir, module + ".tla"), overwrite: true);
+        }
+        else if (!File.Exists(Path.Combine(_tlaDir, module + ".tla")))
+        {
+            throw new FileNotFoundException($"meaning module {module}.tla not found in {_tlaDir}");
+        }
+        File.WriteAllText(Path.Combine(workDir, SemanticsFile), SelectMeaning(File.ReadAllText(Path.Combine(_tlaDir, SemanticsFile)), module));
         File.Copy(_harness, Path.Combine(workDir, Path.GetFileName(_harness)), overwrite: true);
+    }
+
+    private const string SemanticsFile = TlaEmitter.SemanticsModule + ".tla";
+
+    /// <summary>Ax25Semantics.tla with its EXTENDS line naming <paramref name="module"/> instead of the default meaning.</summary>
+    public static string SelectMeaning(string semantics, string module)
+    {
+        var extends = new Regex("^EXTENDS " + DefaultMeaning + "(?=\\r?$)", RegexOptions.Multiline);
+        if (extends.Count(semantics) != 1)
+            throw new InvalidOperationException($"{SemanticsFile} must contain exactly one line 'EXTENDS {DefaultMeaning}'");
+        return extends.Replace(semantics, "EXTENDS " + module);
     }
 
     private static string Bool(bool b) => b ? "TRUE" : "FALSE";
