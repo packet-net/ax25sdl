@@ -310,13 +310,13 @@ jobs:
           echo "runner has $cores cores: --parallel $parallel"
           dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g
 
-  # ─── The independent meaning (ax25spec#116 Phase 2, Step C): the
+  # --- The independent meaning (ax25spec#116 Phase 2, Step C): the
   #     default meaning and spec/tla/Ax25MeaningIndependent.tla in lockstep on
   #     every calibration row, then the plain cross-check (explorer against TLC)
   #     on the independent meaning. Informational for now: the differences are
   #     the product (docs/tla-independent/differences.md), so both steps may
   #     fail without failing the job; the reports are in the job summary and
-  #     the uploaded artifact. ───
+  #     the uploaded artifact. ---
   semantic-tla-independent:
     name: semantic validation - TLA+ independent meaning (informational)
     runs-on: [self-hosted, Linux, X64]
