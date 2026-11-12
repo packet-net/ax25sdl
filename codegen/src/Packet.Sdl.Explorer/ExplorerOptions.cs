@@ -383,6 +383,19 @@ public sealed record ExplorerOptions
     public bool DataBeforeConfirm { get; init; }
 
     /// <summary>
+    /// With <see cref="Reconnect"/>, connected seed only: each reconnecting
+    /// station's layer 3 submits one more frame (<c>a{FramesAb}</c> at A,
+    /// <c>b{FramesBa}</c> at B) once its reconnect has been answered and its
+    /// last link report is up (normally the DL_CONNECT_confirm; strictly, a
+    /// later DL_CONNECT_indication after a DL_DISCONNECT_indication answer
+    /// would do too) with the station in a data state, so data crosses the
+    /// link after the reset. The reconnect gate
+    /// still waits only for the frames submitted at the seed; quiescence
+    /// requires the new frame delivered too. Off by default.
+    /// </summary>
+    public bool DataAfterReconnect { get; init; }
+
+    /// <summary>
     /// The give-up rule. A station that exhausts its N2 retries (a T1 expiry
     /// that takes it to Disconnected) has given up honestly when at least as
     /// many frames were dropped, on either channel, since that station last
@@ -444,6 +457,15 @@ public sealed record ExplorerOptions
     /// by default.
     /// </summary>
     public bool T3 { get; init; }
+
+    /// <summary>
+    /// With <see cref="T3"/>, the stations whose T3 may expire (default both).
+    /// A station left out still runs T3 (the keepalive rest rule still holds
+    /// at it); its expiry is simply never taken, as when its T3 is much longer
+    /// than the peer's. Used to keep one station out of Timer Recovery
+    /// (ax25spec#167) while its peer polls.
+    /// </summary>
+    public FlowControlAt T3At { get; init; } = FlowControlAt.Both;
 
     /// <summary>
     /// The stations whose layer 3 sends one UI datagram (labelled

@@ -11,7 +11,11 @@ usage: dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --jar PATH [optio
 Runs the explorer and TLC on every calibration scenario and reports, row by
 row, whether they agree: the same verdict, the same invariant, the same
 station, the same counterexample length and transition sequence (safety and
-deadlock), and the same number of distinct states (clean runs).
+deadlock), and the same number of distinct states (clean runs). Each
+calibration row also states its expected verdict (Scenarios.cs): the kind,
+and where the row states them the station, the explorer's counterexample
+length and the number of distinct states. A row whose verdict differs from
+its expectation fails, even where the two tools agree.
 
   --jar PATH        tla2tools.jar (default: $TLA2TOOLS_JAR)
   --work DIR        model directories (default: <temp>/ax25sdl-tlacheck)
@@ -40,8 +44,9 @@ A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
 not fired, each with its status and reason.
 
-exit code: 0 every row agrees (and the accounting holds), 1 some row
-disagrees, a run failed, or the accounting does not hold; with --lockstep,
+exit code: 0 every row agrees and meets its expectation (and the accounting
+holds), 1 some row disagrees, misses its expectation, a run failed, or the
+accounting does not hold; with --lockstep,
 0 the two meanings never differed on any row, 1 they did or a run failed
 """;
 
@@ -114,13 +119,14 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.DisconnectUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-unconfirmed"),
     TableSetKind.DisconnectSilent => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent"),
     TableSetKind.DisconnectKeptConnected => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-kept-connected"),
+    TableSetKind.Reverted169 => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-169-reverted"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
 var scenarios = (grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow) : Scenarios.Calibration(Dir)).Where(s => only is null || only.Contains(s.Name)).ToList();
 if (list)
 {
-    foreach (var s in scenarios) Console.WriteLine($"{s.Name,-22} {s.Defect,-18} {s.Tables,-8} {s.Expect}");
+    foreach (var s in scenarios) Console.WriteLine($"{s.Name,-22} {s.Defect,-18} {s.Tables,-8} {s.Expect?.Label}");
     return 0;
 }
 if (jar is null || !File.Exists(jar))
@@ -151,15 +157,17 @@ Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = 
     var row = Compare(scenarios[idx]);
     results[idx] = row;
     Console.Error.WriteLine($"{(row.Agree ? "agree   " : "DISAGREE")} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}");
+    if (row.Unexpected is { } unexpected) Console.Error.WriteLine($"UNEXPECTED {scenarios[idx].Name}: {unexpected}");
 });
 
 var sb = new StringBuilder();
-sb.Append("| Scenario | Defect | Tables | Explorer | TLC | Agree |\n| --- | --- | --- | --- | --- | --- |\n");
+sb.Append("| Scenario | Defect | Tables | Explorer | TLC | Agree | Expected |\n| --- | --- | --- | --- | --- | --- | --- |\n");
 for (var idx = 0; idx < scenarios.Count; idx++)
 {
     var s = scenarios[idx];
     var r = results[idx];
-    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Agree ? "yes" : "**no**: " + r.Why)} |\n");
+    var expected = s.Expect is null ? "" : r.Unexpected is null ? "yes" : "**no**: " + r.Unexpected;
+    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Agree ? "yes" : "**no**: " + r.Why)} | {expected} |\n");
 }
 Console.WriteLine(sb.ToString());
 var currentRuns = scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList();
@@ -174,7 +182,9 @@ if (only is null && !grid)
     Console.WriteLine(text);
     accounted = ok;
 }
-return results.Values.All(r => r.Agree) && accounted ? 0 : 1;
+var unexpectedRows = results.Values.Count(r => r.Unexpected is not null);
+if (unexpectedRows > 0) Console.WriteLine($"{unexpectedRows} row(s) differ from their expected verdict (the Expected column).");
+return results.Values.All(r => r.Agree && r.Unexpected is null) && accounted ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
 
@@ -281,7 +291,12 @@ Row Compare(Scenario s)
             if (first >= 0) why.Add($"step {first + 1}: transition {exTids[first]} vs {tids[first]}");
         }
     }
-    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why), ex.FiredTransitions, tlcArms);
+    // The row's own expectation, against the explorer's verdict (where the
+    // tools disagree the row fails anyway; on a liveness row the explorer's
+    // length is the one the expectation states, TLC's lasso differs).
+    var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.CounterexampleLength, ex.StatesExplored);
+    if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
+    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why), ex.FiredTransitions, tlcArms, unexpected);
 }
 
 static (string Kind, string Station, int Steps, List<string> Tids, string Note) Verdict(TlcResult r, Phase phase, ExplorerOptions o, bool depthBound)
@@ -352,6 +367,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.DisconnectUnconfirmed => "seeded disconnect-unconfirmed",
     TableSetKind.DisconnectSilent => "seeded disconnect-silent",
     TableSetKind.DisconnectKeptConnected => "seeded disconnect-kept-connected",
+    TableSetKind.Reverted169 => "169-reverted",
     _ => "seeded livelock",
 };
 
@@ -362,4 +378,4 @@ static string RepoRoot()
     return d?.FullName ?? throw new InvalidOperationException("run from inside the ax25sdl checkout: no spec-sdl/ in any ancestor of the working directory");
 }
 
-internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms);
+internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null);

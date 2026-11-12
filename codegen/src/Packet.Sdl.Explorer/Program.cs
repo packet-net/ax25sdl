@@ -30,6 +30,8 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          connect is still being set up (asked, not yet answered); the figures save (Requeue) it
   --reconnect A|both     that station's layer 3 (or either's) issues DL_CONNECT_request once, on a live or waiting
                          link, when everything both sides submitted is delivered, and must then get its confirm
+  --data-after-reconnect with --reconnect (connected seed): each reconnecting station's layer 3 submits one more
+                         frame once its reconnect is answered and the link is reported up, so data crosses the link after the reset
   --accept-give-up       the give-up rule: a station that exhausts N2 after enough losses since its last progress
                          has given up honestly, and a settled honest give-up with everything delivered is quiescent
                          (one that lost data is a give-up-loss violation; an unjustified give-up never rests)
@@ -40,6 +42,7 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          T1 holds back the expiry that would exhaust N2 while the station is busy)
   --t3                   model T3 expiry (idle keepalive, T1 not running); at rest a Connected station keeps T1 or
                          T3 running, and with --accept-give-up a station left up after its peer gave up never settles
+  --t3-at A|B|both       with --t3: only that station's T3 expires (default both); the other's still runs
   --unit-data A|B|both   that station's layer 3 (or either's) sends one UI datagram, once, in any state; at rest every
                          datagram was sent and then reached its peer or was dropped
   --ui-form plain|poll|response|long   with --unit-data: the datagram's form on the air (default plain, a UI command
@@ -82,6 +85,8 @@ var peer = PeerKind.Tables;
 var flowControl = FlowControlAt.None;
 var localBusy = FlowControlAt.None;
 var t3 = false;
+var t3At = FlowControlAt.Both;
+var dataAfterReconnect = false;
 var longBusy = false;
 var unitData = FlowControlAt.None;
 var uiForm = UiForm.Plain;
@@ -197,6 +202,16 @@ try
                 }
                 break;
             case "--t3": t3 = true; break;
+            case "--t3-at":
+                t3At = Next(args, ref i) switch
+                {
+                    "A" or "a" => FlowControlAt.A,
+                    "B" or "b" => FlowControlAt.B,
+                    "both" => FlowControlAt.Both,
+                    var v => throw new ArgumentException($"unknown T3 station `{v}` (A, B, both)"),
+                };
+                break;
+            case "--data-after-reconnect": dataAfterReconnect = true; break;
             case "--long-busy": longBusy = true; break;
             case "--release":
                 release = Next(args, ref i) switch
@@ -323,6 +338,8 @@ try
         FlowControl = flowControl,
         LocalBusy = localBusy,
         T3 = t3,
+        T3At = t3At,
+        DataAfterReconnect = dataAfterReconnect,
         LongBusy = longBusy,
         UnitData = unitData,
         UiForm = uiForm,

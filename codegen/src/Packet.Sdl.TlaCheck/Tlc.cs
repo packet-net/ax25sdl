@@ -236,6 +236,13 @@ public sealed class Tlc
             FlowControlAt.Both => new[] { "A", "B" },
             _ => Array.Empty<string>(),
         };
+        var t3At = o.T3At switch
+        {
+            FlowControlAt.A => new[] { "A" },
+            FlowControlAt.B => new[] { "B" },
+            FlowControlAt.Both => new[] { "A", "B" },
+            _ => Array.Empty<string>(),
+        };
         var stepChecks = new List<string>();
         if (On(Invariants.RejectCoherence)) stepChecks.Add("RejectCoherence");
         if (On(Invariants.Delivery)) stepChecks.Add("Delivery");
@@ -297,6 +304,8 @@ public sealed class Tlc
         C("BusyAt", Set(busyAt));
         C("LongBusy", Bool(o.LongBusy));
         C("T3Moves", Bool(o.T3));
+        C("T3At", Set(t3At));
+        C("DataAfterReconnect", Bool(o.DataAfterReconnect));
         C("UnitDataAt", Set(unitDataAt));
         C("UiForm", o.UiForm switch
         {

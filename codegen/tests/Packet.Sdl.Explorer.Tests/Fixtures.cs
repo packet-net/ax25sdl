@@ -17,6 +17,9 @@ internal static class Fixtures
     /// <summary>packethacking/ax25spec fb727db: SREJ go-back-N in figc4.5 (pre #38) and no #40 guard.</summary>
     public static string Pre38Dir => Path.Combine(RepoRoot.Value, "codegen", "tests", "Packet.Sdl.Explorer.Tests", "fixtures", "tables-pre38");
 
+    /// <summary>The current tables with ax25spec#169 reverted: Timer Recovery's SABM and SABME arms with V(s) = V(a) skip the reset box (codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
+    public static string Reverted169Dir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-169-reverted");
+
     /// <summary>The TlaCheck seeded fixture in which Connected answers DISC with UA but stays Connected (codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
     public static string ReleaseStuckDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck");
 
