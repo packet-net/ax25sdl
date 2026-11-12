@@ -175,12 +175,18 @@ public sealed class Stepper
             throw new ArgumentException("the out-of-sequence injected I frames are for links without SREJ (with SREJ the receiver saves the frame, and it would collide with the sender's own frame of that number)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
+        if (_o.DataAfterReconnect && (_o.Reconnect == ReconnectBy.None || _o.Seed != SeedKind.Connected || _o.DataAfterConfirm))
+            throw new ArgumentException("data after a reconnect needs a reconnecting station (--reconnect) on the connected seed, without data offered by moves (--data-after-confirm)", nameof(options));
+        if (_o.T3At != FlowControlAt.Both && !_o.T3)
+            throw new ArgumentException("choosing the stations whose T3 expires needs T3 modelled (--t3)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
             throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
         foreach (var (state, page) in tables.States)
             _eventsByState[state] = new HashSet<string>(page.Transitions.Select(t => t.On), StringComparer.Ordinal);
-        _submittedA = Enumerable.Range(0, _o.FramesAb).Select(i => "a" + Inv(i)).ToArray();
-        _submittedB = Enumerable.Range(0, _o.FramesBa).Select(i => "b" + Inv(i)).ToArray();
+        // With DataAfterReconnect a reconnecting station has one more frame,
+        // submitted once its reset is confirmed.
+        _submittedA = Enumerable.Range(0, _o.FramesAb + (_o.DataAfterReconnect && Reconnects(Station.A) ? 1 : 0)).Select(i => "a" + Inv(i)).ToArray();
+        _submittedB = Enumerable.Range(0, _o.FramesBa + (_o.DataAfterReconnect && Reconnects(Station.B) ? 1 : 0)).Select(i => "b" + Inv(i)).ToArray();
     }
 
     /// <summary>Payload labels A submits for B, in order.</summary>
@@ -234,9 +240,9 @@ public sealed class Stepper
         if (_o.DataAfterConfirm)
             return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0, LinkUpA = _o.DataBeforeConfirm };
 
-        foreach (var label in _submittedA)
+        foreach (var label in _submittedA.Take(_o.FramesAb))
             state = Require(Inject(state, Station.A, new EventInput(UpperEvent(state.A, "DL_DATA_request"), Data: label), "DL_DATA_request (seed)", state.ToA, state.Budget, clearOwed: false, number: 0));
-        foreach (var label in _submittedB)
+        foreach (var label in _submittedB.Take(_o.FramesBa))
             state = Require(Inject(state, Station.B, new EventInput(UpperEvent(state.B, "DL_DATA_request"), Data: label), "DL_DATA_request (seed)", state.ToB, state.Budget, clearOwed: false, number: 0));
 
         return state with { Budget = _o.Budget, AckedA = 0, AckedB = 0 };
@@ -463,6 +469,14 @@ public sealed class Stepper
         _ => false,
     };
 
+    private bool T3Expires(Station station) => _o.T3At switch
+    {
+        FlowControlAt.Both => true,
+        FlowControlAt.A => station == Station.A,
+        FlowControlAt.B => station == Station.B,
+        _ => false,
+    };
+
     private bool SendsUnitData(Station station) => _o.UnitData switch
     {
         FlowControlAt.Both => true,
@@ -611,7 +625,7 @@ public sealed class Stepper
                 {
                     if (station == Station.B && s.StubPeer is not null) continue;
                     var m = s.Machine(station);
-                    if (m.T3 == TimerStatus.Running && Handles(m, "T3_expiry"))
+                    if (m.T3 == TimerStatus.Running && Handles(m, "T3_expiry") && T3Expires(station))
                         moves.Add(new Move(MoveKind.T3Expiry, station));
                 }
             }
@@ -784,7 +798,12 @@ public sealed class Stepper
     }
 
     private bool SubmitReady(SystemState s, Station station) =>
-        _o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length;
+        (_o.DataAfterConfirm && s.LinkUp(station) && s.Offered(station) < Submitted(station).Length)
+        || (_o.DataAfterReconnect && s.Offered(station) == 0 && SeedFrames(station) < Submitted(station).Length
+            && s.Reconnected(station) && !s.ReconnectPending(station) && s.Report(station) == 1 && IsDataState(s.Machine(station).State));
+
+    /// <summary>The frames a station's layer 3 submits at the seed or by its first moves: all but a <see cref="ExplorerOptions.DataAfterReconnect"/> frame.</summary>
+    private int SeedFrames(Station station) => station == Station.A ? _o.FramesAb : _o.FramesBa;
 
     private bool ReleaseReady(SystemState s, Station station) =>
         Releases(station) && !s.Released(station)
@@ -807,7 +826,7 @@ public sealed class Stepper
 
     private bool ReconnectReady(SystemState s, Station station) =>
         Reconnects(station) && !s.Reconnected(station) && IsLinkState(s.Machine(station).State)
-        && s.DeliveredAtB == _submittedA.Length && s.DeliveredAtA == _submittedB.Length;
+        && s.DeliveredAtB == _o.FramesAb && s.DeliveredAtA == _o.FramesBa;
 
     private bool LocalBusies(Station station) => _o.LocalBusy switch
     {
@@ -1102,7 +1121,7 @@ public sealed class Stepper
             }
             case MoveKind.Submit:
             {
-                var label = Submitted(station)[s.Offered(station)];
+                var label = Submitted(station)[_o.DataAfterReconnect ? SeedFrames(station) + s.Offered(station) : s.Offered(station)];
                 var outcome = Inject(s, station, new EventInput(UpperEvent(s.Machine(station), "DL_DATA_request"), Data: label), _o.DataBeforeConfirm && station == Station.A ? "DL_DATA_request (layer 3, not waiting for the confirm)" : "DL_DATA_request (layer 3, link up)", incoming, s.Budget, clearOwed: false, number);
                 var next = station == Station.A
                     ? outcome.Next with { OfferedA = s.OfferedA + 1 }

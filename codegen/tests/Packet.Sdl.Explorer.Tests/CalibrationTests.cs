@@ -2733,6 +2733,48 @@ public class CalibrationTests(ITestOutputHelper output)
         result.FiredTransitions.Should().Contain("TimerRecovery/t18_rr_received_no_no_no_no");
     }
 
+    // ax25spec#169 (packet-net/ax25sdl#119): A sends a0; B's T3 (only B's,
+    // so #167 does not end the run with A in Timer Recovery) takes B to Timer
+    // Recovery holding V(r) = 1 with V(s) = V(a); A's layer 3 resets the link
+    // and, once confirmed, submits a1. With #169's reset box B takes a1 in
+    // sequence. Without it B keeps V(r) = 1, discards a1 (N(s) = 0) and
+    // answers N(r) = 1, which acknowledges at A a frame B never delivered.
+    private static ExplorerOptions Reset169(string dir) => new()
+    {
+        TablesDir = dir, FramesAb = 1, Budget = 0, T3 = true, T3At = FlowControlAt.B, Reconnect = ReconnectBy.A, DataAfterReconnect = true,
+    };
+
+    [Fact]
+    public void A_Reset_Of_Timer_Recovery_With_Nothing_Outstanding_Zeroes_The_Variables()
+    {
+        // reconnect-tr-data
+        var result = Run(Reset169(Fixtures.CurrentDir));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(45);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t13_sabm_received_yes");
+    }
+
+    [Fact]
+    public void Without_The_169_Reset_Box_Data_After_The_Reset_Is_Acknowledged_Undelivered()
+    {
+        // reverted-169
+        var result = Run(Reset169(Fixtures.Reverted169Dir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.AckCoherence);
+        result.Violation.Station.Should().Be(Station.A);
+        result.CounterexampleLength.Should().Be(15);
+        result.Trace.Select(t => t.Transition).Should().Contain("t13_sabm_received_yes");
+    }
+
+    [Fact]
+    public void Data_After_A_Reconnect_And_T3_At_One_Station_Need_Their_Preconditions()
+    {
+        var a = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, DataAfterReconnect = true });
+        a.Should().Throw<ArgumentException>();
+        var b = () => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, T3At = FlowControlAt.B });
+        b.Should().Throw<ArgumentException>();
+    }
+
     [Fact]
     public void Injected_I_Frames_Need_Their_Preconditions()
     {

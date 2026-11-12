@@ -36,6 +36,8 @@ CONSTANTS
     BusyAt,            \* stations that enter a local busy condition once (own receiver busy, RNR), subset of {"A", "B"}
     LongBusy,          \* with BusyAt: the busy period may outlast the peer's retries (no T1 hold)
     T3Moves,           \* model T3 expiry (idle keepalive), the keepalive rest rule and the stricter give-up settle
+    T3At,              \* with T3Moves: the stations whose T3 may expire, subset of {"A", "B"}
+    DataAfterReconnect, \* with ReconnectAt, connected seed: a reconnecting layer 3 submits one more frame once its reset is confirmed
     UnitDataAt,        \* stations whose layer 3 sends one UI datagram, once, in any state, subset of {"A", "B"}
     UiForm,            \* the datagram's form: "plain", "poll" (P = 1), "response" or "long" (fails the N1 check)
     FrameErrors,       \* corrupted forms a frame may arrive in, subset of {"control", "info", "length", "n1", "iresp"}
@@ -65,10 +67,16 @@ View == <<sys, viol>>
 Stations == {"A", "B"}
 Other(s) == IF s = "A" THEN "B" ELSE "A"
 
+\* The frames each station's layer 3 submits at the seed or by its first
+\* moves, and with DataAfterReconnect the one more a reconnecting station
+\* submits once its reset is confirmed (Stepper.SeedFrames).
+SeedFrames(s) == IF s = "A" THEN FramesAB ELSE FramesBA
+AfterReconnect(s) == IF DataAfterReconnect /\ s \in ReconnectAt THEN 1 ELSE 0
+
 \* What each station's layer 3 submitted, in order.
 Submitted(s) ==
-    IF s = "A" THEN [i \in 1..FramesAB |-> "a" \o ToString(i - 1)]
-    ELSE [i \in 1..FramesBA |-> "b" \o ToString(i - 1)]
+    IF s = "A" THEN [i \in 1..(FramesAB + AfterReconnect("A")) |-> "a" \o ToString(i - 1)]
+    ELSE [i \in 1..(FramesBA + AfterReconnect("B")) |-> "b" \o ToString(i - 1)]
 
 \* The label of each station's UI datagram (Stepper.UiLabel).
 UiLabel(s) == IF s = "A" THEN "ua0" ELSE "ub0"
@@ -515,7 +523,7 @@ S1 ==
 \* With DataAfterConfirm nothing is: layer 3 submits by SubmitData moves.
 RECURSIVE Submit(_, _, _)
 Submit(S, s, i) ==
-    IF i > Len(Submitted(s)) THEN S
+    IF i > SeedFrames(s) THEN S
     ELSE Submit(Seeded(Inject(S, s, [Event(UpperEvent(S.m[s], "DL_DATA_request")) EXCEPT !.data = Submitted(s)[i]], S.ch[s], S.budget, FALSE)), s, i + 1)
 
 \* With DataBeforeConfirm, A's layer 3 treats the link as usable as soon as it
@@ -556,7 +564,7 @@ GiveUpSettled(S) ==
         /\ S.ch["A"] = <<>> /\ S.ch["B"] = <<>>
         /\ ~S.owed["A"] /\ ~S.owed["B"]
 
-AllDelivered(S) == S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
+AllDelivered(S) == S.deliv["B"] = Len(Submitted("A")) /\ S.deliv["A"] = Len(Submitted("B"))
 
 \* A settled honest give-up that lost data (Stepper.IsGiveUpLoss): not rest, so
 \* a deadlock there is reported as the loss it is (see last.lossy).
@@ -593,8 +601,8 @@ ResetLoss(S) ==
     /\ \E s \in Stations : S.rs[s] = 1
     /\ \A s \in Stations : S.rs[s] # 2
     /\ ~S.pend["A"] /\ ~S.pend["B"] /\ ~S.dp["A"] /\ ~S.dp["B"] /\ ReportsMatch(S) /\ UiAccounted(S)
-    /\ S.deliv["B"] < FramesAB => S.told["A"] = 2
-    /\ S.deliv["A"] < FramesBA => S.told["B"] = 2
+    /\ S.deliv["B"] < Len(Submitted("A")) => S.told["A"] = 2
+    /\ S.deliv["A"] < Len(Submitted("B")) => S.told["B"] = 2
     /\ PlainRest(S)
 
 (***************************************************************************)
@@ -627,14 +635,18 @@ PopChanges(S, s) ==
         /\ LET c == Dispatch(m, Event("I_frame_pops_off_queue"))
            IN  c.err # "" \/ (\E i \in 1..Len(c.fx) : c.fx[i].kind = "frame") \/ Persist(c) # m
 
-\* Layer 3 holds data and its link is up (DataAfterConfirm).
-SubmitReady(S, s) == DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < Len(Submitted(s))
+\* Layer 3 holds data and its link is up (DataAfterConfirm), or its reset
+\* was confirmed and it has its one more frame (DataAfterReconnect).
+SubmitReady(S, s) ==
+    \/ DataAfterConfirm /\ Table(s) /\ S.up[s] /\ S.offered[s] < Len(Submitted(s))
+    \/ /\ DataAfterReconnect /\ Table(s) /\ S.offered[s] = 0 /\ SeedFrames(s) < Len(Submitted(s))
+       /\ S.rcn[s] /\ ~S.pend[s] /\ S.rep[s] = 1 /\ S.m[s].st \in DataStates
 
 \* Layer 3 releases an established link once everything either side
 \* submitted has been delivered (ReleaseAt), once per station.
 ReleaseReady(S, s) ==
     /\ s \in ReleaseAt /\ Table(s) /\ ~S.rel[s] /\ S.m[s].st \in (IF ReleaseEarly THEN LinkStates ELSE DataStates)
-    /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
+    /\ AllDelivered(S)
 
 \* Layer 3 abandons its own connect (AbandonAt), once per station, while it
 \* is being set up, and only while it has asked to connect and not heard
@@ -645,7 +657,8 @@ AbandonReady(S, s) ==
     /\ S.pend[s] \/ (s = "A" /\ Seed # "connected" /\ S.rep["A"] = 0)
 
 \* Layer 3 resets a live or waiting link under the same gate (ReconnectAt),
-\* once per station, and then waits for its answer (pend).
+\* once per station, and then waits for its answer (pend). The gate counts
+\* only the frames submitted before it (not a DataAfterReconnect frame).
 ReconnectReady(S, s) ==
     /\ s \in ReconnectAt /\ Table(s) /\ ~S.rcn[s] /\ S.m[s].st \in LinkStates
     /\ S.deliv["B"] = FramesAB /\ S.deliv["A"] = FramesBA
@@ -801,7 +814,7 @@ CanT1(s) == viol = NoViol /\ Quiet(sys) /\ sys.m[s].t1 = "running" /\ Handles(sy
 CanT3(s) ==
     /\ viol = NoViol /\ T3Moves /\ Table(s) /\ Quiet(sys)
     /\ sys.m["A"].t1 # "running" /\ (StubB \/ sys.m["B"].t1 # "running")
-    /\ sys.m[s].t3 = "running" /\ Handles(sys.m[s].st, "T3_expiry")
+    /\ sys.m[s].t3 = "running" /\ Handles(sys.m[s].st, "T3_expiry") /\ s \in T3At
 CanBusyOn(s) == viol = NoViol /\ BusyOnReady(sys, s)
 CanBusyOff(s) == viol = NoViol /\ BusyOffReady(sys, s)
 CanUnitData(s) == viol = NoViol /\ UnitDataReady(sys, s)
@@ -910,10 +923,11 @@ FlowOff(s) ==
     /\ CanFlowOff(s)
     /\ Take(Inject(sys, s, Event("DL_FLOW_OFF_request"), sys.ch[s], sys.budget, FALSE), "flow-off", s, NoFrm)
 
-\* Layer 3 submits its next frame (DataAfterConfirm).
+\* Layer 3 submits its next frame (DataAfterConfirm, or DataAfterReconnect,
+\* whose offered count starts after the seed's frames).
 SubmitData(s) ==
     /\ CanSubmit(s)
-    /\ LET r == Inject(sys, s, [Event(UpperEvent(sys.m[s], "DL_DATA_request")) EXCEPT !.data = Submitted(s)[sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
+    /\ LET r == Inject(sys, s, [Event(UpperEvent(sys.m[s], "DL_DATA_request")) EXCEPT !.data = Submitted(s)[(IF DataAfterReconnect THEN SeedFrames(s) ELSE 0) + sys.offered[s] + 1]], sys.ch[s], sys.budget, FALSE)
        IN  Take([r EXCEPT !.sys.offered[s] = @ + 1], "submit", s, NoFrm)
 
 \* Layer 3 releases the link (ReleaseAt).
@@ -976,7 +990,7 @@ InjectMove(s) ==
 \* released: both Disconnected after a layer 3 issued its release.
 PlainQuiescent ==
     /\ PlainRest(sys)
-    /\ sys.deliv["B"] = FramesAB /\ sys.deliv["A"] = FramesBA
+    /\ AllDelivered(sys)
 
 \* With AcceptGiveUp, a settled honest give-up with everything delivered is at
 \* rest too, and nothing is once a station has given up without justification.
