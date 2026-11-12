@@ -469,8 +469,9 @@ public sealed record ExplorerOptions
     /// AwaitingRelease; an FRMR while the receiver is in Connected or
     /// TimerRecovery; an I command (see <see cref="InjectedFrame.IFrame"/>
     /// and the forms after it) while both are in Connected or TimerRecovery,
-    /// whose payload the Delivery check accepts only when the receiver
-    /// delivers it on receiving that frame in sequence, at most once. No table row runs at the sender (the step log reports
+    /// whose payload the Delivery check requires the receiver to deliver
+    /// exactly when it accepts that frame in sequence (V(r) moves past its
+    /// N(s)), once within that dispatch, and in no other dispatch. No table row runs at the sender (the step log reports
     /// <c>pinned:inject_*</c>). Not work in flight and, like a channel fault,
     /// not a move the liveness checks may use. Table-driven peer only. Off by
     /// default.
@@ -528,7 +529,10 @@ public sealed record ExplorerOptions
     /// receiver's V(s) (a pure acknowledgement). Off by default: on a FIFO
     /// channel such a REJ can only come from a reject raised on a stale
     /// duplicate, and figc4.7's do-while loop then pushes I(V(s)), a frame that
-    /// was never sent. See docs/explorer.md.
+    /// was never sent. See docs/explorer.md. With <see cref="Inject"/> it also
+    /// widens the injection gate: the injected REJ and SREJ commands may name
+    /// the receiver's V(s), while it is in TimerRecovery with both channels
+    /// empty (and, for an SREJ, nothing outstanding).
     /// </summary>
     public bool RejMayEqualVs { get; init; }
 

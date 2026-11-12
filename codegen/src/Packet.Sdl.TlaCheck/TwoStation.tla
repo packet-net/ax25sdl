@@ -233,7 +233,7 @@ Route(s, m, fx, acc, flowOff, i) ==
                         ok == fe.detail = acc.inj
                     IN  [acc EXCEPT !.inj = IF ok THEN "" ELSE @,
                                     !.v = IF ~ok /\ vf = NoViol /\ "Delivery" \in StepChecks
-                                          THEN Viol("Delivery", s, "station " \o s \o " delivered the injected payload '" \o fe.detail \o "' upward other than once, on receiving that I frame in sequence")
+                                          THEN Viol("Delivery", s, "station " \o s \o " delivered the injected payload '" \o fe.detail \o "' upward other than once, in the dispatch that accepts that I frame in sequence")
                                           ELSE vf]
                 ELSE IF fe.kind = "dl" /\ fe.prim = "DL_DATA_indication" THEN
                     LET vf == IF acc.v = NoViol /\ "FlowOffDelivery" \in StepChecks /\ flowOff
@@ -292,13 +292,14 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         m == IF ran THEN Persist(c) ELSE pre
         \* With a local busy condition modelled, a station whose own receiver
         \* was busy delivers nothing either (the flow-off delivery check).
+        injIn == IF e.ev = "I_received" /\ e.cmd = 1 /\ e.data \in InjLabels /\ e.ns = pre.vr THEN e.data ELSE ""
         r == Route(s, m, IF ok THEN c.fx ELSE <<>>,
                    [out |-> S.ch[Other(s)], owed |-> S.owed[s] /\ ~clearOwed, deliv |-> S.deliv[s], up |-> S.up[s], conn |-> FALSE,
                     pend |-> S.pend[s], rep |-> S.rep[s], told |-> S.told[s],
                     tell |-> {"DL-ERROR Indication (F)"} \cup (IF e.fe # "" THEN {ErrCode(e.fe)} ELSE {}), v |-> v1,
                     \* The injected payload this dispatch may deliver: its own,
                     \* received in sequence (Stepper: injectedDeliverable).
-                    inj |-> IF e.ev = "I_received" /\ e.cmd = 1 /\ e.data \in InjLabels /\ e.ns = pre.vr THEN e.data ELSE ""],
+                    inj |-> injIn],
                    S.off[s] \/ (BusyAt # {} /\ pre.own), 1)
         \* A link (re)establishment zeroes the variables without acknowledging anything.
         reset == e.ev \in {"SABM_received", "SABME_received", "UA_received"} /\ m.vs = 0 /\ m.va = 0 /\ m.vr = 0
@@ -330,7 +331,13 @@ Inject(S, s, e, newIn, newBudget, clearOwed) ==
         rst == IF FrameErrors # {} /\ ok /\ pre.st \in DataStates /\ e.ev # "DL_CONNECT_request"
                   /\ \E i \in 1..Len(c.fx) : c.fx[i].kind = "frame" /\ c.fx[i].frame.type \in {"SABM", "SABME"}
                THEN Max(S.rs[s], IF e.fe # "" THEN 1 ELSE 2) ELSE S.rs[s]
+        \* The injected payload is delivered exactly when the frame is
+        \* accepted (V(r) moves past its N(s)) in this dispatch.
+        injv == IF ok /\ injIn # "" /\ "Delivery" \in StepChecks /\ (m.vr # pre.vr) # (r.inj = "")
+                THEN Viol("Delivery", s, "station " \o s \o " handled the injected I frame '" \o injIn \o "' in sequence, but did not deliver exactly what it accepted")
+                ELSE NoViol
         v2 == IF r.v # NoViol THEN r.v
+              ELSE IF injv # NoViol THEN injv
               ELSE IF uiv # NoViol THEN uiv
               ELSE IF fev # NoViol THEN fev
               ELSE IF flowOffNow /\ "BusyTracksFlow" \in StepChecks /\ ~m.own

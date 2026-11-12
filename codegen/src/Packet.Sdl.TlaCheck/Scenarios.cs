@@ -57,6 +57,8 @@ public enum TableSetKind
     ResetWrongCode,
     /// <summary>A seeded-defect fixture (fixtures/tables-injected-delivered): Connected delivers an I frame outside the window (P = 1), and delivers an in-sequence one with P = 1 twice.</summary>
     InjectedDelivered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-injected-undelivered): Connected accepts an in-sequence I frame with P = 1 without delivering it.</summary>
+    InjectedUndelivered,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -684,6 +686,14 @@ public static class Scenarios
         }, "Deadlock, 11");
         Add("seeded-injected-stale", "seeded (injected payload delivered out of sequence)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, Stale), "Delivery at B, 2");
         Add("seeded-injected-twice", "seeded (injected payload delivered twice)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
+        Add("seeded-injected-undelivered", "seeded (injected payload accepted, not delivered)", TableSetKind.InjectedUndelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
+        // From the review of batch 7: both stations inject an I frame in
+        // sequence; B's N(r) error recovery in Timer Recovery stays there
+        // (#12's errata branch) and A delivers b0 twice.
+        Add("ip-both", "ax25spec#12 (errata branch stays in TR)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
+        {
+            FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, "Delivery at A, 18");
 
         return list;
     }

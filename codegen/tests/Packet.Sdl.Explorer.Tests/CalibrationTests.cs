@@ -2262,6 +2262,24 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void An_Injected_I_Poll_In_Sequence_Is_Delivered_Once()
+    {
+        // The claim behind ip-inseq, stepped by hand: B's arm delivers xa0
+        // and moves V(r) past it, in the one dispatch.
+        var o = Ip(InjectedFrame.IPoll);
+        var stepper = new Stepper(o, Fixtures.Tables(o.TablesDir));
+        var s = stepper.Seed();
+        var inject = stepper.Apply(s, new Move(MoveKind.Inject, Station.A), 1);
+        inject.Violation.Should().BeNull();
+        var deliver = stepper.Apply(inject.Next, new Move(MoveKind.Deliver, Station.B), 2);
+        deliver.Violation.Should().BeNull();
+        deliver.Record.Transition.Should().Be("t26_i_received_yes_yes_yes_no_yes_yes");
+        deliver.Record.Effects.Count(e => e.Contains("DL_DATA_indication", StringComparison.Ordinal) && e.Contains("xa0", StringComparison.Ordinal)).Should().Be(1);
+        deliver.Next.B.Vr.Should().Be(1);
+        deliver.Next.DeliveredAtB.Should().Be(0);
+    }
+
+    [Fact]
     public void A_Busy_Station_In_Connected_Answers_An_I_Poll_With_RR()
     {
         // ip-busy, a hypothesis for a second reader: figc4.4's own-busy I
@@ -2344,9 +2362,9 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData(InjectedFrame.RejPoll, 1, false, "TimerRecovery/t23_rej_received_no_yes_yes_yes")]
-    [InlineData(InjectedFrame.SrejCommand, 0, true, "TimerRecovery/t24_srej_received_no_yes_no_yes")]
-    public void Reject_Commands_May_Name_V_s_With_RejMayEqualVs(InjectedFrame form, int ab, bool t3, string arm)
+    [InlineData(InjectedFrame.RejPoll, 1, false, 75, "TimerRecovery/t23_rej_received_no_yes_yes_yes")]
+    [InlineData(InjectedFrame.SrejCommand, 0, true, 25, "TimerRecovery/t24_srej_received_no_yes_no_yes")]
+    public void Reject_Commands_May_Name_V_s_With_RejMayEqualVs(InjectedFrame form, int ab, bool t3, int states, string arm)
     {
         // rnv-rej, rnv-srej: the reject-naming-vs command arms.
         var result = Run(Inj(FlowControlAt.B, form) with
@@ -2355,6 +2373,7 @@ public class CalibrationTests(ITestOutputHelper output)
             Invariants = form == InjectedFrame.RejPoll ? Invariants.Default : Invariants.Default & ~Invariants.RejectCoherence,
         });
         result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(states);
         result.FiredTransitions.Should().Contain(arm);
     }
 
@@ -2375,18 +2394,41 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData(InjectedFrame.IPollStale)]
-    [InlineData(InjectedFrame.IPoll)]
-    public void An_Injected_Payload_Counts_Only_When_Delivered_Once_In_Sequence(InjectedFrame form)
+    [InlineData(InjectedFrame.IPollStale, false, "t26_i_received_yes_yes_yes_no_no_no_yes")]
+    [InlineData(InjectedFrame.IPoll, false, "t26_i_received_yes_yes_yes_no_yes_yes")]
+    [InlineData(InjectedFrame.IPoll, true, "t26_i_received_yes_yes_yes_no_yes_yes")]
+    public void An_Injected_Payload_Is_Delivered_Exactly_When_Accepted(InjectedFrame form, bool undelivered, string arm)
     {
-        // seeded-injected-stale, seeded-injected-twice: delivering the frame
-        // outside the window, or the in-sequence one twice, is a Delivery
-        // violation, so accepting the injected label is no blanket leniency.
-        var result = Run(Ip(form) with { TablesDir = Fixtures.InjectedDeliveredDir });
+        // seeded-injected-stale, seeded-injected-twice,
+        // seeded-injected-undelivered: delivering the frame outside the
+        // window, delivering the in-sequence one twice in one dispatch, or
+        // accepting it without delivering it, is a Delivery violation, so
+        // the injected label is no blanket leniency.
+        var result = Run(Ip(form) with { TablesDir = undelivered ? Fixtures.InjectedUndeliveredDir : Fixtures.InjectedDeliveredDir });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Delivery);
         result.Violation.Station.Should().Be(Station.B);
         result.CounterexampleLength.Should().Be(2);
+        result.Trace[^1].Transition.Should().Be(arm);
+    }
+
+    [Fact]
+    public void Both_Stations_Injecting_In_Sequence_Show_The_Errata_Branch_Staying_In_Timer_Recovery()
+    {
+        // ip-both (from the review of batch 7; ax25spec#12): B in Timer
+        // Recovery receives an RR with N(r) past V(s); t18_rr_received_no_no_no
+        // runs N(r) Recovery but stays in Timer Recovery with its variables,
+        // so after A's reset B retransmits b0 and A delivers it again.
+        var result = Run(Ip(InjectedFrame.IFrame) with
+        {
+            Inject = FlowControlAt.Both, FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Delivery);
+        result.Violation.Station.Should().Be(Station.A);
+        result.CounterexampleLength.Should().Be(18);
+        result.Trace.Should().Contain(r => r.Transition == "t18_rr_received_no_no_no");
     }
 
     [Fact]

@@ -59,7 +59,8 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          peer-busy-hold, busy-indication, unit-data, frame-error
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
-  --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s)
+  --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s); with --inject, also let the injected
+                         REJ and SREJ commands name the receiver's V(s) (receiver in TimerRecovery, channels empty)
   --quiescence-accepts-timer-recovery   triage aid: a station in TimerRecovery counts as quiescent
   --max-depth N          depth bound (default 80)
   --max-states N         visited-state bound (default 400000)

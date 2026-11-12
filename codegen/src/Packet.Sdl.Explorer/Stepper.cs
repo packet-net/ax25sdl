@@ -645,7 +645,8 @@ public sealed class Stepper
         var m = s.Machine(station);
         var peer = SystemState.Peer(station);
         var r = s.Machine(peer);
-        return InjectForm(s.Injected(station)) switch
+        var form = InjectForm(s.Injected(station));
+        return form switch
         {
             // The injected I frames: both stations in the data phase and no
             // I frame on the channel to the receiver (the previous injected
@@ -674,7 +675,7 @@ public sealed class Stepper
                 || (m.State == "TimerRecovery" && s.ToA.Count == 0 && s.ToB.Count == 0),
             InjectedFrame.IPollStale => true,
             InjectedFrame.RejPoll or InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => IsDataState(m.State)
-                && (_o.InjectedFrame == InjectedFrame.RejPoll ? r.State == "TimerRecovery" : IsDataState(r.State))
+                && (form == InjectedFrame.RejPoll ? r.State == "TimerRecovery" : IsDataState(r.State))
                 && (Distance(r.Va, m.Vr, r.Modulo) < Distance(r.Va, r.Vs, r.Modulo)
                     // With RejMayEqualVs the reject may also name the
                     // receiver's V(s), no outstanding frame (the
@@ -687,7 +688,7 @@ public sealed class Stepper
                     // nothing outstanding at all (V(a) = V(s)); otherwise it
                     // asks for a frame never sent.
                     || (_o.RejMayEqualVs && m.Vr == r.Vs && r.State == "TimerRecovery" && s.ToA.Count == 0 && s.ToB.Count == 0
-                        && (_o.InjectedFrame == InjectedFrame.RejPoll || r.Va == r.Vs))),
+                        && (form == InjectedFrame.RejPoll || r.Va == r.Vs))),
             InjectedFrame.UaF0 => r.State is "AwaitingConnection" or "AwaitingV22Connection" or "AwaitingRelease",
             InjectedFrame.Frmr => IsDataState(r.State),
             _ => false,
@@ -734,7 +735,7 @@ public sealed class Stepper
             InjectedFrame.IPollAhead => new Frame("I", Command: true, Pf: true, Nr: m.Vr, Ns: (r.Vr + 1) % r.Modulo, Data: label),
             InjectedFrame.IPollStale => new Frame("I", Command: true, Pf: true, Nr: m.Vr, Ns: (r.Vr + r.Modulo - 1) % r.Modulo, Data: label),
             InjectedFrame.RejPoll => new Frame("REJ", Command: true, Pf: true, Nr: m.Vr, Ns: null, Data: null),
-            InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => new Frame("SREJ", Command: true, Pf: _o.InjectedFrame == InjectedFrame.SrejPoll, Nr: m.Vr, Ns: null, Data: null),
+            InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => new Frame("SREJ", Command: true, Pf: form == InjectedFrame.SrejPoll, Nr: m.Vr, Ns: null, Data: null),
             InjectedFrame.UaF0 => new Frame("UA", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
             _ => new Frame("FRMR", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
         };
@@ -1235,14 +1236,15 @@ public sealed class Stepper
         var connectReported = false;
         var told = s.Told(station);
         var effectsText = new List<string>();
-        // An injected I frame's payload (InjectedFrame.IFrame and after) may
-        // be delivered once, by the dispatch of that frame itself, received in
-        // sequence (N(s) = V(r) before it): the only delivery a correct
-        // receiver makes of it. It is not one of the peer's submissions, so
-        // it moves no delivery count.
+        // An injected I frame's payload (InjectedFrame.IFrame and after) is
+        // delivered exactly when the dispatch of that frame itself, received
+        // in sequence (N(s) = V(r) before it), accepts it (V(r) moves past
+        // N(s)): once, in that dispatch, and in no other. It is not one of the
+        // peer's submissions, so it moves no delivery count.
         var injectedDeliverable = input is { Event: "I_received", Command: true } && IsInjectedLabel(input.Data) && input.Ns == pre.Vr
             ? input.Data
             : null;
+        var injectedInSequence = injectedDeliverable;
 
         if (result is not null)
         {
@@ -1284,7 +1286,7 @@ public sealed class Stepper
                                 injectedDeliverable = null;
                             else if (violation is null && On(Invariants.Delivery))
                                 violation = new Violation(Invariants.Delivery, station,
-                                    $"station {station} delivered the injected payload `{ue.Detail}` upward other than once, on receiving that I frame in sequence: out-of-sequence, duplicate or stored delivery");
+                                    $"station {station} delivered the injected payload `{ue.Detail}` upward other than once, in the dispatch that accepts that I frame in sequence: out-of-sequence, duplicate or stored delivery");
                         }
                         else if (expected is not null && string.Equals(ue.Detail, expected, StringComparison.Ordinal))
                         {
@@ -1336,6 +1338,18 @@ public sealed class Stepper
             // anything, so it is excluded.
             var reset = input!.Event is "SABM_received" or "SABME_received" or "UA_received" && m.Vs == 0 && m.Va == 0 && m.Vr == 0;
             if (!reset) acked += Distance(pre.Va, m.Va, m.Modulo);
+        }
+
+        // The other half of the injected payload rule: accepted (V(r) moved)
+        // without delivering it, or delivered without accepting it.
+        if (violation is null && result is not null && injectedInSequence is not null && On(Invariants.Delivery))
+        {
+            var accepted = m.Vr != pre.Vr;
+            var deliveredIt = injectedDeliverable is null;
+            if (accepted != deliveredIt)
+                violation = new Violation(Invariants.Delivery, station, accepted
+                    ? $"station {station} accepted the injected I frame `{injectedInSequence}` in sequence (V(r) {Inv(pre.Vr)} to {Inv(m.Vr)}) but did not deliver it upward: lost delivery"
+                    : $"station {station} delivered the injected payload `{injectedInSequence}` upward but V(r) stayed {Inv(pre.Vr)}: delivered without accepting the frame");
         }
 
         // A UI frame's handling (UnitData): delivered or refused as UI Check
