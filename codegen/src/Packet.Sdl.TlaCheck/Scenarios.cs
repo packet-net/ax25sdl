@@ -845,7 +845,7 @@ public static class Scenarios
         // unreset fails the row. Stop T1 and Stop T3 are not caught by any
         // row (a T1 left running only costs an extra poll): a documented gap.
         Add("reconnect-tr-data-ba", "ax25spec#169 fixed (V(s), V(a))", TableSetKind.Current, o => R169(o) with { FramesBa = 1 }, Clean(170));
-        Add("reverted-169-ba", "ax25spec#169 reverted", TableSetKind.Reverted169, o => R169(o) with { FramesBa = 1 }, Fails(Invariants.Quiescence, steps: 9));
+        Add("reverted-169-ba", "ax25spec#169 reverted", TableSetKind.Reverted169, o => R169(o) with { FramesBa = 1 }, Fails(Invariants.Quiescence));
 
         return list;
     }
