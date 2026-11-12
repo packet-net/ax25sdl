@@ -29,7 +29,7 @@ dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --help
 | `codegen/src/Packet.Sdl.TlaCheck/LockstepSemantics.tla`, `Lockstep.tla` | hand | Two meanings side by side (see "Lockstep" below). |
 | `codegen/src/Packet.Sdl.TlaCheck/TwoStation.tla` | hand | The harness: two stations, the channel, the v2.0 stub peer, the moves, the invariants. A port of the explorer's `Stepper.cs`. |
 | `codegen/src/Packet.Sdl.TlaCheck/` | hand | Runs the explorer and TLC on the same scenario and compares them. |
-| `codegen/src/Packet.Sdl.TlaCheck/fixtures/` | script, documented | Twenty-nine deliberately broken table sets (twenty-four before packet-net/ax25sdl#97's PR B, which added five for the save rules) that fail acknowledgement coherence, quiescence, the release rest, the give-up rule's settled state (with and without T3), the reconnect answer rule, the link report rule, the peer-busy hold, busy delivery, the busy indication (answering a poll and polling), the keepalive rule, the UI rules (delivery, refusal, the poll's answer, every datagram sent) the frame-error rules (the error reported, also on a catch-all; a reset loss only when layer 3 was told; no rest and no reset loss after an unjustified reset), the injected payload rule and the save rules (a lost disconnect, a request released before the link is up, the disconnect answer rule, the abandon rest), which no real defect does (see its README). |
+| `codegen/src/Packet.Sdl.TlaCheck/fixtures/` | script, documented | Twenty-nine deliberately broken table sets (twenty-four before packet-net/ax25sdl#97's PR B, which added five for the save rules) that fail acknowledgement coherence, quiescence, the release rest, the give-up rule's settled state (with and without T3), the reconnect answer rule, the link report rule, the peer-busy hold, busy delivery, the busy indication (answering a poll and polling), the keepalive rule, the UI rules (delivery, refusal, the poll's answer, every datagram sent) the frame-error rules (the error reported, also on a catch-all; a reset loss only when layer 3 was told; no rest and no reset loss after an unjustified reset), the injected payload rule and the save rules (a lost disconnect, a request released before the link is up, the disconnect answer rule, the abandon rest), which no real defect does (see its README). Two more are fixes reverted, so that a fix has a row telling it from what it replaced: `tables-169-reverted` (ax25spec#169) and `tables-set-version-flag-only` (packet-net/ax25sdl#123). |
 | `codegen/src/Packet.Sdl.TlaCheck/unfired.txt` | hand | The rows no calibration scenario fires, grouped by cause with the reason. A full TlaCheck run fails if a listed row fires or an unfired row is not listed (see "The residue" below). |
 | `codegen/tests/Packet.Sdl.CodeGen.Tests/TlaEmitterTests.cs` | hand | Fails if the committed module is not exactly a fresh render of `spec/json`. TlaCheck renders afresh from JSON each run, so this test is what ties the committed module to what was checked. |
 
@@ -125,200 +125,203 @@ Every row of the explorer's calibration suite (`CalibrationTests.cs`), plus its 
 
 | Scenario | Defect | Tables | Explorer | TLC | Agree | Expected |
 | --- | --- | --- | --- | --- | --- | --- |
-| d40-pre40-srej | #40 | pre-40 | RejectCoherence at A, 4 steps | RejectCoherence at A, 4 steps (5.3 s) | yes | yes |
-| d40-pre40-nosrej | #40 | pre-40 | RejectCoherence at A, 4 steps | RejectCoherence at A, 4 steps (5.3 s) | yes | yes |
-| d40-current-srej | #40 fixed | current | clean, 47 states | clean, 47 states (10.3 s) | yes | yes |
-| d40-current-nosrej | #40 fixed | current | clean, 47 states | clean, 47 states (10.4 s) | yes | yes |
-| d40-pre40-rej-eq-vs | #40 | pre-40 | MachineError at A, 5 steps | MachineError at A, 5 steps (5.1 s) | yes | yes |
-| d38-pre38 | #38 | pre-38 | MachineError at A, 15 steps | MachineError at A, 15 steps (8.1 s) | yes | yes |
-| d38-pre40 | #38 | pre-40 | MachineError at A, 15 steps | MachineError at A, 15 steps (7.6 s) | yes | yes |
-| d42 | #42 | current | RejectCoherence at B, 6 steps | RejectCoherence at B, 6 steps (4.6 s) | yes | yes |
-| d42-rc-off | #42 | current | SequenceSanity at B, 16 steps | SequenceSanity at B, 16 steps (6.5 s) | yes | yes |
-| d42-both-off | #42 | current | depth bound hit, 967 states | depth bound hit, 967 states (8.8 s) | yes | yes |
-| d47-rc-off | #47 | current | Delivery at B, 20 steps | Delivery at B, 20 steps (12.2 s) | yes | yes |
-| d47-k2 | #47 | current | Delivery at A, 24 steps | Delivery at A, 24 steps (12.8 s) | yes | yes |
-| d47-rc-on | #47/#42 | current | RejectCoherence at B, 16 steps | RejectCoherence at B, 16 steps (10.9 s) | yes | yes |
-| d9 | #9 | current | Deadlock, 30 steps | Deadlock, 30 steps (10.5 s) | yes | yes |
-| d13-k7 | #13 | current | RejectCoherence at A, 13 steps | RejectCoherence at A, 13 steps (5.9 s) | yes | yes |
-| d13-k4 | #13 control | current | clean, 1144 states | clean, 1144 states (29.1 s) | yes | yes |
-| d44-48-cold | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (7.1 s) | yes | yes |
-| d44-48-cold-mod8 | #44/#48 control | current | clean, 3 states | clean, 3 states (3.3 s) | yes | yes |
-| d161-data-before-confirm | ax25spec#161 | current | Deadlock, 2 steps | Deadlock, 2 steps (2.5 s) | yes | yes |
-| cold-v20-data | #102 control | current | clean, 210 states | clean, 210 states (6.6 s) | yes | yes |
-| cold-v22-data | #44 route | current | clean, 210 states | clean, 210 states (6.6 s) | yes | yes |
-| d54-cold-v22-wrap | #54 | current | Deadlock, 45 steps | Deadlock, 45 steps (3.6 s) | yes | yes |
-| d54-cold-v20-wrap | #54 control | current | clean, 192 states | clean, 192 states (4.8 s) | yes | yes |
-| d43 | #43 | current | BusyTracksFlow at B, 3 steps | BusyTracksFlow at B, 3 steps (4.9 s) | yes | yes |
-| d43-busy-off | #43 | current | FlowOffDelivery at B, 5 steps | FlowOffDelivery at B, 5 steps (4.5 s) | yes | yes |
-| d43-both-off | #43 | current | clean, 42 states | clean, 42 states (11.1 s) | yes | yes |
-| d45-cold-timer-free | #44 masks #45 | current | SelectiveProgress, 2 steps | SelectiveProgress, lasso of 4 states (10.0 s) | yes | yes |
-| d45-cold | #44 masks #45 | current | clean, 6 states | clean, 6 states (8.0 s) | yes | yes |
-| d45-v22-timer-free | #45 | current | SelectiveProgress, 4 steps | SelectiveProgress, lasso of 6 states (10.5 s) | yes | yes |
-| d45-v22 | #45 | current | clean, 8 states | clean, 8 states (7.2 s) | yes | yes |
-| d48-v22-dm | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (6.4 s) | yes | yes |
-| d48-v22-tables | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (6.5 s) | yes | yes |
-| d48-cold-dm | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (5.9 s) | yes | yes |
-| v20-mod8-frmr | #45/#48 control | current | clean, 3 states | clean, 3 states (11.1 s) | yes | yes |
-| v20-mod8-dm | #45/#48 control | current | clean, 3 states | clean, 3 states (11.1 s) | yes | yes |
-| v22-peer-ua | #45/#48 control | current | clean, 3 states | clean, 3 states (9.7 s) | yes | yes |
-| h1 | H1 | current | Deadlock, 19 steps | Deadlock, 19 steps (6.7 s) | yes | yes |
-| h1-tr-quiescent | H1 control | current | clean, 806 states | clean, 806 states (7.6 s) | yes | yes |
-| d114-cold-dup-ua | #114/#50 | current | Deadlock, 7 steps | Deadlock, 7 steps (14.3 s) | yes | yes |
-| d114-cold-dup-ua-mod128 | #114/#50 | current | Deadlock, 6 steps | Deadlock, 6 steps (4.5 s) | yes | yes |
-| d44-48-cold-faults | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (4.7 s) | yes | yes |
-| d45-cold-n2 | #44 masks #45 | current | Deadlock, 5 steps | Deadlock, 5 steps (4.0 s) | yes | yes |
-| v20-frmr-dup | #44/#45 control | current | clean, 59 states | clean, 59 states (5.6 s) | yes | yes |
-| h1-k1 | #91 (H1) | current | Deadlock, 15 steps | Deadlock, 15 steps (11.7 s) | yes | yes |
-| h1-k2-ab3 | #91 (H1) | current | Deadlock, 17 steps | Deadlock, 17 steps (9.7 s) | yes | yes |
-| release-a | release control | current | clean, 44 states | clean, 44 states (4.5 s) | yes | yes |
-| release-both-cold | release | current | clean, 829 states | clean, 829 states (5.0 s) | yes | yes |
-| release-a-tr | release, masks #91 | current | clean, 2890 states | clean, 2890 states (13.5 s) | yes | yes |
-| gu-v22 | give-up control | current | clean, 17 states | clean, 17 states (4.6 s) | yes | yes |
-| gu-release | give-up control | current | clean, 15 states | clean, 15 states (4.2 s) | yes | yes |
-| gu-loss | give-up loss control | current | GiveUpLoss, 6 steps | GiveUpLoss, 6 steps (3.9 s) | yes | yes |
-| d9-give-up | #9 | current | Deadlock, 30 steps | Deadlock, 30 steps (7.0 s) | yes | yes |
-| d9-n1-release | #9, #91 | current | Deadlock, 11 steps | Deadlock, 11 steps (4.4 s) | yes | yes |
-| k7-srej-rc-off | #13 regime | current | clean, 149 states | clean, 149 states (6.0 s) | yes | yes |
-| ro-k1 | reorder control | current | clean, 245 states | clean, 245 states (7.0 s) | yes | yes |
-| ro-k1-srej | reorder control | current | clean, 245 states | clean, 245 states (7.6 s) | yes | yes |
-| ro-srej-rc-off | reorder control | current | clean, 60 states | clean, 60 states (6.7 s) | yes | yes |
-| ro-stale-rej | ax25spec#95 | current | Deadlock, 11 steps | Deadlock, 11 steps (13.1 s) | yes | yes |
-| ro-stale-i | ax25spec#95 | current | Deadlock, 9 steps | Deadlock, 9 steps (11.3 s) | yes | yes |
-| ro-reset-dup | ax25spec#95 | current | Delivery at B, 18 steps | Delivery at B, 18 steps (4.9 s) | yes | yes |
-| ro-d42 | #42 | current | SequenceSanity at B, 16 steps | SequenceSanity at B, 16 steps (3.5 s) | yes | yes |
-| seeded-ack | seeded (AckCoherence) | seeded ack-broken | AckCoherence at A, 4 steps | AckCoherence at A, 4 steps (1.9 s) | yes | yes |
-| seeded-livelock | seeded (Quiescence) | seeded livelock | Quiescence, 0 steps | Quiescence, lasso of 14 states (3.7 s) | yes | yes |
-| seeded-dm-ignored | seeded (give-up rest) | seeded dm-ignored | Deadlock, 6 steps | Deadlock, 6 steps (9.1 s) | yes | yes |
-| seeded-release-stuck | seeded (release rest) | seeded release-stuck | Deadlock, 9 steps | Deadlock, 9 steps (4.5 s) | yes | yes |
-| l3-down-mod128 | #114/#50 (was a MachineError) | current | Deadlock, 7 steps | Deadlock, 7 steps (13.9 s) | yes | yes |
-| l3-down-mod128-b3 | #114/#50 (layer 3 link-down pin) | current | Deadlock, 7 steps | Deadlock, 7 steps (27.6 s) | yes | yes |
-| reconnect-a | reconnect control | current | clean, 40 states | clean, 40 states (5.5 s) | yes | yes |
-| reconnect-both-srej | reconnect control | current | clean, 150 states | clean, 150 states (5.5 s) | yes | yes |
-| reconnect-cold | reconnect control | current | clean, 8 states | clean, 8 states (4.4 s) | yes | yes |
-| reconnect-v22 | reconnect control | current | clean, 121 states | clean, 121 states (6.3 s) | yes | yes |
-| reconnect-both-cold | reconnect control | current | clean, 1139 states | clean, 1139 states (8.1 s) | yes | yes |
-| reconnect-tr | ax25spec#167 (shows through #114) | current | Deadlock, 12 steps | Deadlock, 12 steps (4.1 s) | yes | yes |
-| reconnect-cold-mod128 | #44/#54, #115, #48 | current | Deadlock, 10 steps | Deadlock, 10 steps (4.3 s) | yes | yes |
-| release-early-cold | ax25sdl#97 (saved) | current | clean, 8 states | clean, 8 states (6.0 s) | yes | yes |
-| release-early-v22 | ax25sdl#97 (saved) | current | clean, 8 states | clean, 8 states (5.7 s) | yes | yes |
-| abandon-cold | ax25sdl#97 save | current | clean, 8 states | clean, 8 states (5.1 s) | yes | yes |
-| abandon-v22 | ax25sdl#97 save | current | clean, 8 states | clean, 8 states (4.7 s) | yes | yes |
-| abandon-v20-fallback | ax25sdl#97 save, across the fallback | current | clean, 18 states | clean, 18 states (6.0 s) | yes | yes |
-| abandon-gives-up | ax25sdl#97 save, connect fails | current | clean, 23 states | clean, 23 states (5.8 s) | yes | yes |
-| abandon-release-gives-up | ax25sdl#97 save, release gives up | current | clean, 27 states | clean, 27 states (6.8 s) | yes | yes |
-| release-cold-faults | ax25spec#99 (stale UA answers the DISC) | current | Deadlock, 5 steps | Deadlock, 5 steps (5.5 s) | yes | yes |
-| abandon-cold-faults | ax25spec#99 (stale UA answers the DISC) | current | Deadlock, 5 steps | Deadlock, 5 steps (6.2 s) | yes | yes |
-| abandon-cold-faults-t3 | ax25sdl#97 save, faults, T3 | current | clean, 283 states | clean, 283 states (7.7 s) | yes | yes |
-| abandon-reconnect | ax25sdl#97 save, after a reconnect | current | clean, 74 states | clean, 74 states (6.6 s) | yes | yes |
-| abandon-both-cold | ax25sdl#97 save, both stations | current | clean, 140 states | clean, 140 states (6.7 s) | yes | yes |
-| seeded-disconnect-swallowed | seeded (lost disconnect) | seeded disconnect-swallowed | DisconnectKept at A, 1 steps | DisconnectKept at A, 1 steps (2.3 s) | yes | yes |
-| seeded-disconnect-released-early | seeded (released early) | seeded disconnect-released-early | DisconnectKept at A, 3 steps | DisconnectKept at A, 3 steps (3.0 s) | yes | yes |
-| seeded-disconnect-kept-connected | seeded (released request lost) | seeded disconnect-kept-connected | DisconnectKept at A, 3 steps | DisconnectKept at A, 3 steps (3.6 s) | yes | yes |
-| seeded-disconnect-unconfirmed | seeded (disconnect answer) | seeded disconnect-unconfirmed | Deadlock, 3 steps | Deadlock, 3 steps (4.3 s) | yes | yes |
-| seeded-disconnect-silent | seeded (abandon rest) | seeded disconnect-silent | Deadlock, 3 steps | Deadlock, 3 steps (4.0 s) | yes | yes |
-| seeded-disconnect-silent-v20 | seeded (abandon rest, v2.0 peer) | seeded disconnect-silent | Deadlock, 8 steps | Deadlock, 8 steps (3.6 s) | yes | yes |
-| d161-move | ax25spec#161 | current | Delivery at B, 6 steps | Delivery at B, 6 steps (2.7 s) | yes | yes |
-| seeded-reconnect-swallowed | seeded (reconnect answer) | seeded reconnect-swallowed | Deadlock, 7 steps | Deadlock, 7 steps (3.5 s) | yes | yes |
-| seeded-confirm-as-disconnect | seeded (link report) | seeded confirm-as-disconnect | Deadlock, 3 steps | Deadlock, 3 steps (2.8 s) | yes | yes |
-| busy-b | peer-busy control | current | clean, 1069 states | clean, 1069 states (11.8 s) | yes | yes |
-| busy-a-ba2 | peer-busy control | current | clean, 2369 states | clean, 2369 states (23.0 s) | yes | yes |
-| busy-both-trq | peer-busy control (behind #91) | current | clean, 20221 states | clean, 20221 states (114.3 s) | yes | yes |
-| busy-b-b1 | #91 (after a busy period) | current | Deadlock, 21 steps | Deadlock, 21 steps (34.8 s) | yes | yes |
-| busy-b-long | ax25spec#168 | current | Deadlock, 18 steps | Deadlock, 18 steps (10.1 s) | yes | yes |
-| busy-b-ro | ax25spec#95 (H4), H2 | current | MachineError at A, 16 steps | MachineError at A, 16 steps (14.6 s) | yes | yes |
-| h3-busy-flow-off | #43 (H3) | current | MachineError at B, 4 steps | MachineError at B, 4 steps (2.9 s) | yes | yes |
-| d43-tr | #43 (the Timer Recovery arms) | current | clean, 1170 states | clean, 1170 states (13.4 s) | yes | yes |
-| seeded-rnr-ignored | seeded (peer-busy hold) | seeded rnr-ignored | PeerBusyHold at A, 3 steps | PeerBusyHold at A, 3 steps (2.2 s) | yes | yes |
-| seeded-busy-delivers | seeded (busy delivery) | seeded busy-delivers | FlowOffDelivery at B, 3 steps | FlowOffDelivery at B, 3 steps (2.5 s) | yes | yes |
-| seeded-busy-says-rr | seeded (busy indication) | seeded busy-says-rr | BusyIndication at B, 4 steps | BusyIndication at B, 4 steps (2.1 s) | yes | yes |
-| busy-a-enq | peer-busy control | current | clean, 222 states | clean, 222 states (8.2 s) | yes | yes |
-| seeded-enquiry-says-rr | seeded (busy indication, Transmit_Enquiry) | seeded enquiry-says-rr | BusyIndication at A, 5 steps | BusyIndication at A, 5 steps (3.4 s) | yes | yes |
-| t3-idle | T3 control | current | clean, 5 states | clean, 5 states (5.2 s) | yes | yes |
-| t3-data | T3 control | current | clean, 758 states | clean, 758 states (12.4 s) | yes | yes |
-| t3-gu | T3 give-up control | current | clean, 33 states | clean, 33 states (5.1 s) | yes | yes |
-| t3-gu-release | T3 give-up control | current | clean, 95 states | clean, 95 states (6.0 s) | yes | yes |
-| t3-h1-k1 | #91 | current | Quiescence, 8 steps | Quiescence, lasso of 24 states (16.8 s) | yes | yes |
-| t3-reconnect-cold | ax25spec#167 (fault-free with T3) | current | Quiescence, 4 steps | Quiescence, lasso of 20 states (4.7 s) | yes | yes |
-| seeded-t3-dead | seeded (give-up settles with T3) | seeded t3-dead | Deadlock, 5 steps | Deadlock, 5 steps (3.4 s) | yes | yes |
-| seeded-no-keepalive | seeded (keepalive at rest) | seeded no-keepalive | Deadlock, 2 steps | Deadlock, 2 steps (4.1 s) | yes | yes |
-| ui-connected | UI control | current | clean, 51 states | clean, 51 states (5.3 s) | yes | yes |
-| ui-tr | UI control | current | clean, 214 states | clean, 214 states (7.6 s) | yes | yes |
-| ui-cold | UI control | current | clean, 27 states | clean, 27 states (5.3 s) | yes | yes |
-| ui-cold-poll | ax25spec#154 | current | Deadlock, 8 steps | Deadlock, 8 steps (4.9 s) | yes | yes |
-| ui-v22 | ax25spec#170 | current | UnitData at A, 2 steps | UnitData at A, 2 steps (2.6 s) | yes | yes |
-| ui-v22-poll | ax25spec#170 | current | UnitData at A, 2 steps | UnitData at A, 2 steps (2.6 s) | yes | yes |
-| ui-v22-check-off | ax25spec#170 | current | Deadlock, 5 steps | Deadlock, 5 steps (4.8 s) | yes | yes |
-| ui-v22-a | UI control | current | clean, 8 states | clean, 8 states (5.9 s) | yes | yes |
-| ui-poll | UI control (ax25spec#154 reading) | current | clean, 4 states | clean, 4 states (5.3 s) | yes | yes |
-| ui-poll-tr | UI control (ax25spec#154 reading) | current | clean, 2865 states | clean, 2865 states (26.1 s) | yes | yes |
-| ui-poll-busy | ax25spec#171 (ax25spec#154 reading) | current | BusyIndication at B, 3 steps | BusyIndication at B, 3 steps (2.6 s) | yes | yes |
-| ui-response | UI control | current | clean, 9 states | clean, 9 states (4.9 s) | yes | yes |
-| ui-long | UI control | current | clean, 9 states | clean, 9 states (5.2 s) | yes | yes |
-| ui-release | UI control | current | clean, 202 states | clean, 202 states (6.7 s) | yes | yes |
-| ui-release-poll | UI control (ax25spec#154 reading) | current | clean, 512 states | clean, 512 states (7.7 s) | yes | yes |
-| seeded-ui-swallowed | seeded (UI delivered) | seeded ui-swallowed | UnitData at B, 2 steps | UnitData at B, 2 steps (2.8 s) | yes | yes |
-| seeded-ui-unsent | seeded (UI accounted at rest) | seeded ui-unsent | Deadlock, 6 steps | Deadlock, 6 steps (4.4 s) | yes | yes |
-| seeded-ui-poll-unanswered | seeded (UI poll answered) | seeded ui-poll-unanswered | UnitData at B, 2 steps | UnitData at B, 2 steps (2.7 s) | yes | yes |
-| seeded-ui-response-delivered | seeded (UI response refused) | seeded ui-response-delivered | UnitData at B, 2 steps | UnitData at B, 2 steps (2.7 s) | yes | yes |
-| seeded-ui-arm-deleted | seeded (UI handled on a catch-all) | seeded ui-arm-deleted | UnitData at A, 5 steps | UnitData at A, 5 steps (2.8 s) | yes | yes |
-| fe-cold | frame-error control | current | clean, 11 states | clean, 11 states (4.3 s) | yes | yes |
-| fe-v22 | frame-error control | current | clean, 11 states | clean, 11 states (4.4 s) | yes | yes |
-| fe-release | frame-error control (honest reset, nothing lost) | current | clean, 14 states | clean, 14 states (4.4 s) | yes | yes |
-| fe-a1 | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (3.5 s) | yes | yes |
-| fe-a1-srej | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (3.7 s) | yes | yes |
-| fe-ab1-ctl | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (4.8 s) | yes | yes |
-| fe-a2-k1-info | reset-loss control | current | ResetLoss, 6 steps | ResetLoss, 6 steps (4.1 s) | yes | yes |
-| fe-iresp | frame-error control | current | clean, 16 states | clean, 16 states (5.1 s) | yes | yes |
-| fe-t3-tr | ax25spec#167 (shows through #114) | current | Quiescence, 3 steps | Quiescence, lasso of 14 states (5.0 s) | yes | yes |
-| fe-tr-b3 | ax25spec#50 | current | Deadlock, 4 steps | Deadlock, 4 steps (7.2 s) | yes | yes |
-| fe-iresp-trq | ax25spec#175, #176 | current | clean, 1281 states | clean, 1281 states (9.8 s) | yes | yes |
-| busy-a-tr2 | #91 (H1) | current | Deadlock, 14 steps | Deadlock, 14 steps (22.4 s) | yes | yes |
-| t3-reconnect-cold-mod128 | ax25spec#167 (fault-free with T3, modulo 128) | current | Quiescence, 4 steps | Quiescence, lasso of 20 states (4.6 s) | yes | yes |
-| inj-rej-busy-tr | ax25spec#171 | current | BusyIndication at B, 6 steps | BusyIndication at B, 6 steps (2.9 s) | yes | yes |
-| inj-rej-tr | REJ poll control | current | clean, 67 states | clean, 67 states (6.0 s) | yes | yes |
-| inj-srej-tr | ax25spec#164 (accepted) | current | clean, 83 states | clean, 83 states (5.9 s) | yes | yes |
-| inj-srejp-tr | ax25spec#164 (accepted) | current | clean, 101 states | clean, 101 states (5.6 s) | yes | yes |
-| inj-ua-cold | UA F=0 control | current | clean, 13 states | clean, 13 states (4.5 s) | yes | yes |
-| inj-ua-v22 | UA F=0 control | current | clean, 13 states | clean, 13 states (4.3 s) | yes | yes |
-| inj-ua-release | UA F=0 control | current | clean, 11 states | clean, 11 states (4.6 s) | yes | yes |
-| inj-frmr-srej | FRMR control | current | clean, 5 states | clean, 5 states (4.4 s) | yes | yes |
-| inj-frmr-t3 | FRMR control | current | clean, 25 states | clean, 25 states (5.2 s) | yes | yes |
-| inj-frmr-a1 | ax25spec#50 | current | Deadlock, 4 steps | Deadlock, 4 steps (3.8 s) | yes | yes |
-| seeded-fe-unreported | seeded (frame error reported) | seeded frame-error-unreported | FrameError at B, 2 steps | FrameError at B, 2 steps (2.0 s) | yes | yes |
-| seeded-fe-arms-deleted | seeded (frame error on a catch-all) | seeded frame-error-arms-deleted | FrameError at A, 3 steps | FrameError at A, 3 steps (2.0 s) | yes | yes |
-| seeded-reset-unconfirmed | seeded (reset loss needs layer 3 told) | seeded reset-unconfirmed | Deadlock, 4 steps | Deadlock, 4 steps (3.9 s) | yes | yes |
-| seeded-reset-unconfirmed-a | seeded (reset loss needs layer 3 told) | seeded reset-unconfirmed | Deadlock, 6 steps | Deadlock, 6 steps (3.4 s) | yes | yes |
-| seeded-rr-resets | seeded (unjustified reset never rests) | seeded rr-resets | Deadlock, 6 steps | Deadlock, 6 steps (3.4 s) | yes | yes |
-| seeded-rr-resets-loss | seeded (unjustified reset is no reset loss) | seeded rr-resets | Deadlock, 6 steps | Deadlock, 6 steps (3.2 s) | yes | yes |
-| tr-rej | #91 (H1) | current | Deadlock, 17 steps | Deadlock, 17 steps (17.9 s) | yes | yes |
-| tr-srej-rc-off | #42 (runaway), masked by #42/#47 with the checks on | current | SequenceSanity at A, 24 steps | SequenceSanity at A, 24 steps (8.6 s) | yes | yes |
-| dl-error-u | ax25spec#168 | current | Deadlock, 6 steps | Deadlock, 6 steps (4.5 s) | yes | yes |
-| seeded-reset-wrong-code | seeded (told by the reset's own code) | seeded reset-wrong-code | Deadlock, 4 steps | Deadlock, 4 steps (3.5 s) | yes | yes |
-| ip-inseq | I poll in sequence | current | clean, 6 states | clean, 6 states (3.5 s) | yes | yes |
-| ip-stale | I poll outside the window | current | clean, 4 states | clean, 4 states (3.5 s) | yes | yes |
-| ip-busy | ax25spec#178 (figc4.4 busy I poll answered RR) | current | BusyIndication at B, 3 steps | BusyIndication at B, 3 steps (1.8 s) | yes | yes |
-| ip-rejx | I poll in reject exception; REJ F=1 | current | clean, 159 states | clean, 159 states (4.8 s) | yes | yes |
-| ip-tr-inseq | I poll in sequence, TR | current | clean, 79 states | clean, 79 states (4.3 s) | yes | yes |
-| ip-tr-stale | #91 (H1) | current | Deadlock, 12 steps | Deadlock, 12 steps (3.4 s) | yes | yes |
-| ip-tr-busy | I poll to a busy TR (behind ip-busy) | current | clean, 1244 states | clean, 1244 states (8.7 s) | yes | yes |
-| ip-tr-rejx | I poll in reject exception, TR | current | clean, 444 states | clean, 444 states (6.2 s) | yes | yes |
-| ip-nr | REJ F=1, N(r) beyond V(s) | current | clean, 333 states | clean, 333 states (6.9 s) | yes | yes |
-| ip-nr-v22 | REJ F=1, N(r) beyond V(s), v2.2 | current | clean, 500 states | clean, 500 states (8.0 s) | yes | yes |
-| ip-nr-rnr | RNR, N(r) beyond V(s) | current | clean, 1374 states | clean, 1374 states (11.8 s) | yes | yes |
-| ip-nr-rnr-v22 | RNR, N(r) beyond V(s), v2.2 | current | clean, 2233 states | clean, 2233 states (16.0 s) | yes | yes |
-| rnv-rej | REJ poll naming V(s) | current | clean, 75 states | clean, 75 states (4.3 s) | yes | yes |
-| rnv-srej | SREJ command naming V(s) | current | clean, 25 states | clean, 25 states (3.9 s) | yes | yes |
-| rnv-srejp | #91 (H1); ax25spec#164 | current | Deadlock, 11 steps | Deadlock, 11 steps (3.4 s) | yes | yes |
-| seeded-injected-stale | seeded (injected payload delivered out of sequence) | seeded injected-delivered | Delivery at B, 2 steps | Delivery at B, 2 steps (1.8 s) | yes | yes |
-| seeded-injected-twice | seeded (injected payload delivered twice) | seeded injected-delivered | Delivery at B, 2 steps | Delivery at B, 2 steps (1.8 s) | yes | yes |
-| seeded-injected-undelivered | seeded (injected payload accepted, not delivered) | seeded injected-undelivered | Delivery at B, 2 steps | Delivery at B, 2 steps (2.1 s) | yes | yes |
-| ip-both | ax25spec#12 fixed (#180) | current | clean, 3531 states | clean, 3531 states (17.3 s) | yes | yes |
-| reconnect-tr-data | ax25spec#169 fixed | current | clean, 45 states | clean, 45 states (4.6 s) | yes | yes |
-| reverted-169 | ax25spec#169 reverted | 169-reverted | AckCoherence at A, 15 steps | AckCoherence at A, 15 steps (2.3 s) | yes | yes |
-| reconnect-tr-data-ba | ax25spec#169 fixed (V(s), V(a)) | current | clean, 170 states | clean, 170 states (5.6 s) | yes | yes |
-| reverted-169-ba | ax25spec#169 reverted | 169-reverted | Quiescence, 9 steps | Quiescence, lasso of 25 states (5.4 s) | yes | yes |
+| d40-pre40-srej | #40 | pre-40 | RejectCoherence at A, 4 steps | RejectCoherence at A, 4 steps (9.6 s) | yes | yes |
+| d40-pre40-nosrej | #40 | pre-40 | RejectCoherence at A, 4 steps | RejectCoherence at A, 4 steps (9.3 s) | yes | yes |
+| d40-current-srej | #40 fixed | current | clean, 47 states | clean, 47 states (15.8 s) | yes | yes |
+| d40-current-nosrej | #40 fixed | current | clean, 47 states | clean, 47 states (16.2 s) | yes | yes |
+| d40-pre40-rej-eq-vs | #40 | pre-40 | MachineError at A, 5 steps | MachineError at A, 5 steps (8.5 s) | yes | yes |
+| d38-pre38 | #38 | pre-38 | MachineError at A, 15 steps | MachineError at A, 15 steps (9.4 s) | yes | yes |
+| d38-pre40 | #38 | pre-40 | MachineError at A, 15 steps | MachineError at A, 15 steps (9.4 s) | yes | yes |
+| d42 | #42 | current | RejectCoherence at B, 6 steps | RejectCoherence at B, 6 steps (7.1 s) | yes | yes |
+| d42-rc-off | #42 | current | SequenceSanity at B, 16 steps | SequenceSanity at B, 16 steps (11.3 s) | yes | yes |
+| d42-both-off | #42 | current | depth bound hit, 967 states | depth bound hit, 967 states (12.2 s) | yes | yes |
+| d47-rc-off | #47 | current | Delivery at B, 20 steps | Delivery at B, 20 steps (17.7 s) | yes | yes |
+| d47-k2 | #47 | current | Delivery at A, 24 steps | Delivery at A, 24 steps (19.0 s) | yes | yes |
+| d47-rc-on | #47/#42 | current | RejectCoherence at B, 16 steps | RejectCoherence at B, 16 steps (14.3 s) | yes | yes |
+| d9 | #9 | current | Deadlock, 30 steps | Deadlock, 30 steps (16.1 s) | yes | yes |
+| d13-k7 | #13 | current | RejectCoherence at A, 13 steps | RejectCoherence at A, 13 steps (15.4 s) | yes | yes |
+| d13-k4 | #13 control | current | clean, 1144 states | clean, 1144 states (40.8 s) | yes | yes |
+| d44-48-cold | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (9.4 s) | yes | yes |
+| d44-48-cold-mod8 | #44/#48 control | current | clean, 3 states | clean, 3 states (10.5 s) | yes | yes |
+| d161-data-before-confirm | ax25spec#161 | current | Deadlock, 2 steps | Deadlock, 2 steps (10.4 s) | yes | yes |
+| cold-v20-data | #102 control | current | clean, 210 states | clean, 210 states (27.1 s) | yes | yes |
+| cold-v22-data | #44 route | current | clean, 210 states | clean, 210 states (25.4 s) | yes | yes |
+| d54-cold-v22-wrap | #54 (clean since the Set Version reading, ax25sdl#123) | current | clean, 192 states | clean, 192 states (15.7 s) | yes | yes |
+| d54-cold-v20-wrap | #54 control | current | clean, 192 states | clean, 192 states (16.7 s) | yes | yes |
+| set-version-flag-only-v22 | ax25sdl#123 reverted (SABME) | set-version-flag-only | Deadlock, 45 steps | Deadlock, 45 steps (11.9 s) | yes | yes |
+| sabm-b-mod128-wrap | ax25sdl#123 (SABM at modulo 128) | current | clean, 192 states | clean, 192 states (17.3 s) | yes | yes |
+| set-version-flag-only-v20 | ax25sdl#123 reverted (SABM) | set-version-flag-only | SequenceSanity at A, 42 steps | SequenceSanity at A, 42 steps (7.6 s) | yes | yes |
+| d43 | #43 | current | BusyTracksFlow at B, 3 steps | BusyTracksFlow at B, 3 steps (5.3 s) | yes | yes |
+| d43-busy-off | #43 | current | FlowOffDelivery at B, 5 steps | FlowOffDelivery at B, 5 steps (5.6 s) | yes | yes |
+| d43-both-off | #43 | current | clean, 42 states | clean, 42 states (11.6 s) | yes | yes |
+| d45-cold-timer-free | #44 masks #45 | current | SelectiveProgress, 2 steps | SelectiveProgress, lasso of 4 states (10.9 s) | yes | yes |
+| d45-cold | #44 masks #45 | current | clean, 6 states | clean, 6 states (9.3 s) | yes | yes |
+| d45-v22-timer-free | #45 | current | SelectiveProgress, 4 steps | SelectiveProgress, lasso of 6 states (11.1 s) | yes | yes |
+| d45-v22 | #45 | current | clean, 8 states | clean, 8 states (9.9 s) | yes | yes |
+| d48-v22-dm | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (8.5 s) | yes | yes |
+| d48-v22-tables | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (9.8 s) | yes | yes |
+| d48-cold-dm | #48 | current | Deadlock, 2 steps | Deadlock, 2 steps (10.2 s) | yes | yes |
+| v20-mod8-frmr | #45/#48 control | current | clean, 3 states | clean, 3 states (16.4 s) | yes | yes |
+| v20-mod8-dm | #45/#48 control | current | clean, 3 states | clean, 3 states (15.5 s) | yes | yes |
+| v22-peer-ua | #45/#48 control | current | clean, 3 states | clean, 3 states (14.2 s) | yes | yes |
+| h1 | H1 | current | Deadlock, 19 steps | Deadlock, 19 steps (20.3 s) | yes | yes |
+| h1-tr-quiescent | H1 control | current | clean, 806 states | clean, 806 states (30.7 s) | yes | yes |
+| d114-cold-dup-ua | #114/#50 | current | Deadlock, 7 steps | Deadlock, 7 steps (40.8 s) | yes | yes |
+| d114-cold-dup-ua-mod128 | #114/#50 | current | Deadlock, 6 steps | Deadlock, 6 steps (11.1 s) | yes | yes |
+| d44-48-cold-faults | #44/#48 | current | Deadlock, 2 steps | Deadlock, 2 steps (11.4 s) | yes | yes |
+| d45-cold-n2 | #44 masks #45 | current | Deadlock, 5 steps | Deadlock, 5 steps (8.6 s) | yes | yes |
+| v20-frmr-dup | #44/#45 control | current | clean, 59 states | clean, 59 states (15.5 s) | yes | yes |
+| h1-k1 | #91 (H1) | current | Deadlock, 15 steps | Deadlock, 15 steps (33.1 s) | yes | yes |
+| h1-k2-ab3 | #91 (H1) | current | Deadlock, 17 steps | Deadlock, 17 steps (38.0 s) | yes | yes |
+| release-a | release control | current | clean, 44 states | clean, 44 states (17.9 s) | yes | yes |
+| release-both-cold | release | current | clean, 829 states | clean, 829 states (21.4 s) | yes | yes |
+| release-a-tr | release, masks #91 | current | clean, 2890 states | clean, 2890 states (69.1 s) | yes | yes |
+| gu-v22 | give-up control | current | clean, 17 states | clean, 17 states (12.3 s) | yes | yes |
+| gu-release | give-up control | current | clean, 15 states | clean, 15 states (12.0 s) | yes | yes |
+| gu-loss | give-up loss control | current | GiveUpLoss, 6 steps | GiveUpLoss, 6 steps (8.4 s) | yes | yes |
+| d9-give-up | #9 | current | Deadlock, 30 steps | Deadlock, 30 steps (14.3 s) | yes | yes |
+| d9-n1-release | #9, #91 | current | Deadlock, 11 steps | Deadlock, 11 steps (8.4 s) | yes | yes |
+| k7-srej-rc-off | #13 regime | current | clean, 149 states | clean, 149 states (16.9 s) | yes | yes |
+| ro-k1 | reorder control | current | clean, 245 states | clean, 245 states (17.8 s) | yes | yes |
+| ro-k1-srej | reorder control | current | clean, 245 states | clean, 245 states (18.8 s) | yes | yes |
+| ro-srej-rc-off | reorder control | current | clean, 60 states | clean, 60 states (11.5 s) | yes | yes |
+| ro-stale-rej | ax25spec#95 | current | Deadlock, 11 steps | Deadlock, 11 steps (13.7 s) | yes | yes |
+| ro-stale-i | ax25spec#95 | current | Deadlock, 9 steps | Deadlock, 9 steps (16.4 s) | yes | yes |
+| ro-reset-dup | ax25spec#95 | current | Delivery at B, 18 steps | Delivery at B, 18 steps (14.7 s) | yes | yes |
+| ro-d42 | #42 | current | SequenceSanity at B, 16 steps | SequenceSanity at B, 16 steps (13.5 s) | yes | yes |
+| l3-down-mod128 | #114/#50 (was a MachineError) | current | Deadlock, 7 steps | Deadlock, 7 steps (42.3 s) | yes | yes |
+| l3-down-mod128-b3 | #114/#50 (layer 3 link-down pin) | current | Deadlock, 7 steps | Deadlock, 7 steps (121.2 s) | yes | yes |
+| reconnect-a | reconnect control | current | clean, 40 states | clean, 40 states (13.8 s) | yes | yes |
+| reconnect-both-srej | reconnect control | current | clean, 150 states | clean, 150 states (16.8 s) | yes | yes |
+| reconnect-cold | reconnect control | current | clean, 8 states | clean, 8 states (13.9 s) | yes | yes |
+| reconnect-v22 | reconnect control | current | clean, 121 states | clean, 121 states (15.3 s) | yes | yes |
+| reconnect-both-cold | reconnect control | current | clean, 1139 states | clean, 1139 states (23.0 s) | yes | yes |
+| reconnect-tr | ax25spec#167 (shows through #114) | current | Deadlock, 12 steps | Deadlock, 12 steps (10.1 s) | yes | yes |
+| reconnect-cold-mod128 | #44, #115, #48 | current | Deadlock, 8 steps | Deadlock, 8 steps (11.4 s) | yes | yes |
+| release-early-cold | ax25sdl#97 (saved) | current | clean, 8 states | clean, 8 states (12.9 s) | yes | yes |
+| release-early-v22 | ax25sdl#97 (saved) | current | clean, 8 states | clean, 8 states (11.7 s) | yes | yes |
+| abandon-cold | ax25sdl#97 save | current | clean, 8 states | clean, 8 states (12.1 s) | yes | yes |
+| abandon-v22 | ax25sdl#97 save | current | clean, 8 states | clean, 8 states (10.2 s) | yes | yes |
+| abandon-v20-fallback | ax25sdl#97 save, across the fallback | current | clean, 18 states | clean, 18 states (10.3 s) | yes | yes |
+| abandon-gives-up | ax25sdl#97 save, connect fails | current | clean, 23 states | clean, 23 states (12.1 s) | yes | yes |
+| abandon-release-gives-up | ax25sdl#97 save, release gives up | current | clean, 27 states | clean, 27 states (12.4 s) | yes | yes |
+| release-cold-faults | ax25spec#99 (stale UA answers the DISC) | current | Deadlock, 5 steps | Deadlock, 5 steps (10.5 s) | yes | yes |
+| abandon-cold-faults | ax25spec#99 (stale UA answers the DISC) | current | Deadlock, 5 steps | Deadlock, 5 steps (12.6 s) | yes | yes |
+| abandon-cold-faults-t3 | ax25sdl#97 save, faults, T3 | current | clean, 283 states | clean, 283 states (15.6 s) | yes | yes |
+| abandon-reconnect | ax25sdl#97 save, after a reconnect | current | clean, 74 states | clean, 74 states (12.6 s) | yes | yes |
+| abandon-both-cold | ax25sdl#97 save, both stations | current | clean, 140 states | clean, 140 states (14.5 s) | yes | yes |
+| seeded-disconnect-swallowed | seeded (lost disconnect) | seeded disconnect-swallowed | DisconnectKept at A, 1 steps | DisconnectKept at A, 1 steps (6.4 s) | yes | yes |
+| seeded-disconnect-released-early | seeded (released early) | seeded disconnect-released-early | DisconnectKept at A, 3 steps | DisconnectKept at A, 3 steps (5.3 s) | yes | yes |
+| seeded-disconnect-kept-connected | seeded (released request lost) | seeded disconnect-kept-connected | DisconnectKept at A, 3 steps | DisconnectKept at A, 3 steps (6.6 s) | yes | yes |
+| seeded-disconnect-unconfirmed | seeded (disconnect answer) | seeded disconnect-unconfirmed | Deadlock, 3 steps | Deadlock, 3 steps (9.3 s) | yes | yes |
+| seeded-disconnect-silent | seeded (abandon rest) | seeded disconnect-silent | Deadlock, 3 steps | Deadlock, 3 steps (9.4 s) | yes | yes |
+| seeded-disconnect-silent-v20 | seeded (abandon rest, v2.0 peer) | seeded disconnect-silent | Deadlock, 8 steps | Deadlock, 8 steps (9.8 s) | yes | yes |
+| d161-move | ax25spec#161 | current | Delivery at B, 6 steps | Delivery at B, 6 steps (5.5 s) | yes | yes |
+| seeded-ack | seeded (AckCoherence) | seeded ack-broken | AckCoherence at A, 4 steps | AckCoherence at A, 4 steps (4.9 s) | yes | yes |
+| seeded-livelock | seeded (Quiescence) | seeded livelock | Quiescence, 0 steps | Quiescence, lasso of 14 states (10.9 s) | yes | yes |
+| seeded-dm-ignored | seeded (give-up rest) | seeded dm-ignored | Deadlock, 6 steps | Deadlock, 6 steps (6.7 s) | yes | yes |
+| seeded-release-stuck | seeded (release rest) | seeded release-stuck | Deadlock, 9 steps | Deadlock, 9 steps (11.0 s) | yes | yes |
+| seeded-reconnect-swallowed | seeded (reconnect answer) | seeded reconnect-swallowed | Deadlock, 7 steps | Deadlock, 7 steps (13.6 s) | yes | yes |
+| seeded-confirm-as-disconnect | seeded (link report) | seeded confirm-as-disconnect | Deadlock, 3 steps | Deadlock, 3 steps (10.8 s) | yes | yes |
+| busy-b | peer-busy control | current | clean, 1069 states | clean, 1069 states (42.5 s) | yes | yes |
+| busy-a-ba2 | peer-busy control | current | clean, 2369 states | clean, 2369 states (78.2 s) | yes | yes |
+| busy-both-trq | peer-busy control (behind #91) | current | clean, 20221 states | clean, 20221 states (503.8 s) | yes | yes |
+| busy-b-b1 | #91 (after a busy period) | current | Deadlock, 21 steps | Deadlock, 21 steps (143.2 s) | yes | yes |
+| busy-b-long | ax25spec#168 | current | Deadlock, 18 steps | Deadlock, 18 steps (39.4 s) | yes | yes |
+| busy-b-ro | ax25spec#95 (H4), H2 | current | MachineError at A, 16 steps | MachineError at A, 16 steps (42.0 s) | yes | yes |
+| h3-busy-flow-off | #43 (H3) | current | MachineError at B, 4 steps | MachineError at B, 4 steps (7.1 s) | yes | yes |
+| d43-tr | #43 (the Timer Recovery arms) | current | clean, 1170 states | clean, 1170 states (46.4 s) | yes | yes |
+| seeded-rnr-ignored | seeded (peer-busy hold) | seeded rnr-ignored | PeerBusyHold at A, 3 steps | PeerBusyHold at A, 3 steps (9.0 s) | yes | yes |
+| seeded-busy-delivers | seeded (busy delivery) | seeded busy-delivers | FlowOffDelivery at B, 3 steps | FlowOffDelivery at B, 3 steps (8.1 s) | yes | yes |
+| seeded-busy-says-rr | seeded (busy indication) | seeded busy-says-rr | BusyIndication at B, 4 steps | BusyIndication at B, 4 steps (8.3 s) | yes | yes |
+| busy-a-enq | peer-busy control | current | clean, 222 states | clean, 222 states (22.6 s) | yes | yes |
+| seeded-enquiry-says-rr | seeded (busy indication, Transmit_Enquiry) | seeded enquiry-says-rr | BusyIndication at A, 5 steps | BusyIndication at A, 5 steps (8.1 s) | yes | yes |
+| t3-idle | T3 control | current | clean, 5 states | clean, 5 states (11.3 s) | yes | yes |
+| t3-data | T3 control | current | clean, 758 states | clean, 758 states (24.9 s) | yes | yes |
+| t3-gu | T3 give-up control | current | clean, 33 states | clean, 33 states (8.3 s) | yes | yes |
+| t3-gu-release | T3 give-up control | current | clean, 95 states | clean, 95 states (9.1 s) | yes | yes |
+| t3-h1-k1 | #91 | current | Quiescence, 8 steps | Quiescence, lasso of 25 states (37.1 s) | yes | yes |
+| t3-reconnect-cold | ax25spec#167 (fault-free with T3) | current | Quiescence, 4 steps | Quiescence, lasso of 17 states (9.7 s) | yes | yes |
+| seeded-t3-dead | seeded (give-up settles with T3) | seeded t3-dead | Deadlock, 5 steps | Deadlock, 5 steps (5.2 s) | yes | yes |
+| seeded-no-keepalive | seeded (keepalive at rest) | seeded no-keepalive | Deadlock, 2 steps | Deadlock, 2 steps (4.9 s) | yes | yes |
+| ui-connected | UI control | current | clean, 51 states | clean, 51 states (10.0 s) | yes | yes |
+| ui-tr | UI control | current | clean, 214 states | clean, 214 states (17.7 s) | yes | yes |
+| ui-cold | UI control | current | clean, 27 states | clean, 27 states (14.1 s) | yes | yes |
+| ui-cold-poll | ax25spec#154 | current | Deadlock, 8 steps | Deadlock, 8 steps (11.0 s) | yes | yes |
+| ui-v22 | ax25spec#170 | current | UnitData at A, 2 steps | UnitData at A, 2 steps (6.7 s) | yes | yes |
+| ui-v22-poll | ax25spec#170 | current | UnitData at A, 2 steps | UnitData at A, 2 steps (7.0 s) | yes | yes |
+| ui-v22-check-off | ax25spec#170 | current | Deadlock, 5 steps | Deadlock, 5 steps (12.3 s) | yes | yes |
+| ui-v22-a | UI control | current | clean, 8 states | clean, 8 states (16.8 s) | yes | yes |
+| ui-poll | UI control (ax25spec#154 reading) | current | clean, 4 states | clean, 4 states (15.5 s) | yes | yes |
+| ui-poll-tr | UI control (ax25spec#154 reading) | current | clean, 2865 states | clean, 2865 states (55.8 s) | yes | yes |
+| ui-poll-busy | ax25spec#171 (ax25spec#154 reading) | current | BusyIndication at B, 3 steps | BusyIndication at B, 3 steps (4.2 s) | yes | yes |
+| ui-response | UI control | current | clean, 9 states | clean, 9 states (8.3 s) | yes | yes |
+| ui-long | UI control | current | clean, 9 states | clean, 9 states (7.8 s) | yes | yes |
+| ui-release | UI control | current | clean, 202 states | clean, 202 states (10.6 s) | yes | yes |
+| ui-release-poll | UI control (ax25spec#154 reading) | current | clean, 512 states | clean, 512 states (11.8 s) | yes | yes |
+| seeded-ui-swallowed | seeded (UI delivered) | seeded ui-swallowed | UnitData at B, 2 steps | UnitData at B, 2 steps (4.9 s) | yes | yes |
+| seeded-ui-unsent | seeded (UI accounted at rest) | seeded ui-unsent | Deadlock, 6 steps | Deadlock, 6 steps (11.5 s) | yes | yes |
+| seeded-ui-poll-unanswered | seeded (UI poll answered) | seeded ui-poll-unanswered | UnitData at B, 2 steps | UnitData at B, 2 steps (8.1 s) | yes | yes |
+| seeded-ui-response-delivered | seeded (UI response refused) | seeded ui-response-delivered | UnitData at B, 2 steps | UnitData at B, 2 steps (7.5 s) | yes | yes |
+| seeded-ui-arm-deleted | seeded (UI handled on a catch-all) | seeded ui-arm-deleted | UnitData at A, 5 steps | UnitData at A, 5 steps (9.7 s) | yes | yes |
+| fe-cold | frame-error control | current | clean, 11 states | clean, 11 states (16.6 s) | yes | yes |
+| fe-v22 | frame-error control | current | clean, 11 states | clean, 11 states (12.8 s) | yes | yes |
+| fe-release | frame-error control (honest reset, nothing lost) | current | clean, 14 states | clean, 14 states (10.5 s) | yes | yes |
+| fe-a1 | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (7.8 s) | yes | yes |
+| fe-a1-srej | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (13.1 s) | yes | yes |
+| fe-ab1-ctl | reset-loss control | current | ResetLoss, 4 steps | ResetLoss, 4 steps (15.5 s) | yes | yes |
+| fe-a2-k1-info | reset-loss control | current | ResetLoss, 6 steps | ResetLoss, 6 steps (11.7 s) | yes | yes |
+| fe-iresp | frame-error control | current | clean, 16 states | clean, 16 states (12.2 s) | yes | yes |
+| fe-t3-tr | ax25spec#167 (shows through #114) | current | Quiescence, 3 steps | Quiescence, lasso of 14 states (16.5 s) | yes | yes |
+| fe-tr-b3 | ax25spec#50 | current | Deadlock, 4 steps | Deadlock, 4 steps (19.6 s) | yes | yes |
+| fe-iresp-trq | ax25spec#175, #176 | current | clean, 1281 states | clean, 1281 states (26.2 s) | yes | yes |
+| busy-a-tr2 | #91 (H1) | current | Deadlock, 14 steps | Deadlock, 14 steps (63.2 s) | yes | yes |
+| t3-reconnect-cold-mod128 | ax25spec#167 (fault-free with T3, modulo 128) | current | Quiescence, 4 steps | Quiescence, lasso of 20 states (15.4 s) | yes | yes |
+| tr-rej | #91 (H1) | current | Deadlock, 17 steps | Deadlock, 17 steps (45.2 s) | yes | yes |
+| tr-srej-rc-off | #42 (runaway), masked by #42/#47 with the checks on | current | SequenceSanity at A, 24 steps | SequenceSanity at A, 24 steps (26.8 s) | yes | yes |
+| dl-error-u | ax25spec#168 | current | Deadlock, 6 steps | Deadlock, 6 steps (13.7 s) | yes | yes |
+| inj-rej-busy-tr | ax25spec#171 | current | BusyIndication at B, 6 steps | BusyIndication at B, 6 steps (7.9 s) | yes | yes |
+| inj-rej-tr | REJ poll control | current | clean, 67 states | clean, 67 states (14.9 s) | yes | yes |
+| inj-srej-tr | ax25spec#164 (accepted) | current | clean, 83 states | clean, 83 states (14.2 s) | yes | yes |
+| inj-srejp-tr | ax25spec#164 (accepted) | current | clean, 101 states | clean, 101 states (14.3 s) | yes | yes |
+| inj-ua-cold | UA F=0 control | current | clean, 13 states | clean, 13 states (9.9 s) | yes | yes |
+| inj-ua-v22 | UA F=0 control | current | clean, 13 states | clean, 13 states (11.4 s) | yes | yes |
+| inj-ua-release | UA F=0 control | current | clean, 11 states | clean, 11 states (10.0 s) | yes | yes |
+| inj-frmr-srej | FRMR control | current | clean, 5 states | clean, 5 states (11.2 s) | yes | yes |
+| inj-frmr-t3 | FRMR control | current | clean, 25 states | clean, 25 states (13.9 s) | yes | yes |
+| inj-frmr-a1 | ax25spec#50 | current | Deadlock, 4 steps | Deadlock, 4 steps (7.1 s) | yes | yes |
+| seeded-fe-unreported | seeded (frame error reported) | seeded frame-error-unreported | FrameError at B, 2 steps | FrameError at B, 2 steps (5.3 s) | yes | yes |
+| seeded-fe-arms-deleted | seeded (frame error on a catch-all) | seeded frame-error-arms-deleted | FrameError at A, 3 steps | FrameError at A, 3 steps (5.4 s) | yes | yes |
+| seeded-reset-unconfirmed | seeded (reset loss needs layer 3 told) | seeded reset-unconfirmed | Deadlock, 4 steps | Deadlock, 4 steps (9.4 s) | yes | yes |
+| seeded-reset-unconfirmed-a | seeded (reset loss needs layer 3 told) | seeded reset-unconfirmed | Deadlock, 6 steps | Deadlock, 6 steps (8.2 s) | yes | yes |
+| seeded-reset-wrong-code | seeded (told by the reset's own code) | seeded reset-wrong-code | Deadlock, 4 steps | Deadlock, 4 steps (7.7 s) | yes | yes |
+| seeded-rr-resets | seeded (unjustified reset never rests) | seeded rr-resets | Deadlock, 6 steps | Deadlock, 6 steps (6.7 s) | yes | yes |
+| seeded-rr-resets-loss | seeded (unjustified reset is no reset loss) | seeded rr-resets | Deadlock, 6 steps | Deadlock, 6 steps (6.6 s) | yes | yes |
+| ip-inseq | I poll in sequence | current | clean, 6 states | clean, 6 states (8.7 s) | yes | yes |
+| ip-stale | I poll outside the window | current | clean, 4 states | clean, 4 states (10.4 s) | yes | yes |
+| ip-busy | ax25spec#178 (figc4.4 busy I poll answered RR) | current | BusyIndication at B, 3 steps | BusyIndication at B, 3 steps (6.2 s) | yes | yes |
+| ip-rejx | I poll in reject exception; REJ F=1 | current | clean, 159 states | clean, 159 states (18.0 s) | yes | yes |
+| ip-tr-inseq | I poll in sequence, TR | current | clean, 79 states | clean, 79 states (15.2 s) | yes | yes |
+| ip-tr-stale | #91 (H1) | current | Deadlock, 12 steps | Deadlock, 12 steps (12.1 s) | yes | yes |
+| ip-tr-busy | I poll to a busy TR (behind ip-busy) | current | clean, 1244 states | clean, 1244 states (33.8 s) | yes | yes |
+| ip-tr-rejx | I poll in reject exception, TR | current | clean, 444 states | clean, 444 states (24.0 s) | yes | yes |
+| ip-nr | REJ F=1, N(r) beyond V(s) | current | clean, 333 states | clean, 333 states (20.8 s) | yes | yes |
+| ip-nr-v22 | SREJ F=1, N(r) beyond V(s), v2.2 (REJ before ax25sdl#123) | current | clean, 476 states | clean, 476 states (23.3 s) | yes | yes |
+| ip-nr-rnr | RNR, N(r) beyond V(s) | current | clean, 1374 states | clean, 1374 states (37.5 s) | yes | yes |
+| ip-nr-rnr-v22 | RNR, N(r) beyond V(s), v2.2 | current | clean, 2233 states | clean, 2233 states (50.8 s) | yes | yes |
+| rnv-rej | REJ poll naming V(s) | current | clean, 75 states | clean, 75 states (16.7 s) | yes | yes |
+| rnv-srej | SREJ command naming V(s) | current | clean, 25 states | clean, 25 states (13.7 s) | yes | yes |
+| rnv-srejp | #91 (H1); ax25spec#164 | current | Deadlock, 11 steps | Deadlock, 11 steps (11.0 s) | yes | yes |
+| seeded-injected-stale | seeded (injected payload delivered out of sequence) | seeded injected-delivered | Delivery at B, 2 steps | Delivery at B, 2 steps (6.7 s) | yes | yes |
+| seeded-injected-twice | seeded (injected payload delivered twice) | seeded injected-delivered | Delivery at B, 2 steps | Delivery at B, 2 steps (7.2 s) | yes | yes |
+| seeded-injected-undelivered | seeded (injected payload accepted, not delivered) | seeded injected-undelivered | Delivery at B, 2 steps | Delivery at B, 2 steps (5.6 s) | yes | yes |
+| ip-both | ax25spec#12 fixed (#180) | current | clean, 3531 states | clean, 3531 states (59.7 s) | yes | yes |
+| reconnect-tr-data | ax25spec#169 fixed | current | clean, 45 states | clean, 45 states (14.8 s) | yes | yes |
+| reverted-169 | ax25spec#169 reverted | 169-reverted | AckCoherence at A, 15 steps | AckCoherence at A, 15 steps (7.0 s) | yes | yes |
+| reconnect-tr-data-ba | ax25spec#169 fixed (V(s), V(a)) | current | clean, 170 states | clean, 170 states (22.3 s) | yes | yes |
+| reverted-169-ba | ax25spec#169 reverted | 169-reverted | Quiescence, 9 steps | Quiescence, lasso of 25 states (23.4 s) | yes | yes |
 
-Times are TLC's own (all phases of the row); the whole suite (35 rows, with the coverage reruns) takes about 70 s wall time at `--parallel 6`. Run on 23 October 2026, after rebasing onto ax25sdl#94 (ax25spec pin 3027400). The four cold-connect-then-data rows (`cold-*`, `d54-*`) were added on 11 November 2026 (ax25sdl#102, ax25spec pin 7940267); the whole suite, now 40 rows, was rerun then one row at a time and every earlier row gave the same explorer verdict as above, with TLC agreeing on all 40. The ten coverage batch 1 rows (`d114-*` to `release-*`) were added on 11 November 2026 (ax25spec pin b44b897); the whole suite, now 50 rows, was rerun at `--parallel 4` and every earlier row gave the same verdict, length or state count as before, with TLC agreeing on all 50 (the times in the new rows are from that run). The fifteen coverage batch 2 rows (`gu-*` to `ro-d42`, `seeded-dm-ignored` and `seeded-release-stuck`) were added the same day; the whole suite, now 65 rows, was rerun at `--parallel 3 --heap 1g` in under 3 minutes, every earlier row gave the same verdict, length or state count as before, and TLC agreed on all 65. The fourteen coverage batch 3 rows (`l3-down-mod128` to `seeded-confirm-as-disconnect`) were added the same day; the whole suite was rerun at `--parallel 3 --heap 1g` and diffed against a run of main: every one of the 65 earlier rows gave the same verdict, length or state count, and TLC agreed on every row, now with the distinct-state count compared on the deadlock and liveness rows too. The review of the batch added the link report rule (three batch 3 clean rows changed state count with it: `reconnect-cold` 7 to 8, `reconnect-v22` 106 to 121, `reconnect-both-cold` 1051 to 1139; no earlier row changed), `seeded-confirm-as-disconnect` and `l3-down-mod128-b3`; the suite was then 79 rows. The nineteen coverage batch 4 rows (`busy-b` to `seeded-no-keepalive`) were added the same day; the whole suite, now 98 rows, was rerun at `--parallel 3 --heap 1g` and diffed against a run of main: every one of the 79 earlier rows gave the same verdict, length and state count, and TLC agreed on all 98. Removing the stricter settled state from both tools made `seeded-t3-dead` clean in both (15 states), which is what the row exists to show. The twenty-two coverage batch 5 rows (`busy-a-enq`, `seeded-enquiry-says-rr` and the UI rows) were added on 11 November 2026; the whole suite, now 120 rows, was rerun at `--parallel 3 --heap 1g` and diffed against main's CI run of the same suite: every one of the 98 earlier rows gave the same verdict, length and state count, and TLC agreed on all 120. Removing the UI rest rule, the drop accounting, the answer check, the N1 atom or the UI frame's label from the TLA+ side alone each made a row disagree (`seeded-ui-unsent`, `ui-tr`, `ui-v22` and `seeded-ui-poll-unanswered`, `ui-long`, `ui-connected`). The twenty-nine coverage batch 6 rows (`fe-*`, `inj-*`, `busy-a-tr2`, `t3-reconnect-cold-mod128` and the six seeded frame-error rows) were added on 11 November 2026 (`seeded-ui-arm-deleted`, a batch 5 row, is now listed too), and the review of the batch added four (`tr-rej`, `tr-srej-rc-off`, `dl-error-u`, `seeded-reset-wrong-code`); the whole suite, now 153 rows, was rerun at `--parallel 3 --heap 1g` and diffed against a fresh run of main at the same settings: every one of the 120 earlier rows gave the same verdict, length and state count, TLC agreed on all 153, and the accounting check held. The length of TLC's lasso on a liveness row varies from run to run (it is not the shortest counterexample) and is not compared. The eighteen coverage batch 7 rows (`ip-*`, `rnv-*` and the three seeded injected-payload rows; `ip-both` and `seeded-injected-undelivered` from its review) were added on 12 November 2026 and run one at a time here (the times in those rows); the whole suite runs in CI. No earlier option changed behaviour: the injected frame count replaced a flag one for one, and the new gate clause for rejects naming V(s) needs `RejMayEqualVs`, which no earlier injected row sets. Accepting every injected payload in `TwoStation.tla` alone made `seeded-injected-stale` and `-twice` disagree (TLC clean, 4 and 6 states), and dropping the accepted-but-not-delivered half made `seeded-injected-undelivered` disagree (TLC clean, 6 states). Removing from `TwoStation.tla` alone the FrameError check, the no-rest-after-an-unjustified-reset clause, the justification (every reset honest), either station's "told" condition, the N1 atom, the I response's lost command bit, the setting of `told` or the `"reset"` value of `last.lossy` each made a row disagree (`seeded-fe-unreported` and `seeded-fe-arms-deleted`; `seeded-rr-resets`; `seeded-rr-resets-loss`; `seeded-reset-unconfirmed-a` and `seeded-reset-unconfirmed`; `fe-a1` and `fe-tr-b3`; `fe-iresp` and `fe-iresp-trq`; `fe-a1` and `fe-ab1-ctl`; `fe-a1`), and so did accepting any DL-ERROR as telling layer 3 (`seeded-reset-wrong-code`). Reading the rows against `docs/explorer.md`'s calibration table:
+Times are TLC's own (all phases of the row); the whole suite (35 rows, with the coverage reruns) takes about 70 s wall time at `--parallel 6`. Run on 23 October 2026, after rebasing onto ax25sdl#94 (ax25spec pin 3027400). The four cold-connect-then-data rows (`cold-*`, `d54-*`) were added on 11 November 2026 (ax25sdl#102, ax25spec pin 7940267); the whole suite, now 40 rows, was rerun then one row at a time and every earlier row gave the same explorer verdict as above, with TLC agreeing on all 40. The ten coverage batch 1 rows (`d114-*` to `release-*`) were added on 11 November 2026 (ax25spec pin b44b897); the whole suite, now 50 rows, was rerun at `--parallel 4` and every earlier row gave the same verdict, length or state count as before, with TLC agreeing on all 50 (the times in the new rows are from that run). The fifteen coverage batch 2 rows (`gu-*` to `ro-d42`, `seeded-dm-ignored` and `seeded-release-stuck`) were added the same day; the whole suite, now 65 rows, was rerun at `--parallel 3 --heap 1g` in under 3 minutes, every earlier row gave the same verdict, length or state count as before, and TLC agreed on all 65. The fourteen coverage batch 3 rows (`l3-down-mod128` to `seeded-confirm-as-disconnect`) were added the same day; the whole suite was rerun at `--parallel 3 --heap 1g` and diffed against a run of main: every one of the 65 earlier rows gave the same verdict, length or state count, and TLC agreed on every row, now with the distinct-state count compared on the deadlock and liveness rows too. The review of the batch added the link report rule (three batch 3 clean rows changed state count with it: `reconnect-cold` 7 to 8, `reconnect-v22` 106 to 121, `reconnect-both-cold` 1051 to 1139; no earlier row changed), `seeded-confirm-as-disconnect` and `l3-down-mod128-b3`; the suite was then 79 rows. The nineteen coverage batch 4 rows (`busy-b` to `seeded-no-keepalive`) were added the same day; the whole suite, now 98 rows, was rerun at `--parallel 3 --heap 1g` and diffed against a run of main: every one of the 79 earlier rows gave the same verdict, length and state count, and TLC agreed on all 98. Removing the stricter settled state from both tools made `seeded-t3-dead` clean in both (15 states), which is what the row exists to show. The twenty-two coverage batch 5 rows (`busy-a-enq`, `seeded-enquiry-says-rr` and the UI rows) were added on 11 November 2026; the whole suite, now 120 rows, was rerun at `--parallel 3 --heap 1g` and diffed against main's CI run of the same suite: every one of the 98 earlier rows gave the same verdict, length and state count, and TLC agreed on all 120. Removing the UI rest rule, the drop accounting, the answer check, the N1 atom or the UI frame's label from the TLA+ side alone each made a row disagree (`seeded-ui-unsent`, `ui-tr`, `ui-v22` and `seeded-ui-poll-unanswered`, `ui-long`, `ui-connected`). The twenty-nine coverage batch 6 rows (`fe-*`, `inj-*`, `busy-a-tr2`, `t3-reconnect-cold-mod128` and the six seeded frame-error rows) were added on 11 November 2026 (`seeded-ui-arm-deleted`, a batch 5 row, is now listed too), and the review of the batch added four (`tr-rej`, `tr-srej-rc-off`, `dl-error-u`, `seeded-reset-wrong-code`); the whole suite, now 153 rows, was rerun at `--parallel 3 --heap 1g` and diffed against a fresh run of main at the same settings: every one of the 120 earlier rows gave the same verdict, length and state count, TLC agreed on all 153, and the accounting check held. The length of TLC's lasso on a liveness row varies from run to run (it is not the shortest counterexample) and is not compared. The eighteen coverage batch 7 rows (`ip-*`, `rnv-*` and the three seeded injected-payload rows; `ip-both` and `seeded-injected-undelivered` from its review) were added on 12 November 2026 and run one at a time here (the times in those rows); the whole suite runs in CI. No earlier option changed behaviour: the injected frame count replaced a flag one for one, and the new gate clause for rejects naming V(s) needs `RejMayEqualVs`, which no earlier injected row sets. Accepting every injected payload in `TwoStation.tla` alone made `seeded-injected-stale` and `-twice` disagree (TLC clean, 4 and 6 states), and dropping the accepted-but-not-delivered half made `seeded-injected-undelivered` disagree (TLC clean, 6 states). Removing from `TwoStation.tla` alone the FrameError check, the no-rest-after-an-unjustified-reset clause, the justification (every reset honest), either station's "told" condition, the N1 atom, the I response's lost command bit, the setting of `told` or the `"reset"` value of `last.lossy` each made a row disagree (`seeded-fe-unreported` and `seeded-fe-arms-deleted`; `seeded-rr-resets`; `seeded-rr-resets-loss`; `seeded-reset-unconfirmed-a` and `seeded-reset-unconfirmed`; `fe-a1` and `fe-tr-b3`; `fe-iresp` and `fe-iresp-trq`; `fe-a1` and `fe-ab1-ctl`; `fe-a1`), and so did accepting any DL-ERROR as telling layer 3 (`seeded-reset-wrong-code`). Reading the rows against `docs/explorer.md`'s calibration table: The table above is the CI run of packet-net/ax25sdl#125 on 12 November 2026 (the Set Version reading, packet-net/ax25sdl#123), with every row agreeing and meeting its expectation; against the previous table only the rows named under "Set Version" below moved (TLC's lasso lengths on liveness rows, which are not compared, also differ on `t3-h1-k1` and `t3-reconnect-cold`).
 
 - **Fires where the explorer fires:** #40 on the pre-40 fixture (both SREJ settings, and the phantom retransmission with the REJ = V(s) exemption), #42 (and its runaway behind reject coherence, and the depth-bound witness), #47 (all three variants), #9, #13 at k = 7, #44/#48 from a cold connect, #43 (both symptoms), #45 (from figc4.6 and masked by #44 from a cold connect, both through the timer-free check), #48 (stub and table-driven peer, figc4.6 and figc4.2), and the H1 deadlock.
 - **Clean where the explorer is clean:** #40 on the current tables (the fixed side of the only pre/post pair), #13 at k = 4, the #43 scenario behind both flow checks, the lenient #45 runs, every connect-phase control, and H1 with TimerRecovery counted as quiescent.
@@ -346,6 +349,7 @@ Times are TLC's own (all phases of the row); the whole suite (35 rows, with the 
   | `Stop T3` | clean | clean |
 
   So V(r) is proven by both rows, V(s) and V(a) by `reconnect-tr-data-ba`. `Stop T1` and `Stop T3` are a documented gap: no row fails without them, and they look unprovable as a safety failure in this harness, since a T1 left running into Connected only costs an extra poll and a T3 left running only an extra keepalive.
+- **Set Version** (packet-net/ax25sdl#123, Step D's D1): the "Set Version 2.0" / "Set Version 2.2" boxes set the version flag, the modulus and the reject mode as figc4.7b draws them, with k and N2 left as configured (pinned semantic 9), in the interpreter and `Ax25Meaning.tla` alike. Rows that moved: `d54-cold-v22-wrap` from Deadlock, 45 steps to clean, 192 states (B accepting SABME now runs modulo 128); `reconnect-cold-mod128` from 10 steps to 8 (B now resets with SABME directly, without the lost SABM and T1 retry); `ip-nr-v22` from 500 states to 476, and it now reaches the SREJ arms instead of the REJ ones (B runs selective reject); `l3-down-mod128` and `l3-down-mod128-b3` keep their verdicts with new state counts in the explorer (3644 and 12735, from 3620 and 12394). New rows: `sabm-b-mod128-wrap` (a new harness option, `Modulo128B` / `--mod128b`, seeds B at modulo 128; A's SABM brings it to modulo 8 and nine frames at k = 1 wrap cleanly, 192 states) and, on the twin fixture `tables-set-version-flag-only` (figc4.1's SABM and SABME arms with the flag-only reading put back), `set-version-flag-only-v20` (SequenceSanity at A, 42 steps: B stays at 128 and acknowledges with N(r) = 8) and `set-version-flag-only-v22` (Deadlock, 45 steps: the old #54 failure).
 - **Not in the table:** #41 (outside the explorer's model too: numeric timers), and the interpreter-level H3 note, which the explorer pins as a unit test rather than an exploration.
 
 **Do the comparisons have teeth? Partly, and the coverage says where not.** Three kinds of evidence:
@@ -387,12 +391,11 @@ Accounting: 235 of 280 rows fired, 45 not fired and each accounted for with a re
 
 ### Rows not fired
 
-The 47 rows (41 transitions and 6 subroutine paths) no calibration scenario fires, each accounted for with a status and a reason. `codegen/src/Packet.Sdl.TlaCheck/unfired.txt` is the machine-checked form of this list: a full TlaCheck run fails if a listed row fires or an unfired row is not listed, so the accounting cannot rot (a subset run with `--only`, or the grid, skips the check). The three statuses: **unreachable in the specification as transcribed** (the reason names the issue), **not reachable in this harness** (the reason says what the harness is missing), and **not yet reached** (recorded from bounded attempts, or an existing mechanism could reach it). A first cut of this list called everything "unreachable" and had four rows wrong; the review of the batch reached them (`tr-rej`, `tr-srej-rc-off`, `dl-error-u`) or corrected the reason (figc4.6's DL-DATA Request, which is a harness gap, not #44).
+The 45 rows (41 transitions and 4 subroutine paths) no calibration scenario fires, each accounted for with a status and a reason. `codegen/src/Packet.Sdl.TlaCheck/unfired.txt` is the machine-checked form of this list: a full TlaCheck run fails if a listed row fires or an unfired row is not listed, so the accounting cannot rot (a subset run with `--only`, or the grid, skips the check). The three statuses: **unreachable in the specification as transcribed** (the reason names the issue), **not reachable in this harness** (the reason says what the harness is missing), and **not yet reached** (recorded from bounded attempts, or an existing mechanism could reach it). A first cut of this list called everything "unreachable" and had four rows wrong; the review of the batch reached them (`tr-rej`, `tr-srej-rc-off`, `dl-error-u`) or corrected the reason (figc4.6's DL-DATA Request, which is a harness gap, not #44).
 
 | Group | Rows | Status | Why | What would reach it |
 | --- | --- | --- | --- | --- |
 | never-called | `Set_Version_2_2`, `Set_Version_2_0`, both `Establish_Extended_Data_Link` paths (4) | unreachable in the specification | no page calls these subroutines (ax25spec#54); since packet-net/ax25sdl#123 the Set Version boxes apply the first two's modulus and reject mode, but the paths themselves never run | #54's fix |
-| mod128-srej | Enquiry Response `t04_..._yes_no_yes_no_yes`, `t05_..._yes_no_yes_no_no` (2) | not yet reached | a responder at modulo 128 with SREJ answering a poll; since packet-net/ax25sdl#123 a station that accepts SABME is one (`d54-cold-v22-wrap`), but no row polls it there (until then the tables never set the modulus, ax25spec#54, and the status was "unreachable") | a modulo 128 row with T1 or T3 polls (a modulo 128 SREJ envelope, ax25spec#96) |
 | queue-while-initiated | AwaitingConnection `t10_..._yes`, AwaitingV22Connection `t05_..._yes` (2) | unreachable in the specification | a pop with Layer 3 Initiated set in the Awaiting pages; every arm that sets the flag empties the queue, and DL-DATA Request discards while it is set (no issue: the figures are consistent) | nothing in the current figures |
 | flow-busy-h3 | DL-FLOW-OFF and DL-FLOW-ON busy arms on Connected and Timer Recovery (6) | unreachable in the specification | behind ax25spec#43 nothing sets own receiver busy; with the injected busy condition the arms are reached but fail as H3 (no N(r) staged; `h3-busy-flow-off`), and a failed dispatch is not counted as fired | #43's fix with H3's N(r) box (ax25spec PR #109) |
 | dl-data-in-figc4.6 | AwaitingV22Connection `t04_dl_data_request_yes` (1) | not reachable in this harness | figc4.6 with Layer 3 Initiated is reached (`--seed disconnected --mod128 --reconnect both`), but the harness's layer 3 reconnects only once everything is delivered, so it never offers data while figc4.6 waits | a layer 3 that offers data during its own reconnect |
@@ -407,7 +410,7 @@ The 47 rows (41 transitions and 6 subroutine paths) no calibration scenario fire
 | tr-srej-out-of-sequence | Timer Recovery `t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes` (1) | not yet reached | masked by #42/#47 with the checks on; it fires in the explorer with reject coherence, sequence sanity and delivery off at 1 + 3 frames, SREJ, four drops (38 621 states), which TLC does not finish within its 600 s limit; its sibling with an SREJ outstanding fires in `tr-srej-rc-off` | a cheaper scenario, or a longer TLC limit |
 | rej-nr-error-v22 | Connected `t25_rej_received_no_yes`, Timer Recovery `t23_rej_received_yes_no_yes` (2) | not yet reached | REJ with N(r) out of range at version 2.2. Since packet-net/ax25sdl#123 every version 2.2 link in calibration runs selective reject (Set Version 2.2 on SABME; the seeds tie SREJ to version 2.2), so B answers a frame ahead of sequence with SREJ; `ip-nr-v22` fired both while the flag-only reading left B with the flag and implicit reject | an injected REJ response |
 
-Final figure, 12 November 2026 (after packet-net/ax25sdl#123, the Set Version reading): 233 of 280 rows fired, 47 not fired and each accounted for with a reason: 12 unreachable in the specification as transcribed, 18 not reachable in this harness, 17 not yet reached; none unaccounted. (After coverage batch 7, the pin of ax25spec f567fdf and packet-net/ax25sdl#97's PR B: 235 fired, 45 not, 14 of them unreachable in the specification and 13 not yet reached.) (Before PR B: 236 fired, 44 not, 17 of them not reachable in this harness.) (After coverage batch 6: 215 fired, 63 not, 32 of them not yet reached.)
+Final figure, 12 November 2026 (after packet-net/ax25sdl#123, the Set Version reading): 235 of 280 rows fired, 45 not fired and each accounted for with a reason: 12 unreachable in the specification as transcribed, 18 not reachable in this harness, 15 not yet reached; none unaccounted. #123 moved four rows: Enquiry Response's two modulo 128 SREJ paths (`t04_..._yes_no_yes_no_yes`, `t05_..._yes_no_yes_no_no`, listed until then as unreachable behind ax25spec#54) now fire, because a B that accepts SABME runs modulo 128 with SREJ and answers polls there; and the two REJ arms of `rej-nr-error-v22` no longer fire. (After coverage batch 7, the pin of ax25spec f567fdf and packet-net/ax25sdl#97's PR B: 235 fired, 45 not, 14 of them unreachable in the specification and 13 not yet reached.) (Before PR B: 236 fired, 44 not, 17 of them not reachable in this harness.) (After coverage batch 6: 215 fired, 63 not, 32 of them not yet reached.)
 
 ## Wider: the explorer's grid
 

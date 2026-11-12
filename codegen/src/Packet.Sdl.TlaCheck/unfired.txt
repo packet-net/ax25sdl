@@ -19,10 +19,6 @@ Set_Version_2_0:t01_set_version_2_0
 Establish_Extended_Data_Link:t01_establish_extended_data_link_yes
 Establish_Extended_Data_Link:t02_establish_extended_data_link_no
 
-group mod128-srej: not-yet: Enquiry Response's modulo 128 SREJ paths need a responder at modulo 128 with selective reject answering a poll; since packet-net/ax25sdl#123 a station that accepts SABME is one (d54-cold-v22-wrap), but no row polls it there
-Enquiry_Response:t04_enquiry_response_yes_no_yes_no_yes
-Enquiry_Response:t05_enquiry_response_yes_no_yes_no_no
-
 group queue-while-initiated: spec: a pop with Layer 3 Initiated set in the Awaiting pages; every arm that sets the flag empties the queue, and DL-DATA Request discards while it is set (no issue: the figures never queue there)
 AwaitingConnection/t10_i_frame_pops_off_queue_yes
 AwaitingV22Connection/t05_i_frame_pops_off_queue_yes
