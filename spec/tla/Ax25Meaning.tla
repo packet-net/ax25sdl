@@ -296,8 +296,10 @@ Processing(c, e, verb) ==
       [] verb = "set_acknowledge_pending" -> [c EXCEPT !.ack = TRUE]
       [] verb = "Clear Acknowledge Pending" -> [c EXCEPT !.ack = FALSE]
       \* Version and parameters.
-      [] verb = "Set Version 2.2" -> [c EXCEPT !.v22 = TRUE]
-      [] verb = "set_version_2_0" -> [c EXCEPT !.v22 = FALSE]
+      \* The Set Version boxes call figc4.7b's subroutines for the version flag,
+      \* the modulus and the reject mode; k and N2 stay as configured (policy 9).
+      [] verb = "Set Version 2.2" -> [c EXCEPT !.v22 = TRUE, !.mod = 128, !.srej = TRUE]
+      [] verb = "set_version_2_0" -> [c EXCEPT !.v22 = FALSE, !.mod = 8, !.srej = FALSE]
       [] verb = "Set Half Duplex" -> [c EXCEPT !.hd = TRUE]
       [] verb = "Set Selective Reject" -> [c EXCEPT !.srej = TRUE]
       [] verb = "Set Implicit Reject" -> [c EXCEPT !.srej = FALSE]
