@@ -99,6 +99,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.DisconnectReleasedEarly => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-released-early"),
     TableSetKind.DisconnectUnconfirmed => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-unconfirmed"),
     TableSetKind.DisconnectSilent => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent"),
+    TableSetKind.DisconnectKeptConnected => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-kept-connected"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -334,6 +335,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.DisconnectReleasedEarly => "seeded disconnect-released-early",
     TableSetKind.DisconnectUnconfirmed => "seeded disconnect-unconfirmed",
     TableSetKind.DisconnectSilent => "seeded disconnect-silent",
+    TableSetKind.DisconnectKeptConnected => "seeded disconnect-kept-connected",
     _ => "seeded livelock",
 };
 

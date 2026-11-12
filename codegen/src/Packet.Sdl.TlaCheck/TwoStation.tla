@@ -56,6 +56,10 @@ VARIABLES
     last   \* the move into this state: for reading counterexamples, for coverage,
            \* and for the liveness check; outside VIEW
 vars == <<sys, viol, last>>
+
+\* One layer 3 issues at most one DL-DISCONNECT Request: abandon and release
+\* are never combined (Stepper refuses the same).
+ASSUME AbandonAt = {} \/ ReleaseAt = {}
 View == <<sys, viol>>
 
 Stations == {"A", "B"}
@@ -363,7 +367,9 @@ InjectAs(S, s, e, p, newIn, newBudget, clearOwed) ==
                lost |-> IF ~hold /\ c.err = "" /\ isReq /\ own.st \notin DisconnectedOrReleasing THEN pre.st \o "/" \o c.tid ELSE "",
                dp |-> IF hold \/ c.err # "" THEN S.dp[s]
                       ELSE IF AnswersDisconnect(c.fx) THEN FALSE ELSE IF isReq THEN TRUE ELSE S.dp[s]]
-        rp == IF ran THEN Replay(a0) ELSE a0
+        \* A held input changes nothing, so nothing can be released after it
+        \* (Machine.Dispatch returns at once on a hold).
+        rp == IF ran /\ ~hold THEN Replay(a0) ELSE a0
         ok == ran /\ rp.err = ""
         v1 == IF ran /\ rp.err # "" THEN Viol("MachineError", s, "interpreter error at station " \o s \o ": " \o rp.err)
               ELSE IF ok /\ rp.lost # "" /\ "DisconnectKept" \in StepChecks

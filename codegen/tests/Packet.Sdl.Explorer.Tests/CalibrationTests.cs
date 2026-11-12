@@ -1404,7 +1404,8 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Abandon_With_Faults_A_Duplicated_Connect_UA_Answers_The_Disc()
     {
-        // abandon-cold-faults (a finding, not a figure defect: docs/explorer.md).
+        // abandon-cold-faults (packethacking/ax25spec#99; release-cold-faults
+        // shows the same without a save).
         // The duplicated UA of the connect reaches A in Awaiting Release,
         // where figc4.3 t03 takes any UA F = 1 as the answer to its DISC; the
         // DISC is then lost and B stays up with nothing to tell it otherwise.
@@ -1454,9 +1455,11 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Abandon_Is_Only_Offered_While_Layer_3_Waits_For_Its_Own_Connect()
     {
-        // Once the connect is reported (here the confirm), the gate is shut,
-        // even if the link later goes back to a connect page; and a station
-        // whose layer 3 never asked (B) is never offered it.
+        // Once the connect is reported (here the confirm), the gate is shut;
+        // and a station whose layer 3 never asked (B) is never offered it.
+        // (That it stays shut if the link later returns to a connect page
+        // without a new layer 3 connect is pinned only through the state
+        // count of abandon-cold-faults-t3.)
         var options = AbandonCold(Fixtures.CurrentDir) with { Abandon = ReleaseBy.Both };
         var stepper = new Stepper(options, Fixtures.Tables(options.TablesDir));
         var seed = stepper.Seed();
@@ -1475,6 +1478,8 @@ public class CalibrationTests(ITestOutputHelper output)
         ((Action)(() => Fixtures.Run(AbandonCold(Fixtures.CurrentDir) with { DataAfterConfirm = true, FramesAb = 1 }))).Should().Throw<ArgumentException>();
         ((Action)(() => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Abandon = ReleaseBy.A }))).Should().Throw<ArgumentException>();
         ((Action)(() => Fixtures.Run(AbandonFallback(Fixtures.CurrentDir) with { Abandon = ReleaseBy.Both }))).Should().Throw<ArgumentException>();
+        // One layer 3, one DL-DISCONNECT Request: never abandon and release together.
+        ((Action)(() => Fixtures.Run(AbandonCold(Fixtures.CurrentDir) with { Release = ReleaseBy.A, ReleaseEarly = true }))).Should().Throw<ArgumentException>();
     }
 
     // Seeded defects for the save rules (fixtures/README.md).
@@ -1505,6 +1510,47 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[2].Transition.Should().Be("t14_frmr_received");
         result.Trace[2].Replayed.Should().Equal("AwaitingConnection/t11_all_other_primitives__from_upper_layer");
         result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Seeded_A_Released_Request_Consumed_Without_Going_Down_Is_A_Lost_Disconnect()
+    {
+        // tables-disconnect-kept-connected: Connected's DL-DISCONNECT arm only
+        // discards the I frame queue and stays Connected. The held request is
+        // released into it once the link is up: the released branch of
+        // disconnect kept.
+        var result = Run(AbandonCold(Fixtures.DisconnectKeptConnectedDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.DisconnectKept);
+        result.Violation.Message.Should().Contain("Connected/t01_dl_disconnect_request (released from a save)");
+        result.Trace[2].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Abandon_A_Release_That_Gives_Up_Is_Answered_By_The_Indication()
+    {
+        // abandon-release-gives-up: both DISCs are lost and Awaiting Release
+        // gives up with DL-DISCONNECT Indication only, which answers the
+        // request (the Indication half of the answer rule).
+        var result = Run(AbandonCold(Fixtures.CurrentDir) with { N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(27);
+    }
+
+    [Fact]
+    public void Release_With_Faults_A_Duplicated_Connect_UA_Answers_The_Disc()
+    {
+        // release-cold-faults: the abandon-cold-faults deadlock without any
+        // save (packethacking/ax25spec#99): a plain release after the connect.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[3].Transition.Should().Be("t03_ua_received_yes");
+        result.CounterexampleLength.Should().Be(5);
     }
 
     [Fact]

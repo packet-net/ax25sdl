@@ -354,7 +354,9 @@ public sealed record ExplorerOptions
     /// abandoned, quiescence means both stations Disconnected (a v2.0 stub
     /// peer disconnected), and every DL_DISCONNECT_request consumed must have
     /// been answered with DL_DISCONNECT_confirm or DL_DISCONNECT_indication.
-    /// Station A may abandon with the v2.0 stub as B. Off by default.
+    /// Station A may abandon with the v2.0 stub as B. Not with
+    /// <see cref="Release"/>: one layer 3 issues at most one
+    /// DL_DISCONNECT_request. Off by default.
     /// </summary>
     public ReleaseBy Abandon { get; init; } = ReleaseBy.None;
 

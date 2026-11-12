@@ -147,6 +147,8 @@ public sealed class Stepper
             throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
         if (_o.Abandon == ReleaseBy.Both && _o.Peer != PeerKind.Tables)
             throw new ArgumentException("with the v2.0 stub as B only station A can abandon its connect (--abandon A)", nameof(options));
+        if (_o.Abandon != ReleaseBy.None && _o.Release != ReleaseBy.None)
+            throw new ArgumentException("abandon and release at once could have one layer 3 issue two DL_DISCONNECT_requests (abandon, then release while still connecting); use one or the other", nameof(options));
         if (_o.Abandon != ReleaseBy.None && _o.DataAfterConfirm)
             throw new ArgumentException("abandoning a connect is for scenarios whose data is submitted up front: a layer 3 that abandons its connect never offers data after a confirm, so that data could never be delivered", nameof(options));
         if (_o.Abandon != ReleaseBy.None && _o.Seed == SeedKind.Connected && _o.Reconnect == ReconnectBy.None)

@@ -67,6 +67,8 @@ public enum TableSetKind
     DisconnectUnconfirmed,
     /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-silent): DL-DISCONNECT Request in Connected confirms and goes Disconnected without sending DISC.</summary>
     DisconnectSilent,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-kept-connected): DL-DISCONNECT Request in Connected stays Connected, so a released request is lost.</summary>
+    DisconnectKeptConnected,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -424,7 +426,15 @@ public static class Scenarios
         // A duplicated UA of the connect answers the replayed DISC in
         // Awaiting Release (figc4.3 t03 takes any UA F = 1); the DISC is then
         // lost and B stays up. A finding, recovered by T3 (the next row).
-        Add("abandon-cold-faults", "finding (stale UA answers the DISC)", TableSetKind.Current, o => o with
+        Add("abandon-release-gives-up", "ax25sdl#97 save, release gives up", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "clean");
+        Add("release-cold-faults", "ax25spec#99 (stale UA answers the DISC)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 5");
+        Add("abandon-cold-faults", "ax25spec#99 (stale UA answers the DISC)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
         }, "Deadlock, 5");
@@ -450,6 +460,10 @@ public static class Scenarios
         Add("seeded-disconnect-released-early", "seeded (released early)", TableSetKind.DisconnectReleasedEarly, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Peer = PeerKind.V20Frmr, Abandon = ReleaseBy.A,
+        }, "DisconnectKept at A, 3");
+        Add("seeded-disconnect-kept-connected", "seeded (released request lost)", TableSetKind.DisconnectKeptConnected, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
         }, "DisconnectKept at A, 3");
         Add("seeded-disconnect-unconfirmed", "seeded (disconnect answer)", TableSetKind.DisconnectUnconfirmed, o => o with
         {

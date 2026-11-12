@@ -95,6 +95,9 @@ internal static class Fixtures
     /// <summary>The TlaCheck seeded fixture in which DL-DISCONNECT Request in Connected goes Disconnected without sending DISC.</summary>
     public static string DisconnectSilentDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent");
 
+    /// <summary>The TlaCheck seeded fixture in which DL-DISCONNECT Request in Connected stays Connected (a released request is lost).</summary>
+    public static string DisconnectKeptConnectedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-kept-connected");
+
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);
 
     public static TableSet Tables(string dir)

@@ -1,0 +1,142 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "management_data_link",
+  "state": "Ready",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.1",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t01_mdl_negotiate_request",
+      "from": "Ready",
+      "on": "MDL_NEGOTIATE_request",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "Initiate Classes of Procedures Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Initiate Optional Functions Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Initiate N1 Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Initiate Window Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Initiate Retry Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Initiate T1 Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "AV := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "P := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Start TM201",
+          "kind": "processing"
+        },
+        {
+          "verb": "XID Command",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Negotiating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_xid_command_received_yes",
+      "from": "Ready",
+      "on": "XID_command_received",
+      "guard": "P_eq_1",
+      "actions": [
+        {
+          "verb": "Classes of Procedures Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Optional Functions Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "N1 Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Window Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Retry Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "T1 Negotiation Response",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "P := 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "XID Response",
+          "kind": "signal_lower"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_xid_command_received_no",
+      "from": "Ready",
+      "on": "XID_command_received",
+      "guard": "not P_eq_1",
+      "actions": [
+        {
+          "verb": "MDL_ERROR_indicate_A",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t03_xid_response_received",
+      "from": "Ready",
+      "on": "XID_response_received",
+      "guard": "",
+      "actions": [
+        {
+          "verb": "MDL_ERROR_indicate_B",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ],
+  "saves": []
+}
