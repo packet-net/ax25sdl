@@ -32,7 +32,11 @@ internal static class GridRecords
             ["index"] = index,
             ["mode"] = "cross",
             ["meaning"] = meaning,
-            ["done"] = r.TlcKind is not ("error" or "timeout") && r.ExplorerKind.Length > 0,
+            ["done"] = r.TlcKind != "error" && r.ExplorerKind.Length > 0,
+            ["timedOut"] = r.TlcKind == "timeout",
+            ["compared"] = r.Capped.Length == 0,
+            ["capped"] = r.Capped,
+            ["cappedFinding"] = r.CappedFinding,
             ["agree"] = r.Agree,
             ["explorerKind"] = r.ExplorerKind,
             ["tlcKind"] = r.TlcKind,
@@ -58,17 +62,19 @@ internal static class GridRecords
         var explorerArms = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal) && !tlcOnly.Contains(a)).Concat(Set(o["explorerOnly"])).ToHashSet(StringComparer.Ordinal);
         return new Row((string?)o["explorer"] ?? "", (string?)o["tlc"] ?? "", (bool?)o["agree"] ?? false, (string?)o["why"] ?? "", explorerArms, tlcArms, null,
             (string?)o["explorerKind"] ?? "", (string?)o["tlcKind"] ?? "", (long?)o["explorerStates"] ?? 0, (long?)o["tlcStates"] ?? 0,
-            (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0);
+            (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0, (string?)o["capped"] ?? "");
     }
 
     /// <summary>A lockstep cell.</summary>
-    public static JsonObject Lockstep(string cell, int index, string meaning, LockstepRow r) => new()
+    public static JsonObject Lockstep(string cell, int index, string meaning, int iterate, LockstepRow r) => new()
     {
         ["cell"] = cell,
         ["index"] = index,
         ["mode"] = "lockstep",
         ["meaning"] = meaning,
-        ["done"] = r.Error.Length == 0,
+        ["iterate"] = iterate,
+        ["done"] = r.Error.Length == 0 || TimedOut(r),
+        ["timedOut"] = TimedOut(r),
         ["result"] = r.Error.Length > 0 ? "error" : r.Diffs.Count == 0 ? "same" : "differ",
         ["states"] = r.States,
         ["exhausted"] = r.Exhausted,
@@ -82,6 +88,28 @@ internal static class GridRecords
         }).ToArray()),
         ["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
     };
+
+    private static bool TimedOut(LockstepRow r) => r.Error.Contains("timeout:", StringComparison.Ordinal);
+
+    /// <summary>The checkout's commit (git rev-parse HEAD), or "unknown".</summary>
+    public static string Commit(string repoRoot)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = repoRoot, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            psi.ArgumentList.Add("rev-parse");
+            psi.ArgumentList.Add("HEAD");
+            using var p = System.Diagnostics.Process.Start(psi);
+            if (p is null) return "unknown";
+            var head = p.StandardOutput.ReadToEnd().Trim();
+            p.WaitForExit();
+            return p.ExitCode == 0 && head.Length > 0 ? head : "unknown";
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return "unknown";
+        }
+    }
 
     // Steps keep their order.
     private static JsonArray Ordered(IEnumerable<string> items) => new(items.Select(i => (JsonNode?)JsonValue.Create(i)).ToArray());
@@ -97,18 +125,26 @@ internal static class GridRecords
     }
 
     /// <summary>The closing summary of a cross-check grid run: the verdicts, agreement and the time spent.</summary>
-    public static string Summary(IReadOnlyList<Row> rows, int skipped)
+    public static string Summary(IReadOnlyList<(string Name, Row Row)> cells, int skipped)
     {
+        var rows = cells.Select(c => c.Row).ToList();
         var sb = new StringBuilder();
-        var agree = rows.Count(r => r.Agree);
-        var noVerdict = rows.Count(r => r.TlcKind is "error" or "timeout" || r.ExplorerKind.Length == 0);
-        sb.Append(CultureInfo.InvariantCulture, $"Grid summary: {rows.Count} cell(s), {agree} agree, {rows.Count - agree - noVerdict} disagree, {noVerdict} without a verdict (rerun them with --resume)");
+        var capped = rows.Where(r => r.Capped.Length > 0).ToList();
+        var compared = rows.Where(r => r.Capped.Length == 0).ToList();
+        var agree = compared.Count(r => r.Agree);
+        var failed = compared.Count(r => r.TlcKind == "error" || r.ExplorerKind.Length == 0);
+        var timedOut = compared.Count(r => r.TlcKind == "timeout" && r.ExplorerKind.Length > 0);
+        sb.Append(CultureInfo.InvariantCulture, $"Grid summary: {rows.Count} cell(s): {agree} agree, {compared.Count - agree - failed - timedOut} disagree, {capped.Count} capped (not compared), {timedOut} timed out (rerun with --resume --retry-timeouts and a larger --timeout), {failed} failed (rerun with --resume)");
         if (skipped > 0) sb.Append(CultureInfo.InvariantCulture, $"; {skipped} read from the results file");
         sb.Append(".\n");
         sb.Append("Verdicts (explorer): ").Append(string.Join(", ", rows.Where(r => r.ExplorerKind.Length > 0).GroupBy(r => r.ExplorerKind)
             .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count().ToString(CultureInfo.InvariantCulture)}"))).Append(".\n");
-        var capped = rows.Count(r => r.ExplorerKind == "bound");
-        if (capped > 0) sb.Append(CultureInfo.InvariantCulture, $"{capped} cell(s) hit the explorer's 1.2 million state cap (TLC has none): a disagreement there is the cap, not a finding.\n");
+        if (capped.Count > 0)
+        {
+            sb.Append(CultureInfo.InvariantCulture, $"Capped, not compared: {capped.Count(r => r.Capped == "states")} at the explorer's state cap, {capped.Count(r => r.Capped == "depth")} at its depth limit (TLC has neither).\n");
+            foreach (var (name, r) in cells.Where(c => c.Row.CappedFinding))
+                sb.Append(CultureInfo.InvariantCulture, $"FINDING to look at: {name} is capped in the explorer, and TLC found {r.Tlc}\n");
+        }
         var largest = rows.OrderByDescending(r => r.TlcStates).FirstOrDefault();
         sb.Append(CultureInfo.InvariantCulture, $"Time: explorer {rows.Sum(r => r.ExplorerSeconds):0} s, TLC {rows.Sum(r => r.TlcSeconds):0} s in all; largest cell {largest?.TlcStates ?? 0} distinct states.\n");
         return sb.ToString();

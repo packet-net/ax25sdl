@@ -44,7 +44,7 @@ public static class Lockstep
         Each(idx =>
         {
             var s = scenarios[idx];
-            if (resultsFile?.Done(s.Name, "lockstep", MeaningName(meaning)) is { } done)
+            if (resultsFile?.Done(s.Name, "lockstep", MeaningName(meaning), iterate) is { } done)
             {
                 results[idx] = GridRecords.LockstepRow(done);
                 Interlocked.Increment(ref skipped);
@@ -54,11 +54,11 @@ public static class Lockstep
             if (grid)
             {
                 try { row = One(s, tlc, work, iterate); }
-                catch (Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or UnauthorizedAccessException)
+                catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
                     row = new LockstepRow(Array.Empty<LockstepDiff>(), 0, false, $"{ex.GetType().Name}: {ex.Message}", 0);
                 }
-                resultsFile?.Append(GridRecords.Lockstep(s.Name, cellIndex is not null && cellIndex.TryGetValue(s.Name, out var i) ? i : idx, MeaningName(meaning), row));
+                resultsFile?.Append(GridRecords.Lockstep(s.Name, cellIndex is not null && cellIndex.TryGetValue(s.Name, out var i) ? i : idx, MeaningName(meaning), iterate, row));
                 if (row.Error.Length == 0 && row.Diffs.Count == 0)
                 {
                     var dir = Path.Combine(work, s.Name);

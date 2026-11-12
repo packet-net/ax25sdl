@@ -444,8 +444,10 @@ Refused, with the reason printed: the axes (`frames-ab`, `frames-ba`, `budget`, 
 **Long unattended runs.**
 
 - `--results FILE` appends one JSON line per cell as the cell completes and flushes it to disk: the cell's name, index, mode (`cross` or `lockstep`), meaning, whether it has a verdict, both verdicts and texts, agreement, distinct states and seconds for each tool, the arms fired (TLC's, plus any transition only one tool fired), and for lockstep the differences with their counterexamples. TlaCheck refuses an existing FILE unless `--resume` is given.
-- `--resume` skips the cells FILE already records with a verdict from a run in the same mode with the same meaning; a cell recorded without one (TLC timed out or failed, the run was killed) runs again, and a line cut short by a kill is ignored. Each completed cell's line also says when it finished. At the end the report covers every selected cell, read back from FILE where it was skipped, so a resumed run that finds nothing to do just prints the whole report.
-- At the end: the report table, the coverage report, and a summary (cells agreeing and disagreeing, cells without a verdict, the explorer's verdicts by kind, cells that hit the explorer's 1.2 million state cap, the time spent and the largest cell). A cell that hits the cap disagrees by construction (the explorer says "bound", TLC, which has no cap, explores the lot). The flow-control grid's largest cell does once its flow checks are disabled (`--grid-with disable=busy-tracks-flow+flow-off-delivery`); with them on, every cell where A sends stops early on #43.
+- `--resume` skips the cells FILE already records as finished in a run of the same mode with the same meaning (and, for lockstep, the same `--lockstep-iterate`); a cell whose run failed (an exception, TLC crashing, the run killed mid-cell) runs again, and a line cut short by a kill is ignored. A cell where TLC timed out is finished: it reruns only with `--retry-timeouts`, which is worth it only with a larger `--timeout`. Every line records the code commit it ran and when it finished. At the end the report covers every selected cell, read back from FILE where it was skipped, so a resumed run that finds nothing to do just prints the whole report.
+- `--timeout` is per TLC phase, and a cell runs up to five (safety, deadlock, two liveness, coverage), so a cell can take five times it. When a phase gives no verdict, the cell's coverage phase is skipped (it would only time out again).
+- Any exception in a cell is recorded as that cell's failure and the run carries on.
+- At the end: the report table, the coverage report, and a summary (cells agreeing, disagreeing, capped, timed out and failed, the explorer's verdicts by kind, the time spent and the largest cell). A cell the explorer cuts off at its 1.2 million state cap or its depth limit of 80 is **capped, not compared**: TLC has neither limit, so the two cannot be compared there, and such a cell is neither counted as a disagreement nor fails the run. The log line, the JSON record (`compared: false`, `capped: "states"` or `"depth"`) and the summary say which limit it hit. A capped cell where TLC found a violation is flagged as a finding to look at (`FINDING` in the summary, `cappedFinding: true`), since TLC's search there went further than the explorer's. The flow-control grid's largest cell is capped once its flow checks are disabled (`--grid-with disable=busy-tracks-flow+flow-off-delivery`); with them on, every cell where A sends stops early on #43.
 - `--grid-cells SPEC` selects cells: a comma list of indices (`12`), ranges (`0-143`), strides (`%4=1`, every index whose remainder modulo 4 is 1) and name patterns with `*` and `?` (`g-ab3-*`). Strides split a grid evenly across processes; a range does not, as the large cells sit together at the end.
 - Within a process the cells run largest first (a guess from frames and budget), one at a time per slot, so a run does not end with one slot grinding through the biggest cells alone.
 - Disk: TLC's fingerprint and queue files and its extracted modules are deleted after every TLC run, and a coverage run's state dump once read (as for calibration). A grid run also deletes each cell's model directory once the cell agrees (with `--lockstep`, once it shows no difference), so the work directory holds only the cells in progress and those worth reading. A cell in progress needs room for its coverage dump: about 1.2 GB on the largest data-phase cell, more on a larger one.
@@ -454,7 +456,13 @@ Refused, with the reason printed: the axes (`frames-ab`, `frames-ba`, `budget`, 
 
 The grids need more memory than the dev container; one large box runs all of them in a few hours. The figures below are estimates (see "Relative cost").
 
-1. Packages and tools (as root or with sudo):
+1. Attach a large volume (or use instance store) and mount it at `/data`: the work directories need about 10 GB per slot, and the Amazon Linux root volume is small. A full disk shows up as a stream of failed cells, not a crash. For example, with an EBS volume at `/dev/nvme1n1`:
+
+   ```sh
+   sudo mkfs.xfs /dev/nvme1n1 && sudo mkdir -p /data && sudo mount /dev/nvme1n1 /data && sudo chown "$USER" /data
+   ```
+
+2. Packages and tools (as root or with sudo):
 
    ```sh
    sudo dnf install -y git tar libicu java-21-amazon-corretto-headless
@@ -473,25 +481,30 @@ The grids need more memory than the dev container; one large box runs all of the
    dotnet build codegen/src/Packet.Sdl.TlaCheck --configuration Release
    ```
 
-2. Size `--parallel` and `--heap` by memory, not cores: each slot is one TLC JVM (`--heap`, plus about 1 GB outside the heap) and its share of the one .NET process, which holds the explorer's whole state graph while that cell runs (a few GB on the largest cells). Allow about 8 GB per slot with `--heap 3g`: `--parallel 8` on 64 GB, 16 on 128 GB, 32 on 256 GB, 48 on 384 GB, and at most one slot per core (`--workers 1` keeps TLC's shortest-trace guarantee, so a slot uses one core). Keep 10 GB of disk per slot under `--work` (the coverage dumps). `--timeout 3600` gives the largest cells room; the default 600 s is what the largest base cell needs per TLC run, and the flow-control grid's largest are bigger.
+3. Size `--parallel` and `--heap` by memory, not cores: each slot is one TLC JVM (`--heap`, plus about 1 GB outside the heap) and its share of the one .NET process, which holds the explorer's whole state graph while that cell runs (a few GB on the largest cells). `--parallel` is per process: two processes at `--parallel 32` are 64 slots. Allow about 8 GB per slot with `--heap 3g`, counted over all processes running at once: `--parallel 8` on 64 GB, 16 on 128 GB, 32 on 256 GB, 48 on 384 GB, and at most one slot per core (`--workers 1` keeps TLC's shortest-trace guarantee, so a slot uses one core). Keep 10 GB of disk per slot under `--work` (the coverage dumps); the heavy option sets (last in "Relative cost") explore far more in TLC's uncapped coverage phase, so give them fewer slots. `--timeout 3600` gives the largest cells room; the default 600 s is what the largest base cell needs per TLC run, and the flow-control grid's largest are bigger.
 
-3. Run each grid into its own results file, under `nohup` (or `tmux`) so the run survives the session. `RUN` is the common part:
+4. Run the grids one after another, each with the whole box, into its own results file, from a script under `nohup` (or in `tmux`) so it survives the session:
 
    ```sh
-   RUN="dotnet run --no-build --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --parallel 32 --heap 3g --timeout 3600"
+   cat > grids.sh <<'SH'
+   #!/bin/bash
+   RUN="dotnet run --no-build --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --parallel 32 --heap 3g --timeout 3600 --resume"
+   run() { name=$1; shift; $RUN "$@" --work /data/w-$name --results results/$name.jsonl > results/$name.md 2>> results/$name.log; }
    mkdir -p results
-   nohup $RUN --grid --work /data/w-base --results results/base.jsonl > results/base.md 2> results/base.log &
-   nohup $RUN --grid-flow --work /data/w-flow --results results/flow.jsonl > results/flow.md 2> results/flow.log &
-   nohup $RUN --grid-stub --work /data/w-stub --results results/stub.jsonl > results/stub.md 2> results/stub.log &
-   # one per option set, for example
-   nohup $RUN --grid --grid-with t3 --work /data/w-t3 --results results/t3.jsonl > results/t3.md 2> results/t3.log &
-   # the independent meaning in lockstep
-   nohup $RUN --grid --lockstep --meaning Ax25MeaningIndependent --lockstep-iterate 8 --work /data/w-lockstep --results results/lockstep.jsonl > results/lockstep.md 2> results/lockstep.log &
+   run base --grid
+   run stub --grid-stub
+   run flow --grid-flow
+   run t3 --grid --grid-with t3
+   run release --grid --grid-with release=both
+   # ... one line per option set ...
+   run lockstep --grid --lockstep --meaning Ax25MeaningIndependent --lockstep-iterate 8
+   SH
+   chmod +x grids.sh && nohup ./grids.sh > grids.out 2>&1 &
    ```
 
-   Several runs at once share the box: divide the slots between them. `wc -l results/*.jsonl` shows progress; the `.log` files have one line per cell. If a run stops (a spot interruption, a crash, an out-of-memory kill), rerun the same command with `--resume`. To split one grid over several processes or boxes, give each `--grid-cells %N=R` (R = 0..N-1) and its own `--work` and results file; afterwards `cat` the files into one and run the grid once more with `--resume` on it to print the whole report without rerunning anything.
+   `--resume` on a results file that does not exist yet just starts it, so the script can be rerun as it stands after a spot interruption, a crash or an out-of-memory kill: finished cells are skipped. `wc -l results/*.jsonl` shows progress; the `.log` files have one line per cell. To split one grid over several processes or boxes, give each `--grid-cells %N=R` (R = 0..N-1), its own `--work` and results file, and a share of the slots; afterwards `cat` the files into one and run the grid once more with `--resume` on it to print the whole report (it reruns only cells recorded as failed, and timed-out ones with `--retry-timeouts`).
 
-4. Copy back only the results: the `.jsonl`, `.md` and `.log` files, compressed (`tar czf results.tgz results`), a few MB in all. Egress from AWS is billed; leave the work directories behind. The model directories left there are the cells that disagreed or had no verdict, each with its configs and TLC's output (`tlc_*.out`); if one needs reading, copy back just that cell's `tlc_*.out`.
+5. Copy back only the results: the `.jsonl`, `.md` and `.log` files, compressed (`tar czf results.tgz results`), a few MB in all. Egress from AWS is billed; leave the work directories behind. The model directories left there are the cells that disagreed, were capped or had no verdict, each with its configs and TLC's output (`tlc_*.out`); if one needs reading, copy back just that cell's `tlc_*.out`.
 
 ### Relative cost
 
