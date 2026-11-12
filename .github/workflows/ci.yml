@@ -321,7 +321,7 @@ jobs:
     name: semantic validation - TLA+ independent meaning (informational)
     runs-on: [self-hosted, Linux, X64]
     needs: csharp
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v6
         with:
