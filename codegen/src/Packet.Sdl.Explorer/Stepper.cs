@@ -151,6 +151,10 @@ public sealed class Stepper
             throw new ArgumentException("an injected frame needs the table-driven peer and a form (--inject-frame)", nameof(options));
         if (_o.InjectedFrame != InjectedFrame.None && _o.Inject == FlowControlAt.None)
             throw new ArgumentException("an injected frame form needs a station that injects it (--inject)", nameof(options));
+        if (_o.InjectedThen != InjectedFrame.None && _o.InjectedFrame == InjectedFrame.None)
+            throw new ArgumentException("a second injected frame needs a first (--inject-frame FIRST,SECOND)", nameof(options));
+        if (_o.Srej && (_o.InjectedFrame is InjectedFrame.IPollAhead or InjectedFrame.IPollStale || _o.InjectedThen is InjectedFrame.IPollAhead or InjectedFrame.IPollStale))
+            throw new ArgumentException("the out-of-sequence injected I frames are for links without SREJ (with SREJ the receiver saves the frame, and it would collide with the sender's own frame of that number)", nameof(options));
         if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
             throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
         if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
@@ -637,11 +641,38 @@ public sealed class Stepper
     /// </summary>
     private bool InjectReady(SystemState s, Station station)
     {
-        if (!Injects(station) || s.Injected(station)) return false;
+        if (!Injects(station) || s.Injected(station) >= InjectCount) return false;
         var m = s.Machine(station);
-        var r = s.Machine(SystemState.Peer(station));
-        return _o.InjectedFrame switch
+        var peer = SystemState.Peer(station);
+        var r = s.Machine(peer);
+        return InjectForm(s.Injected(station)) switch
         {
+            // The injected I frames: both stations in the data phase and no
+            // I frame on the channel to the receiver (the previous injected
+            // one, or one of the sender's own), so the receiver's V(r) the
+            // frame is numbered from is still current when it arrives (on a
+            // channel without reordering). The in-sequence
+            // forms take a number the sender's machine has not used, so the
+            // receiver's next acknowledgement is an N(r) error at the sender
+            // and the link is reset: only once everything either station
+            // submitted has been delivered and the sender's queue is empty, so
+            // nothing of the sender's own can collide with the frame and the
+            // reset loses nothing the harness did not cause.
+            InjectedFrame.IFrame or InjectedFrame.IPoll or InjectedFrame.IPollAhead or InjectedFrame.IPollStale when
+                !IsDataState(m.State) || !IsDataState(r.State) || s.Incoming(peer).Any(f => f.Type == "I") => false,
+            InjectedFrame.IFrame or InjectedFrame.IPoll => r.Vr == m.Vs && m.QueueEntries.Count == 0 && AllDelivered(s),
+            // Without SREJ the receiver answers the frame ahead of sequence
+            // with a REJ F=1 naming its V(r). When that is the sender's V(s)
+            // (nothing outstanding), only while the sender is in
+            // TimerRecovery with both channels empty, so the REJ reaches it
+            // there (figc4.5's F=1 arm, where N(r) = V(s) brings it back to
+            // Connected). In Connected, figc4.4's REJ arm takes N(r) = V(s)
+            // as in range and Invoke Retransmission runs round the whole
+            // modulus (a reject naming no outstanding frame, the
+            // reject-naming-vs group), which is not this frame's to show.
+            InjectedFrame.IPollAhead => r.Vr != m.Vs
+                || (m.State == "TimerRecovery" && s.ToA.Count == 0 && s.ToB.Count == 0),
+            InjectedFrame.IPollStale => true,
             InjectedFrame.RejPoll or InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => IsDataState(m.State)
                 && (_o.InjectedFrame == InjectedFrame.RejPoll ? r.State == "TimerRecovery" : IsDataState(r.State))
                 && Distance(r.Va, m.Vr, r.Modulo) < Distance(r.Va, r.Vs, r.Modulo),
@@ -658,24 +689,47 @@ public sealed class Stepper
         InjectedFrame.SrejCommand => "pinned:inject_srej_command",
         InjectedFrame.SrejPoll => "pinned:inject_srej_poll",
         InjectedFrame.UaF0 => "pinned:inject_ua_f0",
+        InjectedFrame.IFrame => "pinned:inject_i_frame",
+        InjectedFrame.IPoll => "pinned:inject_i_poll",
+        InjectedFrame.IPollAhead => "pinned:inject_i_poll_ahead",
+        InjectedFrame.IPollStale => "pinned:inject_i_poll_stale",
         _ => "pinned:inject_frmr",
     };
+
+    /// <summary>How many frames each injecting station puts on the air: one, or two with <see cref="ExplorerOptions.InjectedThen"/>.</summary>
+    private int InjectCount => _o.InjectedThen == InjectedFrame.None ? 1 : 2;
+
+    /// <summary>The form of a station's injected frame number <paramref name="n"/> (0 the first).</summary>
+    private InjectedFrame InjectForm(int n) => n == 0 ? _o.InjectedFrame : _o.InjectedThen;
+
+    /// <summary>The payload label of a station's injected I frame number <paramref name="n"/>: <c>xa0</c>, <c>xa1</c>, <c>xb0</c>, <c>xb1</c>.</summary>
+    public static string InjectedLabel(Station sender, int n) => (sender == Station.A ? "xa" : "xb") + Inv(n);
+
+    /// <summary>Whether a payload label is an injected I frame's (never a submitted or UI label).</summary>
+    public static bool IsInjectedLabel(string? label) => label is not null && label.StartsWith('x');
 
     /// <summary>The station puts its injected frame on the air (<see cref="ExplorerOptions.Inject"/>).</summary>
     private StepOutcome InjectFrame(SystemState s, Station station, int number)
     {
         var m = s.Machine(station);
-        var frame = _o.InjectedFrame switch
+        var n = s.Injected(station);
+        var form = InjectForm(n);
+        var r = s.Machine(SystemState.Peer(station));
+        var label = InjectedLabel(station, n);
+        var frame = form switch
         {
+            InjectedFrame.IFrame or InjectedFrame.IPoll => new Frame("I", Command: true, Pf: form == InjectedFrame.IPoll, Nr: m.Vr, Ns: r.Vr, Data: label),
+            InjectedFrame.IPollAhead => new Frame("I", Command: true, Pf: true, Nr: m.Vr, Ns: (r.Vr + 1) % r.Modulo, Data: label),
+            InjectedFrame.IPollStale => new Frame("I", Command: true, Pf: true, Nr: m.Vr, Ns: (r.Vr + r.Modulo - 1) % r.Modulo, Data: label),
             InjectedFrame.RejPoll => new Frame("REJ", Command: true, Pf: true, Nr: m.Vr, Ns: null, Data: null),
             InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => new Frame("SREJ", Command: true, Pf: _o.InjectedFrame == InjectedFrame.SrejPoll, Nr: m.Vr, Ns: null, Data: null),
             InjectedFrame.UaF0 => new Frame("UA", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
             _ => new Frame("FRMR", Command: false, Pf: false, Nr: null, Ns: null, Data: null),
         };
         var outgoing = new List<Frame>(s.Outgoing(station)) { frame };
-        var next = station == Station.A ? s with { ToB = outgoing, InjectedA = true } : s with { ToA = outgoing, InjectedB = true };
+        var next = station == Station.A ? s with { ToB = outgoing, InjectedA = n + 1 } : s with { ToA = outgoing, InjectedB = n + 1 };
         var record = new StepRecord(number, station.ToString(), $"{frame.Render()} put on the air by the harness (another implementation)",
-            InjectId(_o.InjectedFrame), new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
+            InjectId(form), new[] { "frame " + frame.Render() }, SummaryOf(next, Station.A), SummaryOf(next, Station.B));
         return new StepOutcome(next, record, null);
     }
 
@@ -1169,6 +1223,14 @@ public sealed class Stepper
         var connectReported = false;
         var told = s.Told(station);
         var effectsText = new List<string>();
+        // An injected I frame's payload (InjectedFrame.IFrame and after) may
+        // be delivered once, by the dispatch of that frame itself, received in
+        // sequence (N(s) = V(r) before it): the only delivery a correct
+        // receiver makes of it. It is not one of the peer's submissions, so
+        // it moves no delivery count.
+        var injectedDeliverable = input is { Event: "I_received", Command: true } && IsInjectedLabel(input.Data) && input.Ns == pre.Vr
+            ? input.Data
+            : null;
 
         if (result is not null)
         {
@@ -1204,7 +1266,15 @@ public sealed class Stepper
                         }
                         var submitted = Submitted(peer);
                         var expected = delivered < submitted.Length ? submitted[delivered] : null;
-                        if (expected is not null && string.Equals(ue.Detail, expected, StringComparison.Ordinal))
+                        if (IsInjectedLabel(ue.Detail))
+                        {
+                            if (injectedDeliverable is not null && string.Equals(ue.Detail, injectedDeliverable, StringComparison.Ordinal))
+                                injectedDeliverable = null;
+                            else if (violation is null && On(Invariants.Delivery))
+                                violation = new Violation(Invariants.Delivery, station,
+                                    $"station {station} delivered the injected payload `{ue.Detail}` upward other than once, on receiving that I frame in sequence: out-of-sequence, duplicate or stored delivery");
+                        }
+                        else if (expected is not null && string.Equals(ue.Detail, expected, StringComparison.Ordinal))
                         {
                             delivered++;
                         }

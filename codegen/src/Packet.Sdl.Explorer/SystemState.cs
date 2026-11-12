@@ -146,10 +146,10 @@ public sealed record SystemState
 
     public int ToldB { get; init; }
 
-    /// <summary>With <see cref="ExplorerOptions.Inject"/>, whether the station has put its injected frame on the air.</summary>
-    public bool InjectedA { get; init; }
+    /// <summary>With <see cref="ExplorerOptions.Inject"/>, how many injected frames the station has put on the air (0, 1 or 2).</summary>
+    public int InjectedA { get; init; }
 
-    public bool InjectedB { get; init; }
+    public int InjectedB { get; init; }
 
     /// <summary>The v2.0 stub playing station B, or null when B is the table-driven machine <see cref="B"/>.</summary>
     public V20Peer? StubPeer { get; init; }
@@ -188,7 +188,7 @@ public sealed record SystemState
 
     public bool UiDone(Station s) => s == Station.A ? UiDoneA : UiDoneB;
 
-    public bool Injected(Station s) => s == Station.A ? InjectedA : InjectedB;
+    public int Injected(Station s) => s == Station.A ? InjectedA : InjectedB;
 
     public int Reset(Station s) => s == Station.A ? ResetA : ResetB;
 
@@ -235,7 +235,7 @@ public sealed record SystemState
           .Append(HeardBusyA ? '1' : '0').Append(HeardBusyB ? '1' : '0')
           .Append("|v").Append(UiSentA ? '1' : '0').Append(UiSentB ? '1' : '0').Append(UiDoneA ? '1' : '0').Append(UiDoneB ? '1' : '0')
           .Append("|e").Append(Inv(ResetA)).Append(Inv(ResetB)).Append(Inv(ToldA)).Append(Inv(ToldB))
-          .Append("|i").Append(InjectedA ? '1' : '0').Append(InjectedB ? '1' : '0');
+          .Append("|i").Append(Inv(InjectedA)).Append(Inv(InjectedB));
         if (StubPeer is not null) sb.Append("|p").Append(StubPeer.Fingerprint());
         return sb.ToString();
     }

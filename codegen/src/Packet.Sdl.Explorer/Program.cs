@@ -46,7 +46,9 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --inject A|B|both      that station (or either) puts one injected frame on the air, as from another implementation
   --inject-frame FORM    with --inject: rej-poll (receiver in TimerRecovery), srej-command (receiver in Connected or
                          TimerRecovery; srej-poll the same with P=1), each naming a frame outstanding at the receiver, ua-f0 (receiver on a connect or release page) or frmr (receiver in
-                         Connected or TimerRecovery)
+                         Connected or TimerRecovery), or an I command carrying payload xa0 (xb0): i-frame (P=0) or
+                         i-poll (P=1) with N(s) the receiver's V(r), i-poll-ahead (V(r)+1) or i-poll-stale (V(r)-1);
+                         FIRST,SECOND puts a second frame on the air after the first
   --frame-errors LIST    comma list of corrupted forms a frame may arrive in, as a channel fault under the budget:
                          control, info, length, n1, i-response; the receiver reports each with its DL-ERROR, a
                          reset is honest only on a corrupted frame, and data an honest reset loses is reset-loss
@@ -61,12 +63,14 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --quiescence-accepts-timer-recovery   triage aid: a station in TimerRecovery counts as quiescent
   --max-depth N          depth bound (default 80)
   --max-states N         visited-state bound (default 400000)
+  --fired                after the verdict, list the table rows the search fired (State/id, Subroutine:id)
 
 exit code: 0 no violation, 1 violation, 2 bound hit
 """;
 
 string tables = "spec/json";
 int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
+bool fired = false;
 bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, dataBeforeConfirm = false, releaseEarly = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
@@ -81,6 +85,7 @@ var uiForm = UiForm.Plain;
 var frameErrors = FrameErrors.None;
 var inject = FlowControlAt.None;
 var injectedFrame = InjectedFrame.None;
+var injectedThen = InjectedFrame.None;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
 var invariants = Invariants.Default;
@@ -154,16 +159,25 @@ try
                 };
                 break;
             case "--inject-frame":
-                injectedFrame = Next(args, ref i) switch
+            {
+                var forms = Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries).Select(f => f switch
                 {
                     "rej-poll" => InjectedFrame.RejPoll,
                     "srej-command" => InjectedFrame.SrejCommand,
                     "srej-poll" => InjectedFrame.SrejPoll,
                     "ua-f0" => InjectedFrame.UaF0,
                     "frmr" => InjectedFrame.Frmr,
-                    var v => throw new ArgumentException($"unknown injected frame `{v}` (rej-poll, srej-command, srej-poll, ua-f0, frmr)"),
-                };
+                    "i-frame" => InjectedFrame.IFrame,
+                    "i-poll" => InjectedFrame.IPoll,
+                    "i-poll-ahead" => InjectedFrame.IPollAhead,
+                    "i-poll-stale" => InjectedFrame.IPollStale,
+                    var v => throw new ArgumentException($"unknown injected frame `{v}` (rej-poll, srej-command, srej-poll, ua-f0, frmr, i-frame, i-poll, i-poll-ahead, i-poll-stale)"),
+                }).ToArray();
+                if (forms.Length is < 1 or > 2) throw new ArgumentException("--inject-frame takes one form, or two separated by a comma");
+                injectedFrame = forms[0];
+                injectedThen = forms.Length == 2 ? forms[1] : InjectedFrame.None;
                 break;
+            }
             case "--frame-errors":
                 foreach (var f in Next(args, ref i).Split(',', StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -216,6 +230,7 @@ try
             case "--accept-give-up": acceptGiveUp = true; break;
             case "--selective-progress": selective = true; break;
             case "--rej-may-equal-vs": rejMayEqualVs = true; break;
+            case "--fired": fired = true; break;
             case "--quiescence-accepts-timer-recovery": trQuiescent = true; break;
             case "--faults":
                 faults = FaultKinds.None;
@@ -300,6 +315,7 @@ try
         FrameErrors = frameErrors,
         Inject = inject,
         InjectedFrame = injectedFrame,
+        InjectedThen = injectedThen,
         Release = release,
         ReleaseEarly = releaseEarly,
         Reconnect = reconnect,
@@ -316,6 +332,11 @@ try
 
     var result = Explorer.Run(options);
     Console.WriteLine(result.Render());
+    if (fired)
+    {
+        Console.WriteLine("table rows fired:");
+        foreach (var t in result.FiredTransitions.Order(StringComparer.Ordinal)) Console.WriteLine("  " + t);
+    }
     return result.Outcome switch
     {
         Outcome.NoViolation => 0,
