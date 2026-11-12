@@ -495,7 +495,27 @@ The grids need more memory than the dev container; one large box runs all of the
 
 ### Relative cost
 
-{COST}
+Measured with the explorer alone (12 November 2026), on a sample of 24 cells of each grid (frames 1..3 from A, 0 or 2 from B, budget 1 and 2, SREJ off and on, k = 4, drop+dup), as the total distinct states against the base grid's; TLC's time follows the states (the base grid took about 2.7 hours at `--parallel 8`, "Wider" above). A cell that stops on an early violation is cheap, so a set that makes violations show sooner looks cheaper than its space.
+
+| Set (`--grid-with`) | States against the base grid | Sample cells at the 1.2 million cap |
+| --- | --- | --- |
+| (base, `--grid`) | 1 | 0 |
+| `t3` | 1.0 | 0 |
+| `inject=both,inject-frame=rej-poll` | 1.1 | 0 |
+| `accept-give-up`, `t3,accept-give-up` | 1.4 | 0 |
+| `reconnect=A,abandon=A` | 1.5 | 0 |
+| `inject=both,inject-frame=i-poll` | 1.9 | 0 |
+| `release=both` | 2.0 | 0 |
+| `reconnect=both` | 2.5 | 0 |
+| `frame-errors=control+info+length+n1+i-response` | 2.7 | 0 |
+| `release=both,accept-give-up` | 3.0 | 0 |
+| `reconnect=both,data-after-reconnect` | 9 | 0 |
+| `unit-data=both` | 13 | 1 |
+| `inject=both,inject-frame=frmr` | 18 | 1 |
+| `inject=both,inject-frame=srej-command` | 31 | 3 |
+| `local-busy=both` | 70 | 8 |
+
+`--grid-flow` stops every cell where A sends at 3 steps on #43, so it costs far less than the base grid until its flow checks are disabled. The stub grid is 72 cells of under 110 states each: minutes. The last four sets reach past the explorer's cap on their largest cells, where TLC (which has no cap) runs on unbounded: run them last, and start with their budget 0 and 1 cells (`--grid-cells '*-b0-*,*-b1-*'`). On the dev container a 1+1 frame, budget 1 cell with `local-busy=both` had not finished its TLC phases after 15 minutes. Lockstep runs one TLC search per cell (per iteration) instead of the cross-check's three to five, so a lockstep grid costs roughly a third of the cross-check grid, more with `--lockstep-iterate`.
 
 ## Not covered yet
 
