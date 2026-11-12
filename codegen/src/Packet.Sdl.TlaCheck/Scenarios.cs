@@ -642,7 +642,7 @@ public static class Scenarios
         const InjectedFrame Ahead = InjectedFrame.IPollAhead, Stale = InjectedFrame.IPollStale;
         Add("ip-inseq", "I poll in sequence", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "clean");
         Add("ip-stale", "I poll outside the window", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale), "clean");
-        Add("ip-busy", "figc4.4 busy I poll answered RR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { LocalBusy = FlowControlAt.B }, "BusyIndication at B, 3");
+        Add("ip-busy", "ax25spec#178 (figc4.4 busy I poll answered RR)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { LocalBusy = FlowControlAt.B }, "BusyIndication at B, 3");
         Add("ip-rejx", "I poll in reject exception; REJ F=1", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Ahead, Ahead) with
         {
             FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
