@@ -981,7 +981,9 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[9].Transition.Should().Be("t14_sabm_received_yes");
         result.Violation.Message.Should().Contain("delivered at A: 0/0, at B: 1/2");
         result.CounterexampleLength.Should().Be(11);
-        result.FiredTransitions.Should().Contain(["TimerRecovery/t11_ua_received", "TimerRecovery/t18_rr_received_no_no_no"]);
+        // Since ax25spec#180 B's stale RR leaves Timer Recovery for Awaiting
+        // Connection, so the UA no longer arrives in Timer Recovery here.
+        result.FiredTransitions.Should().Contain("TimerRecovery/t18_rr_received_no_no_no_no");
     }
 
     [Fact]
@@ -1622,7 +1624,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[2].Transition.Should().Be("t13_t3_expiry");
         result.Trace[3].Transition.Should().Be("t07_dl_connect_request");
         result.Trace[3].SummaryA.Should().StartWith("TimerRecovery");
-        result.StatesExplored.Should().Be(45);
+        result.StatesExplored.Should().Be(47);
     }
     // ─── Coverage batch 5: UI frames (ExplorerOptions.UnitData) ─────────
 
@@ -1935,7 +1937,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Quiescence);
         result.Trace[^1].Transition.Should().Be("t08_control_field_error");
         result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery");
-        result.StatesExplored.Should().Be(55);
+        result.StatesExplored.Should().Be(53);
         result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t09_info_not_permitted_in_frame", "TimerRecovery/t10_u_or_s_frame_length_error" });
     }
 
@@ -2006,7 +2008,7 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Quiescence);
-        result.StatesExplored.Should().Be(45);
+        result.StatesExplored.Should().Be(47);
         result.FiredTransitions.Should().Contain("TimerRecovery/t14_sabme_received_yes");
     }
 
@@ -2341,12 +2343,13 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData(SeedKind.Connected, false, 363, "TimerRecovery/t23_rej_received_yes_no_no")]
-    [InlineData(SeedKind.AwaitingV22Connection, false, 532, "TimerRecovery/t23_rej_received_yes_no_yes")]
-    [InlineData(SeedKind.AwaitingV22Connection, true, 2271, "TimerRecovery/t19_rnr_received_yes_no_yes")]
+    [InlineData(SeedKind.Connected, false, 333, "TimerRecovery/t23_rej_received_yes_no_no")]
+    [InlineData(SeedKind.AwaitingV22Connection, false, 500, "TimerRecovery/t23_rej_received_yes_no_yes")]
+    [InlineData(SeedKind.Connected, true, 1374, "TimerRecovery/t19_rnr_received_no_no_no_no")]
+    [InlineData(SeedKind.AwaitingV22Connection, true, 2233, "TimerRecovery/t19_rnr_received_yes_no_yes")]
     public void An_I_Frame_In_Sequence_Puts_The_Peers_N_r_Past_V_s(SeedKind seed, bool busy, int states, string arm)
     {
-        // ip-nr, ip-nr-v22, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
+        // ip-nr, ip-nr-v22, ip-nr-rnr, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
         // its poll lost, sends an I frame in sequence that its own machine
         // never numbered; then a frame ahead of sequence draws REJ F=1, or B's
         // busy condition draws RNR, each with N(r) = V(s) + 1 at A. Reject
@@ -2413,22 +2416,23 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Both_Stations_Injecting_In_Sequence_Show_The_Errata_Branch_Staying_In_Timer_Recovery()
+    public void Both_Stations_Injecting_In_Sequence_Are_Clean_Now_The_N_r_Error_Leaves_Timer_Recovery()
     {
-        // ip-both (from the review of batch 7; ax25spec#12): B in Timer
-        // Recovery receives an RR with N(r) past V(s); t18_rr_received_no_no_no
-        // runs N(r) Recovery but stays in Timer Recovery with its variables,
-        // so after A's reset B retransmits b0 and A delivers it again.
+        // ip-both (from the review of batch 7; ax25spec#12, H9): B in Timer
+        // Recovery receives an RR with N(r) past V(s). Until ax25spec#180 the
+        // errata branch ran N(r) Recovery and stayed in Timer Recovery with
+        // its variables, so after A's reset B retransmitted b0 and A
+        // delivered it again (Delivery at A, 18 steps). Since #180 the arm
+        // leaves for Awaiting Connection, as the 1998 figure draws, and the
+        // row is clean.
         var result = Run(Ip(InjectedFrame.IFrame) with
         {
             Inject = FlowControlAt.Both, FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop,
             Invariants = Invariants.Default & ~Invariants.RejectCoherence,
         });
-        result.Outcome.Should().Be(Outcome.Violation);
-        result.Violation!.Kind.Should().Be(Invariants.Delivery);
-        result.Violation.Station.Should().Be(Station.A);
-        result.CounterexampleLength.Should().Be(18);
-        result.Trace.Should().Contain(r => r.Transition == "t18_rr_received_no_no_no");
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(3531);
+        result.FiredTransitions.Should().Contain("TimerRecovery/t18_rr_received_no_no_no_no");
     }
 
     [Fact]

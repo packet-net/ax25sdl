@@ -12,8 +12,8 @@ func TestDataLinkTimerRecovery_SourceFigure(t *testing.T) {
 }
 
 func TestDataLinkTimerRecovery_TransitionsArePresent(t *testing.T) {
-	if got := len(DataLinkTimerRecovery.Transitions); got != 92 {
-		t.Errorf("len(Transitions) = %d, want 92", got)
+	if got := len(DataLinkTimerRecovery.Transitions); got != 94 {
+		t.Errorf("len(Transitions) = %d, want 94", got)
 	}
 }
 
@@ -802,8 +802,8 @@ func TestDataLinkTimerRecovery_t13_sabm_received_yes(t *testing.T) {
 	if tx.Guard != "vs_eq_va" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "vs_eq_va")
 	}
-	if got := len(tx.Actions); got != 5 {
-		t.Fatalf("len(Actions) = %d, want 5", got)
+	if got := len(tx.Actions); got != 10 {
+		t.Fatalf("len(Actions) = %d, want 10", got)
 	}
 	if tx.Actions[0].Verb != "F := P" {
 		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "F := P")
@@ -834,6 +834,36 @@ func TestDataLinkTimerRecovery_t13_sabm_received_yes(t *testing.T) {
 	}
 	if tx.Actions[4].Kind != SignalUpper {
 		t.Errorf("Actions[4].Kind = %v, want SignalUpper", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "Stop T1" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Stop T1")
+	}
+	if tx.Actions[5].Kind != Processing {
+		t.Errorf("Actions[5].Kind = %v, want Processing", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "Stop T3" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "Stop T3")
+	}
+	if tx.Actions[6].Kind != Processing {
+		t.Errorf("Actions[6].Kind = %v, want Processing", tx.Actions[6].Kind)
+	}
+	if tx.Actions[7].Verb != "V(s) := 0" {
+		t.Errorf("Actions[7].Verb = %q, want %q", tx.Actions[7].Verb, "V(s) := 0")
+	}
+	if tx.Actions[7].Kind != Processing {
+		t.Errorf("Actions[7].Kind = %v, want Processing", tx.Actions[7].Kind)
+	}
+	if tx.Actions[8].Verb != "V(a) := 0" {
+		t.Errorf("Actions[8].Verb = %q, want %q", tx.Actions[8].Verb, "V(a) := 0")
+	}
+	if tx.Actions[8].Kind != Processing {
+		t.Errorf("Actions[8].Kind = %v, want Processing", tx.Actions[8].Kind)
+	}
+	if tx.Actions[9].Verb != "V(r) := 0" {
+		t.Errorf("Actions[9].Verb = %q, want %q", tx.Actions[9].Verb, "V(r) := 0")
+	}
+	if tx.Actions[9].Kind != Processing {
+		t.Errorf("Actions[9].Kind = %v, want Processing", tx.Actions[9].Kind)
 	}
 }
 
@@ -954,8 +984,8 @@ func TestDataLinkTimerRecovery_t14_sabme_received_yes(t *testing.T) {
 	if tx.Guard != "vs_eq_va" {
 		t.Errorf("Guard = %q, want %q", tx.Guard, "vs_eq_va")
 	}
-	if got := len(tx.Actions); got != 5 {
-		t.Fatalf("len(Actions) = %d, want 5", got)
+	if got := len(tx.Actions); got != 10 {
+		t.Fatalf("len(Actions) = %d, want 10", got)
 	}
 	if tx.Actions[0].Verb != "F := P" {
 		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "F := P")
@@ -986,6 +1016,36 @@ func TestDataLinkTimerRecovery_t14_sabme_received_yes(t *testing.T) {
 	}
 	if tx.Actions[4].Kind != SignalUpper {
 		t.Errorf("Actions[4].Kind = %v, want SignalUpper", tx.Actions[4].Kind)
+	}
+	if tx.Actions[5].Verb != "Stop T1" {
+		t.Errorf("Actions[5].Verb = %q, want %q", tx.Actions[5].Verb, "Stop T1")
+	}
+	if tx.Actions[5].Kind != Processing {
+		t.Errorf("Actions[5].Kind = %v, want Processing", tx.Actions[5].Kind)
+	}
+	if tx.Actions[6].Verb != "Stop T3" {
+		t.Errorf("Actions[6].Verb = %q, want %q", tx.Actions[6].Verb, "Stop T3")
+	}
+	if tx.Actions[6].Kind != Processing {
+		t.Errorf("Actions[6].Kind = %v, want Processing", tx.Actions[6].Kind)
+	}
+	if tx.Actions[7].Verb != "V(s) := 0" {
+		t.Errorf("Actions[7].Verb = %q, want %q", tx.Actions[7].Verb, "V(s) := 0")
+	}
+	if tx.Actions[7].Kind != Processing {
+		t.Errorf("Actions[7].Kind = %v, want Processing", tx.Actions[7].Kind)
+	}
+	if tx.Actions[8].Verb != "V(a) := 0" {
+		t.Errorf("Actions[8].Verb = %q, want %q", tx.Actions[8].Verb, "V(a) := 0")
+	}
+	if tx.Actions[8].Kind != Processing {
+		t.Errorf("Actions[8].Kind = %v, want Processing", tx.Actions[8].Kind)
+	}
+	if tx.Actions[9].Verb != "V(r) := 0" {
+		t.Errorf("Actions[9].Verb = %q, want %q", tx.Actions[9].Verb, "V(r) := 0")
+	}
+	if tx.Actions[9].Kind != Processing {
+		t.Errorf("Actions[9].Kind = %v, want Processing", tx.Actions[9].Kind)
 	}
 }
 
@@ -1656,25 +1716,62 @@ func TestDataLinkTimerRecovery_t18_rr_received_no_no_yes(t *testing.T) {
 	}
 }
 
-func TestDataLinkTimerRecovery_t18_rr_received_no_no_no(t *testing.T) {
+func TestDataLinkTimerRecovery_t18_rr_received_no_no_no_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkTimerRecovery.Transitions {
-		if DataLinkTimerRecovery.Transitions[i].ID == "t18_rr_received_no_no_no" {
+		if DataLinkTimerRecovery.Transitions[i].ID == "t18_rr_received_no_no_no_yes" {
 			tx = &DataLinkTimerRecovery.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t18_rr_received_no_no_no not found")
+		t.Fatalf("transition t18_rr_received_no_no_no_yes not found")
 	}
 	if tx.On != "RR_received" {
 		t.Errorf("On = %q, want RR_received", tx.On)
 	}
-	if tx.Next != "TimerRecovery" {
-		t.Errorf("Next = %q, want TimerRecovery", tx.Next)
+	if tx.Next != "AwaitingV22Connection" {
+		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
 	}
-	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs")
+	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2")
+	}
+	if got := len(tx.Actions); got != 2 {
+		t.Fatalf("len(Actions) = %d, want 2", got)
+	}
+	if tx.Actions[0].Verb != "clear_peer_receiver_busy" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "clear_peer_receiver_busy")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "N(r) Recovery" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "N(r) Recovery")
+	}
+	if tx.Actions[1].Kind != Subroutine {
+		t.Errorf("Actions[1].Kind = %v, want Subroutine", tx.Actions[1].Kind)
+	}
+}
+
+func TestDataLinkTimerRecovery_t18_rr_received_no_no_no_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkTimerRecovery.Transitions {
+		if DataLinkTimerRecovery.Transitions[i].ID == "t18_rr_received_no_no_no_no" {
+			tx = &DataLinkTimerRecovery.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t18_rr_received_no_no_no_no not found")
+	}
+	if tx.On != "RR_received" {
+		t.Errorf("On = %q, want RR_received", tx.On)
+	}
+	if tx.Next != "AwaitingConnection" {
+		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
+	}
+	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2")
 	}
 	if got := len(tx.Actions); got != 2 {
 		t.Fatalf("len(Actions) = %d, want 2", got)
@@ -2091,25 +2188,62 @@ func TestDataLinkTimerRecovery_t19_rnr_received_no_no_yes(t *testing.T) {
 	}
 }
 
-func TestDataLinkTimerRecovery_t19_rnr_received_no_no_no(t *testing.T) {
+func TestDataLinkTimerRecovery_t19_rnr_received_no_no_no_yes(t *testing.T) {
 	var tx *TransitionSpec
 	for i := range DataLinkTimerRecovery.Transitions {
-		if DataLinkTimerRecovery.Transitions[i].ID == "t19_rnr_received_no_no_no" {
+		if DataLinkTimerRecovery.Transitions[i].ID == "t19_rnr_received_no_no_no_yes" {
 			tx = &DataLinkTimerRecovery.Transitions[i]
 			break
 		}
 	}
 	if tx == nil {
-		t.Fatalf("transition t19_rnr_received_no_no_no not found")
+		t.Fatalf("transition t19_rnr_received_no_no_no_yes not found")
 	}
 	if tx.On != "RNR_received" {
 		t.Errorf("On = %q, want RNR_received", tx.On)
 	}
-	if tx.Next != "TimerRecovery" {
-		t.Errorf("Next = %q, want TimerRecovery", tx.Next)
+	if tx.Next != "AwaitingV22Connection" {
+		t.Errorf("Next = %q, want AwaitingV22Connection", tx.Next)
 	}
-	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs" {
-		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs")
+	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2")
+	}
+	if got := len(tx.Actions); got != 2 {
+		t.Fatalf("len(Actions) = %d, want 2", got)
+	}
+	if tx.Actions[0].Verb != "set_peer_receiver_busy" {
+		t.Errorf("Actions[0].Verb = %q, want %q", tx.Actions[0].Verb, "set_peer_receiver_busy")
+	}
+	if tx.Actions[0].Kind != Processing {
+		t.Errorf("Actions[0].Kind = %v, want Processing", tx.Actions[0].Kind)
+	}
+	if tx.Actions[1].Verb != "N(r) Recovery" {
+		t.Errorf("Actions[1].Verb = %q, want %q", tx.Actions[1].Verb, "N(r) Recovery")
+	}
+	if tx.Actions[1].Kind != Subroutine {
+		t.Errorf("Actions[1].Kind = %v, want Subroutine", tx.Actions[1].Kind)
+	}
+}
+
+func TestDataLinkTimerRecovery_t19_rnr_received_no_no_no_no(t *testing.T) {
+	var tx *TransitionSpec
+	for i := range DataLinkTimerRecovery.Transitions {
+		if DataLinkTimerRecovery.Transitions[i].ID == "t19_rnr_received_no_no_no_no" {
+			tx = &DataLinkTimerRecovery.Transitions[i]
+			break
+		}
+	}
+	if tx == nil {
+		t.Fatalf("transition t19_rnr_received_no_no_no_no not found")
+	}
+	if tx.On != "RNR_received" {
+		t.Errorf("On = %q, want RNR_received", tx.On)
+	}
+	if tx.Next != "AwaitingConnection" {
+		t.Errorf("Next = %q, want AwaitingConnection", tx.Next)
+	}
+	if tx.Guard != "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2" {
+		t.Errorf("Guard = %q, want %q", tx.Guard, "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2")
 	}
 	if got := len(tx.Actions); got != 2 {
 		t.Fatalf("len(Actions) = %d, want 2", got)

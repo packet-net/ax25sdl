@@ -642,7 +642,7 @@ public static class Scenarios
         const InjectedFrame Ahead = InjectedFrame.IPollAhead, Stale = InjectedFrame.IPollStale;
         Add("ip-inseq", "I poll in sequence", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "clean");
         Add("ip-stale", "I poll outside the window", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale), "clean");
-        Add("ip-busy", "figc4.4 busy I poll answered RR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { LocalBusy = FlowControlAt.B }, "BusyIndication at B, 3");
+        Add("ip-busy", "ax25spec#178 (figc4.4 busy I poll answered RR)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { LocalBusy = FlowControlAt.B }, "BusyIndication at B, 3");
         Add("ip-rejx", "I poll in reject exception; REJ F=1", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Ahead, Ahead) with
         {
             FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, RejMayEqualVs = true,
@@ -666,6 +666,12 @@ public static class Scenarios
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, "clean");
+        // Since ax25spec#180 the RNR arm splits by version; this is the
+        // version 2.0 half (t19_rnr_received_no_no_no_no).
+        Add("ip-nr-rnr", "RNR, N(r) beyond V(s)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
+        {
+            T3 = true, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
+        }, "clean");
         Add("ip-nr-rnr-v22", "RNR, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
@@ -688,12 +694,14 @@ public static class Scenarios
         Add("seeded-injected-twice", "seeded (injected payload delivered twice)", TableSetKind.InjectedDelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
         Add("seeded-injected-undelivered", "seeded (injected payload accepted, not delivered)", TableSetKind.InjectedUndelivered, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll), "Delivery at B, 2");
         // From the review of batch 7: both stations inject an I frame in
-        // sequence; B's N(r) error recovery in Timer Recovery stays there
-        // (#12's errata branch) and A delivers b0 twice.
-        Add("ip-both", "ax25spec#12 (errata branch stays in TR)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
+        // sequence and B, in Timer Recovery, meets an RR with N(r) past V(s).
+        // #12's errata branch stayed in Timer Recovery and A delivered b0
+        // twice (Delivery at A, 18); fixed by ax25spec#180, which leaves for
+        // Awaiting Connection as the 1998 figure draws.
+        Add("ip-both", "ax25spec#12 fixed (#180)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IFrame) with
         {
             FramesBa = 1, T3 = true, Budget = 2, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
-        }, "Delivery at A, 18");
+        }, "clean");
 
         return list;
     }

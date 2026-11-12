@@ -10,7 +10,7 @@ def test_source_figure() -> None:
 
 
 def test_transitions_are_present() -> None:
-    assert len(DATA_LINK_TIMER_RECOVERY.transitions) == 92
+    assert len(DATA_LINK_TIMER_RECOVERY.transitions) == 94
 
 
 def test_t01_dl_disconnect_request() -> None:
@@ -343,7 +343,7 @@ def test_t13_sabm_received_yes() -> None:
     assert t.on == "SABM_received"
     assert t.next == "Connected"
     assert t.guard == "vs_eq_va"
-    assert len(t.actions) == 5
+    assert len(t.actions) == 10
     assert t.actions[0].verb == "F := P"
     assert t.actions[0].kind == ActionKind.PROCESSING
     assert t.actions[1].verb == "set_version_2_0"
@@ -354,6 +354,16 @@ def test_t13_sabm_received_yes() -> None:
     assert t.actions[3].kind == ActionKind.SUBROUTINE
     assert t.actions[4].verb == "DL-ERROR Indication (F)"
     assert t.actions[4].kind == ActionKind.SIGNAL_UPPER
+    assert t.actions[5].verb == "Stop T1"
+    assert t.actions[5].kind == ActionKind.PROCESSING
+    assert t.actions[6].verb == "Stop T3"
+    assert t.actions[6].kind == ActionKind.PROCESSING
+    assert t.actions[7].verb == "V(s) := 0"
+    assert t.actions[7].kind == ActionKind.PROCESSING
+    assert t.actions[8].verb == "V(a) := 0"
+    assert t.actions[8].kind == ActionKind.PROCESSING
+    assert t.actions[9].verb == "V(r) := 0"
+    assert t.actions[9].kind == ActionKind.PROCESSING
 
 
 def test_t13_sabm_received_no() -> None:
@@ -401,7 +411,7 @@ def test_t14_sabme_received_yes() -> None:
     assert t.on == "SABME_received"
     assert t.next == "Connected"
     assert t.guard == "vs_eq_va"
-    assert len(t.actions) == 5
+    assert len(t.actions) == 10
     assert t.actions[0].verb == "F := P"
     assert t.actions[0].kind == ActionKind.PROCESSING
     assert t.actions[1].verb == "Set Version 2.2"
@@ -412,6 +422,16 @@ def test_t14_sabme_received_yes() -> None:
     assert t.actions[3].kind == ActionKind.SUBROUTINE
     assert t.actions[4].verb == "DL-ERROR Indication (F)"
     assert t.actions[4].kind == ActionKind.SIGNAL_UPPER
+    assert t.actions[5].verb == "Stop T1"
+    assert t.actions[5].kind == ActionKind.PROCESSING
+    assert t.actions[6].verb == "Stop T3"
+    assert t.actions[6].kind == ActionKind.PROCESSING
+    assert t.actions[7].verb == "V(s) := 0"
+    assert t.actions[7].kind == ActionKind.PROCESSING
+    assert t.actions[8].verb == "V(a) := 0"
+    assert t.actions[8].kind == ActionKind.PROCESSING
+    assert t.actions[9].verb == "V(r) := 0"
+    assert t.actions[9].kind == ActionKind.PROCESSING
 
 
 def test_t14_sabme_received_no() -> None:
@@ -684,15 +704,31 @@ def test_t18_rr_received_no_no_yes() -> None:
     assert t.actions[1].kind == ActionKind.PROCESSING
 
 
-def test_t18_rr_received_no_no_no() -> None:
+def test_t18_rr_received_no_no_no_yes() -> None:
     t = next(
-        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t18_rr_received_no_no_no"),
+        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t18_rr_received_no_no_no_yes"),
         None,
     )
-    assert t is not None, "transition t18_rr_received_no_no_no not found"
+    assert t is not None, "transition t18_rr_received_no_no_no_yes not found"
     assert t.on == "RR_received"
-    assert t.next == "TimerRecovery"
-    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs"
+    assert t.next == "AwaitingV22Connection"
+    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2"
+    assert len(t.actions) == 2
+    assert t.actions[0].verb == "clear_peer_receiver_busy"
+    assert t.actions[0].kind == ActionKind.PROCESSING
+    assert t.actions[1].verb == "N(r) Recovery"
+    assert t.actions[1].kind == ActionKind.SUBROUTINE
+
+
+def test_t18_rr_received_no_no_no_no() -> None:
+    t = next(
+        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t18_rr_received_no_no_no_no"),
+        None,
+    )
+    assert t is not None, "transition t18_rr_received_no_no_no_no not found"
+    assert t.on == "RR_received"
+    assert t.next == "AwaitingConnection"
+    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2"
     assert len(t.actions) == 2
     assert t.actions[0].verb == "clear_peer_receiver_busy"
     assert t.actions[0].kind == ActionKind.PROCESSING
@@ -862,15 +898,31 @@ def test_t19_rnr_received_no_no_yes() -> None:
     assert t.actions[1].kind == ActionKind.PROCESSING
 
 
-def test_t19_rnr_received_no_no_no() -> None:
+def test_t19_rnr_received_no_no_no_yes() -> None:
     t = next(
-        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t19_rnr_received_no_no_no"),
+        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t19_rnr_received_no_no_no_yes"),
         None,
     )
-    assert t is not None, "transition t19_rnr_received_no_no_no not found"
+    assert t is not None, "transition t19_rnr_received_no_no_no_yes not found"
     assert t.on == "RNR_received"
-    assert t.next == "TimerRecovery"
-    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs"
+    assert t.next == "AwaitingV22Connection"
+    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2"
+    assert len(t.actions) == 2
+    assert t.actions[0].verb == "set_peer_receiver_busy"
+    assert t.actions[0].kind == ActionKind.PROCESSING
+    assert t.actions[1].verb == "N(r) Recovery"
+    assert t.actions[1].kind == ActionKind.SUBROUTINE
+
+
+def test_t19_rnr_received_no_no_no_no() -> None:
+    t = next(
+        (x for x in DATA_LINK_TIMER_RECOVERY.transitions if x.id == "t19_rnr_received_no_no_no_no"),
+        None,
+    )
+    assert t is not None, "transition t19_rnr_received_no_no_no_no not found"
+    assert t.on == "RNR_received"
+    assert t.next == "AwaitingConnection"
+    assert t.guard == "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2"
     assert len(t.actions) == 2
     assert t.actions[0].verb == "set_peer_receiver_busy"
     assert t.actions[0].kind == ActionKind.PROCESSING

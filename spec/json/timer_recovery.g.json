@@ -476,6 +476,26 @@
         {
           "verb": "DL-ERROR Indication (F)",
           "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
         }
       ],
       "next": "Connected",
@@ -568,6 +588,26 @@
         {
           "verb": "DL-ERROR Indication (F)",
           "kind": "signal_upper"
+        },
+        {
+          "verb": "Stop T1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Stop T3",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(s) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(a) := 0",
+          "kind": "processing"
+        },
+        {
+          "verb": "V(r) := 0",
+          "kind": "processing"
         }
       ],
       "next": "Connected",
@@ -964,10 +1004,10 @@
       "loops": []
     },
     {
-      "id": "t18_rr_received_no_no_no",
+      "id": "t18_rr_received_no_no_no_yes",
       "from": "TimerRecovery",
       "on": "RR_received",
-      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs",
+      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2",
       "actions": [
         {
           "verb": "clear_peer_receiver_busy",
@@ -978,7 +1018,27 @@
           "kind": "subroutine"
         }
       ],
-      "next": "TimerRecovery",
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t18_rr_received_no_no_no_no",
+      "from": "TimerRecovery",
+      "on": "RR_received",
+      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "clear_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
       "notes": "",
       "references": [],
       "loops": []
@@ -1212,10 +1272,10 @@
       "loops": []
     },
     {
-      "id": "t19_rnr_received_no_no_no",
+      "id": "t19_rnr_received_no_no_no_yes",
       "from": "TimerRecovery",
       "on": "RNR_received",
-      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs",
+      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and version_2_2",
       "actions": [
         {
           "verb": "set_peer_receiver_busy",
@@ -1226,7 +1286,27 @@
           "kind": "subroutine"
         }
       ],
-      "next": "TimerRecovery",
+      "next": "AwaitingV22Connection",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t19_rnr_received_no_no_no_no",
+      "from": "TimerRecovery",
+      "on": "RNR_received",
+      "guard": "not response_and_F_eq_1 and not command_and_P_eq_1 and not va_le_nr_le_vs and not version_2_2",
+      "actions": [
+        {
+          "verb": "set_peer_receiver_busy",
+          "kind": "processing"
+        },
+        {
+          "verb": "N(r) Recovery",
+          "kind": "subroutine"
+        }
+      ],
+      "next": "AwaitingConnection",
       "notes": "",
       "references": [],
       "loops": []
