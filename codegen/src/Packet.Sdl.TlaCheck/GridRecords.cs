@@ -107,6 +107,8 @@ internal static class GridRecords
         sb.Append(".\n");
         sb.Append("Verdicts (explorer): ").Append(string.Join(", ", rows.Where(r => r.ExplorerKind.Length > 0).GroupBy(r => r.ExplorerKind)
             .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count().ToString(CultureInfo.InvariantCulture)}"))).Append(".\n");
+        var capped = rows.Count(r => r.ExplorerKind == "bound");
+        if (capped > 0) sb.Append(CultureInfo.InvariantCulture, $"{capped} cell(s) hit the explorer's 1.2 million state cap (TLC has none): a disagreement there is the cap, not a finding.\n");
         var largest = rows.OrderByDescending(r => r.TlcStates).FirstOrDefault();
         sb.Append(CultureInfo.InvariantCulture, $"Time: explorer {rows.Sum(r => r.ExplorerSeconds):0} s, TLC {rows.Sum(r => r.TlcSeconds):0} s in all; largest cell {largest?.TlcStates ?? 0} distinct states.\n");
         return sb.ToString();

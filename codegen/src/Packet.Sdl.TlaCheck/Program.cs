@@ -246,7 +246,12 @@ if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meani
 
 var results = new ConcurrentDictionary<int, Row>();
 var skipped = 0;
-Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
+void Each(Action<int> body)
+{
+    if (gridMode) GridOptions.LargestFirst(scenarios, parallel, body);
+    else Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, body);
+}
+Each(idx =>
 {
     var s = scenarios[idx];
     if (resultsFile?.Done(s.Name, "cross", Lockstep.MeaningName(meaning)) is { } done)
@@ -295,7 +300,7 @@ Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current), currentRuns));
 // The accounting check (unfired.txt) needs the whole calibration suite: a
 // subset or the grid fires less, so it is skipped then.
 var accounted = true;
-if (only is null && !grid)
+if (only is null && !gridMode)
 {
     var (ok, text) = Coverage.CheckExpectedUnfired(Dir(TableSetKind.Current),
         Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "unfired.txt"), Coverage.NeverFired(Dir(TableSetKind.Current), currentRuns));

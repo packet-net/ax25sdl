@@ -9,6 +9,7 @@ dotnet run --project codegen/src/Packet.Sdl.CodeGen -- --tla          # regenera
 export TLA2TOOLS_JAR=/path/to/tla2tools.jar                            # TLC 2.19 (tlaplus v1.7.4)
 dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --parallel 6   # the calibration suite, explorer vs TLC
 dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --grid --parallel 8   # the explorer's 576-cell grid
+dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --grid --grid-with t3 --results t3.jsonl   # the grid with an option set, resumable
 dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --help
 ```
 
@@ -420,7 +421,81 @@ All 576 agree. Rerun on 23 October 2026 after the review fixes and the rebase on
 
 The grid does not change the coverage picture: it varies frame counts, faults, k and SREJ, not the inputs, so it reaches the same kinds of arm.
 
-Not yet run: the flow-control grid (`--grid-flow`) and the v2.0 stub-peer grid.
+Not yet run: the flow-control grid (`--grid-flow`), the v2.0 stub-peer grid (`--grid-stub`), the grids with any of the options added since (packet-net/ax25sdl#112, "Runs not done"), and the grid in lockstep. TlaCheck can now drive all of these; the runbook below says how.
+
+### Grid runs
+
+Three grids, each compared cell by cell exactly as a calibration row:
+
+- `--grid`: the data-phase grid above, 576 cells.
+- `--grid-flow`: the same 576 cells with B's layer 3 flow-controlling (`docs/explorer.md`, "Grid with flow control"). Cell names end `-flowB`.
+- `--grid-stub`: the v2.0 stub-peer grid (`docs/explorer.md`, "Grid with the v2.0 stub peer"), 72 cells: the cold seed with A at modulo 128 and the figc4.6 seed, the `v20-frmr` and `v20-dm` stubs, budget 0..2, faults drop, dup and drop+dup, timer-free progress off and on. Cell names are `s-{cold|v22}-{frmr|dm}-b{budget}-{faults}[-sp]`.
+
+`--list` prints each cell with its index. The grids have no expected verdicts and skip the unfired-row accounting; the coverage report still prints, over the cells run.
+
+**With options.** `--grid-with LIST` applies an option set to every cell. LIST is a comma list of the explorer's own option names without the dashes, bare (`t3`) or with a value (`release=A`); where the explorer takes a comma list as the value, join the items with `+` (`frame-errors=control+info`). The flag may be repeated. The cell names gain the set as a suffix (`g-ab1-ba0-b1-k4-nosrej-drop@t3,release=A`), so the results of different sets never mix. Before anything runs, TlaCheck checks every selected cell against the explorer's own refusals (`Stepper.Validate`, the checks the stepper makes when it starts) and stops at the first, naming the cell and the reason, so a combination the harness refuses fails at once rather than 576 times.
+
+Grid-compatible: `release`, `release-early`, `abandon` (only with `reconnect` on the data-phase grids), `reconnect`, `data-after-reconnect`, `accept-give-up`, `local-busy`, `long-busy`, `t3`, `t3-at`, `unit-data`, `ui-form`, `frame-errors`, `inject`, `inject-frame` (`i-poll-ahead` and `i-poll-stale` are refused on the SREJ cells; select the others with `--grid-cells '*-nosrej-*'`), `n2`, `drop-scope`, `flow-rounds`, `flow-off-after`, `disable`, `selective-progress` (not with `--grid-stub`, where it is an axis), `rej-may-equal-vs`, `quiescence-accepts-timer-recovery`. On the stub grid the stepper refuses everything that needs the table-driven peer; `abandon=A`, `accept-give-up`, `t3` and `n2` remain.
+
+Refused, with the reason printed: the axes (`frames-ab`, `frames-ba`, `budget`, `k`, `srej`, `faults`), the seeds and connect-phase options (`seed`, `peer`, `mod128`, `mod128b`, `peer-declines-sabme`, `data-after-confirm`, `data-before-confirm`: the data-phase grids start from the connected seed, and the stub peer has its own grid), `flow-control` (use `--grid-flow`), the bounds (`max-depth`, `max-states`), `tables` and `fired`.
+
+**In lockstep.** `--grid --lockstep --meaning M` (or `--grid-flow`, `--grid-stub`, with or without `--grid-with`) runs every cell as a lockstep row ("Lockstep" above), with the same per-cell report and signature list as the calibration lockstep. `--lockstep-iterate N` works as there.
+
+**Long unattended runs.**
+
+- `--results FILE` appends one JSON line per cell as the cell completes and flushes it to disk: the cell's name, index, mode (`cross` or `lockstep`), meaning, whether it has a verdict, both verdicts and texts, agreement, distinct states and seconds for each tool, the arms fired (TLC's, plus any transition only one tool fired), and for lockstep the differences with their counterexamples. TlaCheck refuses an existing FILE unless `--resume` is given.
+- `--resume` skips the cells FILE already records with a verdict from a run in the same mode with the same meaning; a cell recorded without one (TLC timed out or failed, the run was killed) runs again, and a line cut short by a kill is ignored. Each completed cell's line also says when it finished. At the end the report covers every selected cell, read back from FILE where it was skipped, so a resumed run that finds nothing to do just prints the whole report.
+- At the end: the report table, the coverage report, and a summary (cells agreeing and disagreeing, cells without a verdict, the explorer's verdicts by kind, cells that hit the explorer's 1.2 million state cap, the time spent and the largest cell). A cell that hits the cap disagrees by construction (the explorer says "bound", TLC, which has no cap, explores the lot). The flow-control grid's largest cell does once its flow checks are disabled (`--grid-with disable=busy-tracks-flow+flow-off-delivery`); with them on, every cell where A sends stops early on #43.
+- `--grid-cells SPEC` selects cells: a comma list of indices (`12`), ranges (`0-143`), strides (`%4=1`, every index whose remainder modulo 4 is 1) and name patterns with `*` and `?` (`g-ab3-*`). Strides split a grid evenly across processes; a range does not, as the large cells sit together at the end.
+- Within a process the cells run largest first (a guess from frames and budget), one at a time per slot, so a run does not end with one slot grinding through the biggest cells alone.
+- Disk: TLC's fingerprint and queue files and its extracted modules are deleted after every TLC run, and a coverage run's state dump once read (as for calibration). A grid run also deletes each cell's model directory once the cell agrees (with `--lockstep`, once it shows no difference), so the work directory holds only the cells in progress and those worth reading. A cell in progress needs room for its coverage dump: about 1.2 GB on the largest data-phase cell, more on a larger one.
+
+### Runbook: the grids on a large Amazon Linux 2023 box
+
+The grids need more memory than the dev container; one large box runs all of them in a few hours. The figures below are estimates (see "Relative cost").
+
+1. Packages and tools (as root or with sudo):
+
+   ```sh
+   sudo dnf install -y git tar libicu java-21-amazon-corretto-headless
+   git clone --recurse-submodules https://github.com/packet-net/ax25sdl.git && cd ax25sdl
+   # The SDK global.json pins, beside nothing else; dotnet crashes at start without libicu.
+   curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+   bash /tmp/dotnet-install.sh --jsonfile global.json --install-dir "$HOME/.dotnet"
+   export DOTNET_ROOT="$HOME/.dotnet" PATH="$HOME/.dotnet:$PATH"   # DOTNET_ROOT too, or test hosts fail to start
+   # TLC exactly as CI fetches it: the pinned tlaplus release, checked against its SHA-256.
+   TLA_VERSION=1.7.4
+   TLA_SHA256=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+   curl --proto '=https' --tlsv1.2 -fsSL -o "$HOME/tla2tools.jar" "https://github.com/tlaplus/tlaplus/releases/download/v$TLA_VERSION/tla2tools.jar"
+   echo "$TLA_SHA256  $HOME/tla2tools.jar" | sha256sum -c -
+   export TLA2TOOLS_JAR="$HOME/tla2tools.jar"
+   java -version && dotnet --version
+   dotnet build codegen/src/Packet.Sdl.TlaCheck --configuration Release
+   ```
+
+2. Size `--parallel` and `--heap` by memory, not cores: each slot is one TLC JVM (`--heap`, plus about 1 GB outside the heap) and its share of the one .NET process, which holds the explorer's whole state graph while that cell runs (a few GB on the largest cells). Allow about 8 GB per slot with `--heap 3g`: `--parallel 8` on 64 GB, 16 on 128 GB, 32 on 256 GB, 48 on 384 GB, and at most one slot per core (`--workers 1` keeps TLC's shortest-trace guarantee, so a slot uses one core). Keep 10 GB of disk per slot under `--work` (the coverage dumps). `--timeout 3600` gives the largest cells room; the default 600 s is what the largest base cell needs per TLC run, and the flow-control grid's largest are bigger.
+
+3. Run each grid into its own results file, under `nohup` (or `tmux`) so the run survives the session. `RUN` is the common part:
+
+   ```sh
+   RUN="dotnet run --no-build --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --parallel 32 --heap 3g --timeout 3600"
+   mkdir -p results
+   nohup $RUN --grid --work /data/w-base --results results/base.jsonl > results/base.md 2> results/base.log &
+   nohup $RUN --grid-flow --work /data/w-flow --results results/flow.jsonl > results/flow.md 2> results/flow.log &
+   nohup $RUN --grid-stub --work /data/w-stub --results results/stub.jsonl > results/stub.md 2> results/stub.log &
+   # one per option set, for example
+   nohup $RUN --grid --grid-with t3 --work /data/w-t3 --results results/t3.jsonl > results/t3.md 2> results/t3.log &
+   # the independent meaning in lockstep
+   nohup $RUN --grid --lockstep --meaning Ax25MeaningIndependent --lockstep-iterate 8 --work /data/w-lockstep --results results/lockstep.jsonl > results/lockstep.md 2> results/lockstep.log &
+   ```
+
+   Several runs at once share the box: divide the slots between them. `wc -l results/*.jsonl` shows progress; the `.log` files have one line per cell. If a run stops (a spot interruption, a crash, an out-of-memory kill), rerun the same command with `--resume`. To split one grid over several processes or boxes, give each `--grid-cells %N=R` (R = 0..N-1) and its own `--work` and results file; afterwards `cat` the files into one and run the grid once more with `--resume` on it to print the whole report without rerunning anything.
+
+4. Copy back only the results: the `.jsonl`, `.md` and `.log` files, compressed (`tar czf results.tgz results`), a few MB in all. Egress from AWS is billed; leave the work directories behind. The model directories left there are the cells that disagreed or had no verdict, each with its configs and TLC's output (`tlc_*.out`); if one needs reading, copy back just that cell's `tlc_*.out`.
+
+### Relative cost
+
+{COST}
 
 ## Not covered yet
 
@@ -428,4 +503,4 @@ Not yet run: the flow-control grid (`--grid-flow`) and the v2.0 stub-peer grid.
 - The Management Data Link (C5) and the other Annex C machines: the emitter renders only machine `data_link`, and the harness drives only Data Link stations. So figc5.2's saves (MDL-NEGOTIATE Request and XID Command in Negotiating) are in no checker; the Data Link saves are (packet-net/ax25sdl#97).
 - Anything the explorer's envelope leaves out (docs/explorer.md): numeric timers, T3 firing while a T1 runs at either station (T3 is modelled from coverage batch 4, but only once no T1 runs anywhere; the peer's half of that is a modelling assumption that T3 outlasts the peer's N2 x T1 retry loop, where §6.7.1.3 only requires T3 > T1, see pinned semantic 15), data arriving after recovery has begun, premature T1, and most of the modulo 128 data phase. `cold-v22-data` and `d54-cold-v22-wrap` run A at modulo 128 in the data phase (fault-free, at most 9 frames, A seeded at modulo 128 by hand, B left at modulo 8 by the tables); a link where both stations run modulo 128, SREJ at modulo 128, windows above 7 and faults at modulo 128 are not covered. The TLA+ model shares the envelope, by design, so that the two can be compared; widening it is the next step for both.
 - Liveness under strong (per-move) fairness, which would make TLC's liveness verdict exact rather than sound in one direction, is out of reach of TLC at these sizes.
-- The calibration cross-check runs in CI (the `semantic validation - TLA+ cross-check` job): it installs Temurin 21, fetches `tla2tools.jar` from the pinned tlaplus v1.7.4 release and verifies its SHA-256, then runs the suite with `--heap 1g` and `--parallel 4` on a runner with 8 or more cores (`--parallel 2` otherwise; coverage batch 4 doubled the job on an 8-core runner, to about 14 minutes, most of it `busy-both-trq`), failing on any row where the explorer and TLC disagree or the verdict differs from the row's expectation. The 576-cell grid is not in CI (hours of wall time); run it locally. The drift test is in `dotnet test`.
+- The calibration cross-check runs in CI (the `semantic validation - TLA+ cross-check` job): it installs Temurin 21, fetches `tla2tools.jar` from the pinned tlaplus v1.7.4 release and verifies its SHA-256, then runs the suite with `--heap 1g` and `--parallel 4` on a runner with 8 or more cores (`--parallel 2` otherwise; coverage batch 4 doubled the job on an 8-core runner, to about 14 minutes, most of it `busy-both-trq`), failing on any row where the explorer and TLC disagree or the verdict differs from the row's expectation. The grids are not in CI (hours of wall time); run them on a large box ("Runbook" above). The drift test is in `dotnet test`.

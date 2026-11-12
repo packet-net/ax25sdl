@@ -214,6 +214,23 @@ public static class GridOptions
     }
 
     /// <summary>
+    /// Run <paramref name="body"/> over the cells' indices, the likely largest
+    /// first and one cell at a time per slot (no chunking), so a long run does
+    /// not end with one slot grinding through the biggest cells alone. The
+    /// size guess grows with the frames and steeply with the fault budget
+    /// (3+3 frames: about 1 000 states at budget 0, 51 000 at 1, 600 000 at 2).
+    /// </summary>
+    public static void LargestFirst(IReadOnlyList<Scenario> cells, int parallel, Action<int> body)
+    {
+        var order = Enumerable.Range(0, cells.Count)
+            .OrderByDescending(i => Math.Pow(cells[i].Options.FramesAb + cells[i].Options.FramesBa + 1, cells[i].Options.Budget + 2))
+            .ThenBy(i => i)
+            .ToList();
+        Parallel.ForEach(System.Collections.Concurrent.Partitioner.Create(order, System.Collections.Concurrent.EnumerablePartitionerOptions.NoBuffering),
+            new ParallelOptions { MaxDegreeOfParallelism = parallel }, body);
+    }
+
+    /// <summary>
     /// <c>--grid-cells SPEC</c>: a comma list of cell indices (<c>12</c>),
     /// index ranges (<c>0-143</c>), strides (<c>%4=1</c>: every index i with
     /// i mod 4 = 1) and name patterns (anything else, with <c>*</c> and

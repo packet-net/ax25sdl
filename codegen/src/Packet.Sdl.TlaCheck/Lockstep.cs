@@ -36,7 +36,12 @@ public static class Lockstep
     {
         var results = new ConcurrentDictionary<int, LockstepRow>();
         var skipped = 0;
-        Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
+        void Each(Action<int> body)
+        {
+            if (grid) GridOptions.LargestFirst(scenarios, parallel, body);
+            else Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, body);
+        }
+        Each(idx =>
         {
             var s = scenarios[idx];
             if (resultsFile?.Done(s.Name, "lockstep", MeaningName(meaning)) is { } done)

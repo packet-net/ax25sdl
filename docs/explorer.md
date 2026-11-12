@@ -243,6 +243,8 @@ done; done; done; done; done
 
 The whole set (2 304 data-phase cells and 72 connect-phase cells) runs in about two minutes on 12 cores.
 
+`TlaCheck --grid`, `--grid-flow` and `--grid-stub` run the same grids against TLC, optionally with an option set on every cell (`--grid-with`), in lockstep, and resumably (`docs/tla.md`, "Grid runs").
+
 ## Interpreter changes made for the explorer
 
 All in `codegen/src/Packet.Sdl.Interpreter`, kept to the smallest set that leaves every golden trace's observed effects unchanged:
