@@ -87,5 +87,5 @@ public static class SimplexPhy_Receiving
     /// same state included) consume the first queued input that state does not save
     /// (ITU-T Z.100 save semantics). Empty for most states.
     /// </summary>
-    public static IReadOnlyList<Ax25Event> Saves { get; } = new Ax25Event[] {  };
+    public static IReadOnlyList<Ax25Event> Saves { get; } = System.Array.Empty<Ax25Event>();
 }

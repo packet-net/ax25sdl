@@ -47,6 +47,9 @@ public sealed record DispatchResult(string TransitionId, string NextState, IRead
     /// <summary>The event this result answers (set by the machine; empty on a hand-built result).</summary>
     public string Event { get; init; } = "";
 
+    /// <summary>The input this result answers, with its parameters (set by the machine; null on a hand-built result).</summary>
+    public EventInput? Input { get; init; }
+
     /// <summary>Held inputs consumed after this transition entered its next state, in the order they were consumed (docs/golden-traces.md, "Saves").</summary>
     public IReadOnlyList<DispatchResult> Replayed { get; init; } = Array.Empty<DispatchResult>();
 
@@ -146,8 +149,9 @@ public sealed class DataLinkMachine
     /// <summary>
     /// True when the current state saves <paramref name="eventName"/>. A
     /// caller that routes unhandled inputs to a page's "all other" column
-    /// must ask this first: an explicit save takes precedence over the
-    /// catch-all (ITU-T Z.101 clause 11.7; docs/golden-traces.md, "Saves").
+    /// must ask this first: an asterisk input covers only the signals a
+    /// state neither inputs nor saves, so an explicit save takes precedence
+    /// (asterisk input: ITU-T Z.103 / Z.100; docs/golden-traces.md, "Saves").
     /// </summary>
     public bool IsSavedHere(string eventName) => _tables.States[State].IsSaved(eventName);
 
@@ -311,16 +315,16 @@ public sealed class DataLinkMachine
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // SDL save (figc4.2, figc4.6, figc5.2; AX.25 2.2 C1.2; ITU-T Z.101
-        // clause 11.7): a saved input causes no operations in this state. It
-        // joins the held inputs, after any already held, and waits.
+        // SDL save (figc4.2, figc4.6, figc5.2; AX.25 2.2 C1.2; save: ITU-T
+        // Z.101 clause 11.7): a saved input causes no operations in this
+        // state. It joins the held inputs, after any already held, and waits.
         if (IsSavedHere(input.Event))
         {
             _held.Add(input);
-            return new DispatchResult(SaveTransitionId, State, Array.Empty<Effect>()) { Event = input.Event };
+            return new DispatchResult(SaveTransitionId, State, Array.Empty<Effect>()) { Event = input.Event, Input = input };
         }
 
-        var result = DispatchInput(input) with { Event = input.Event };
+        var result = DispatchInput(input) with { Event = input.Event, Input = input };
         var replayed = ReplayHeld();
         return replayed.Count == 0 ? result : result with { Replayed = replayed };
     }
@@ -330,7 +334,10 @@ public sealed class DataLinkMachine
     /// included), scan the held inputs from the head and consume the first
     /// one that state does not save; that consumption enters a state in turn,
     /// so scan again, until every input still held is saved by the current
-    /// state. Inputs a state still saves keep their place and order.
+    /// state. Inputs a state still saves keep their place and order. A
+    /// released input goes through exactly the path a fresh input takes
+    /// (<see cref="DispatchInput"/>), so it is handled as a fresh one would
+    /// be, catch-all routing aside (the machine does none; pinned 19(c)).
     /// </summary>
     private List<DispatchResult> ReplayHeld()
     {
@@ -345,7 +352,7 @@ public sealed class DataLinkMachine
             _held.RemoveAt(index);
             try
             {
-                replayed.Add(DispatchInput(input) with { Event = input.Event });
+                replayed.Add(DispatchInput(input) with { Event = input.Event, Input = input });
             }
             catch (InvalidOperationException ex)
             {

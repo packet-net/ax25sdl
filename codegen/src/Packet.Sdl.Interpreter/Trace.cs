@@ -95,7 +95,7 @@ public sealed class ExpectDoc
 
     /// <summary>
     /// Held inputs the step's transition released, in the order they were
-    /// consumed: exhaustive when present (<c>replayed: []</c> asserts none).
+    /// consumed: exhaustive. Absent means none, the same as <c>replayed: []</c>.
     /// The step's own <see cref="Effects"/> cover the triggering transition
     /// only; each entry here carries the replayed transition's effects.
     /// </summary>

@@ -16,7 +16,7 @@ public class DataLink_Disconnected_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DataLink_Disconnected.Transitions.Count.Should().Be(17);
 
-    [Fact] public void SavesAreAsTranscribed() => DataLink_Disconnected.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => DataLink_Disconnected.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_dl_disconnect_request()
     {

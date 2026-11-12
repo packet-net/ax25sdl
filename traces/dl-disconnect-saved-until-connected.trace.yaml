@@ -6,9 +6,9 @@
 # does not cause operations to be done in the present state. Instead, that
 # particular input event is 'saved' until the state machine (triggered by
 # other events) has reached a new and different state."
-# ITU-T Z.101 clause 11.7 (Save): saved signals stay in the input port in
-# arrival order; on entering a state the first signal that state does not
-# save is consumed.
+# SDL save (ITU-T Z.101 clause 11.7; semantics as the SDL Forum's Z.100
+# reference states them): saved signals stay in the input port in arrival
+# order, and in the following state they are treated as normal signals.
 # §6.3.1: on T1 expiry "the originating TNC resends the SABM frame and starts
 # T1 running again"; UA ends the attempt.
 # §6.3.4: "either TNC may indicate a request to disconnect the link by

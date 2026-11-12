@@ -16,7 +16,7 @@ public class DuplexPhy_Receiving_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DuplexPhy_Receiving.Transitions.Count.Should().Be(2);
 
-    [Fact] public void SavesAreAsTranscribed() => DuplexPhy_Receiving.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => DuplexPhy_Receiving.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_hw_data_indication()
     {

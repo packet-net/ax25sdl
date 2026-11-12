@@ -16,7 +16,7 @@ public class SimplexPhy_Digipeating_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => SimplexPhy_Digipeating.Transitions.Count.Should().Be(4);
 
-    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_Digipeating.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_Digipeating.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_ph_expedited_data_request()
     {

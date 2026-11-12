@@ -126,6 +126,13 @@ public static class TraceRunner
                 return $"held inputs: expected [{string.Join(", ", expect.Held)}], actual [{string.Join(", ", held)}]";
         }
 
+        // An absent `replayed:` asserts that nothing was replayed, so a step
+        // written before saves existed cannot pass while held inputs fire
+        // behind its back (its `effects:` cover the triggering transition only).
+        if (expect.Replayed is null && result.Replayed.Count > 0)
+            return $"the step replayed {result.Replayed.Count} held input(s) but declares no `replayed:`: " +
+                   $"[{string.Join(", ", result.Replayed.Select(r => $"{r.Event} via {r.TransitionId}"))}]";
+
         if (expect.Replayed is not null)
         {
             var actual = result.Replayed;

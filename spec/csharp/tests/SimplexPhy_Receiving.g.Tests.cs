@@ -16,7 +16,7 @@ public class SimplexPhy_Receiving_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => SimplexPhy_Receiving.Transitions.Count.Should().Be(5);
 
-    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_Receiving.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_Receiving.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_ph_expedited_data_request()
     {

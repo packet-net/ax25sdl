@@ -16,7 +16,7 @@ public class Reassembler_Ready_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => Reassembler_Ready.Transitions.Count.Should().Be(7);
 
-    [Fact] public void SavesAreAsTranscribed() => Reassembler_Ready.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => Reassembler_Ready.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_dl_data_indication_yes_yes()
     {

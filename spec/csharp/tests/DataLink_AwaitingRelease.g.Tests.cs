@@ -16,7 +16,7 @@ public class DataLink_AwaitingRelease_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DataLink_AwaitingRelease.Transitions.Count.Should().Be(20);
 
-    [Fact] public void SavesAreAsTranscribed() => DataLink_AwaitingRelease.Saves.Should().Equal(new Ax25Event[] {  });
+    [Fact] public void SavesAreAsTranscribed() => DataLink_AwaitingRelease.Saves.Should().Equal(System.Array.Empty<Ax25Event>());
 
     [Fact] public void t01_dl_disconnect_request()
     {

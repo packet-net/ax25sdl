@@ -16,7 +16,7 @@ public class {{ page.class_name }}_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => {{ page.class_name }}.Transitions.Count.Should().Be({{ page.transitions.size }});
 
-    [Fact] public void SavesAreAsTranscribed() => {{ page.class_name }}.Saves.Should().Equal(new Ax25Event[] { {{ page.saves_csv }} });
+    [Fact] public void SavesAreAsTranscribed() => {{ page.class_name }}.Saves.Should().Equal({{ page.saves_expected }});
 {{ for t in page.transitions }}
     [Fact] public void {{ t.id }}()
     {

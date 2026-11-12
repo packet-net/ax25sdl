@@ -3,9 +3,9 @@
 # Connection (which saves it too), and is acted on once the link comes up.
 #
 # C1.2: the input is saved "until the state machine ... has reached a new
-# and different state"; ITU-T Z.101 clause 11.7: the save is attached to a
-# state, and a signal stays in the input port while each state it meets
-# saves it. Awaiting Connection is new and different but saves the request
+# and different state"; SDL (ITU-T Z.101 clause 11.7): the save is attached
+# to a state, and a signal stays in the input port while each state it
+# meets saves it. Awaiting Connection is new and different but saves the request
 # as well, so it keeps waiting (pinned delegated semantic in
 # docs/golden-traces.md, "Saves").
 # §6.3.1 (UA ends the connection attempt); §6.3.4 (DISC P=1 on release).

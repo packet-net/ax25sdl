@@ -108,9 +108,20 @@ public class SaveTests
             ("DL_DISCONNECT_request", "AwaitingRelease"),
             ("DL_DISCONNECT_request", "AwaitingRelease"));
         result.Replayed[0].TransitionId.Should().Be("t01_dl_disconnect_request");
+        result.Replayed.Select(r => r.Input!.Data).Should().Equal(new[] { "first", "second" }, "held inputs are consumed in arrival order");
         result.AllEffects.Should().HaveCount(result.Effects.Count + result.Replayed.Sum(r => r.Effects.Count));
         machine.HeldInputs.Should().BeEmpty();
         machine.State.Should().Be("AwaitingRelease");
+    }
+
+    [Fact]
+    public void A_Replay_Is_Not_Reported_Unless_A_Held_Input_Was_Consumed()
+    {
+        var machine = AwaitingConnection();
+        var result = machine.Dispatch(new EventInput("UA_received", Pf: true));
+        result.Replayed.Should().BeEmpty();
+        result.Input!.Event.Should().Be("UA_received");
+        result.AllEffects.Should().Equal(result.Effects);
     }
 
     [Fact]

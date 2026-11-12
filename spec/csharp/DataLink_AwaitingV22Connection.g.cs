@@ -327,5 +327,5 @@ public static class DataLink_AwaitingV22Connection
     /// same state included) consume the first queued input that state does not save
     /// (ITU-T Z.100 save semantics). Empty for most states.
     /// </summary>
-    public static IReadOnlyList<Ax25Event> Saves { get; } = new Ax25Event[] { Ax25Event.DLDISCONNECTRequest };
+    public static IReadOnlyList<Ax25Event> Saves { get; } = System.Array.AsReadOnly(new Ax25Event[] { Ax25Event.DLDISCONNECTRequest });
 }
