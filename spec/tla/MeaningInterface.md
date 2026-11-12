@@ -28,7 +28,7 @@ Built by the harness with `Ax25Values.Event` and fields set by `EXCEPT`. One per
 | `info` | The environment's answer to `info_field_length_le_N1_and_content_is_octet_aligned`. TRUE unless the scenario says otherwise. |
 | `ftype`, `fe` | For the harness's own checks. A meaning must not read them. |
 
-A received frame is dispatched as its own `*_received` event when the current page has that column, else as the page's catch-all (the harness routes it); a catch-all event raised by a frame carries the frame's fields. The frame-error inputs, `LM_SEIZE_confirm`, timer expiries, `I_frame_pops_off_queue` and layer 3 primitives carry `None` in `pf`, `cmd`, `nr` and `ns`.
+A received frame is dispatched as its own `*_received` event when the current page has that column, else as the page's catch-all (the harness routes it); a catch-all event raised by a frame carries the frame's fields. An input the current page saves is not dispatched at all when it arrives (see "Runner policies"); when it is released later it is dispatched like any other event, with the fields it arrived with, so a meaning never sees the difference. The frame-error inputs, `LM_SEIZE_confirm`, timer expiries, `I_frame_pops_off_queue` and layer 3 primitives carry `None` in `pf`, `cmd`, `nr` and `ns`.
 
 ### Verb and atom spellings
 
@@ -156,13 +156,13 @@ Fixed by `Ax25Runner.tla`; a meaning cannot change them.
 - A `processing` box whose verb is `Clear Exception Conditions` is a call of that subroutine.
 - No subroutine call-depth limit.
 - The first error wins and nothing runs after it; `Settle` skips `AfterTransition` on a failed dispatch.
-- `Saves[state]` (the figures' Save symbol) is table data the runner does not consume yet; when it does, holding and releasing a saved input will be runner policy.
+- Saves (`Saves[state]`, the figures' Save symbol; pinned semantic 19 in `docs/explorer.md`). An input the current state saves is not dispatched: no meaning operator is called, the station record is unchanged, and the input is held after any already held. After every dispatch whose transition did not fail (into the same state included), the held inputs are scanned from the head and the first one the new state does not save is dispatched, through `Dispatch` exactly as a fresh input with the fields it arrived with (routed to the page's catch-all if the page has no column for it); that enters a state in turn, so the scan repeats until every input still held is saved. Inputs still saved keep their place and order, across any number of state changes. An explicit save takes precedence over a catch-all column. The runner defines the policy (`SavedIn(st, ev)`, `ReleaseIndex(st, held)`, `Unheld(held, i)`); the held inputs are not part of the station record, the harness keeps them beside it, and the effects of the released dispatches follow the triggering one's in the harness's view. So a meaning needs nothing for saves: it must not define `Saves`, and it neither sees nor stores held inputs.
 
 ## Reserved names
 
 A meaning must not define any of these (the instantiation would not parse):
 
 - From `Ax25Values.tla`: `None Frm NoFrm FrameFx UpperFx LmFx Event Has Get Put Del FixedFields Fail`, and every operator of `Integers`, `Sequences`, `FiniteSets` and `TLC`.
-- From `Ax25Runner.tla`: `MaxLoopIterations EvalTerms SelectGuard SubroutineBindings SubroutineFor BeforeCall ProcessingCallsSubroutine DataLinkStates Handles Invoke Act RunRange RunLoop RunActions CallSubroutine Goto DispatchState Prepare Settle Dispatch`.
+- From `Ax25Runner.tla`: `MaxLoopIterations EvalTerms SelectGuard SubroutineBindings SubroutineFor BeforeCall ProcessingCallsSubroutine DataLinkStates Handles Invoke Act RunRange RunLoop RunActions CallSubroutine Goto SavedIn ReleaseIndex Unheld DispatchState Prepare Settle Dispatch`.
 - From `Ax25DataLinkTables.tla`: `Box Is Not Loop Pages Saves Subroutines` and every `Page_*` name.
 - From the harness `TwoStation.tla`, which extends the result: any name it defines (its constants, variables and operators). A clash there is reported by SANY when the harness is parsed.
