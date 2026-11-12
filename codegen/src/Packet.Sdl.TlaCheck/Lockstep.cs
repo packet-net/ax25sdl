@@ -86,6 +86,9 @@ public static class Lockstep
             seconds += r.Elapsed.TotalSeconds;
             states = r.Distinct;
             File.Copy(Path.Combine(dir, "tlc_Lockstep.out"), Path.Combine(dir, $"tlc_Lockstep_{run}.out"), overwrite: true);
+            // TLC's fingerprint and queue files are not read again; on a shared runner they fill the disk.
+            foreach (var junk in new[] { "meta_Lockstep", "jtmp" })
+                if (Directory.Exists(Path.Combine(dir, junk))) Directory.Delete(Path.Combine(dir, junk), recursive: true);
             if (r.Kind == "clean") return new LockstepRow(diffs, states, false, "", seconds);
             var d = Difference(r, dir);
             if (d is null) return new LockstepRow(diffs, states, false, r.Kind + ": " + r.Message, seconds);
