@@ -310,6 +310,76 @@ jobs:
           echo "runner has $cores cores: --parallel $parallel"
           dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g
 
+  # ─── The independent meaning (ax25spec#116 Phase 2, Step C): the
+  #     default meaning and spec/tla/Ax25MeaningIndependent.tla in lockstep on
+  #     every calibration row, then the plain cross-check (explorer against TLC)
+  #     on the independent meaning. Informational for now: the differences are
+  #     the product (docs/tla-independent/differences.md), so both steps may
+  #     fail without failing the job; the reports are in the job summary and
+  #     the uploaded artifact. ───
+  semantic-tla-independent:
+    name: semantic validation - TLA+ independent meaning (informational)
+    runs-on: [self-hosted, Linux, X64]
+    needs: csharp
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Choose where setup-dotnet installs
+        if: runner.environment == 'self-hosted'
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: ${{ runner.environment == 'github-hosted' }}
+          cache-dependency-path: Directory.Packages.props
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Fetch tla2tools.jar (TLC 2.19, tlaplus v1.7.4)
+        run: |
+          set -euo pipefail
+          TLA_VERSION=1.7.4
+          TLA_SHA256=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+          jar="$RUNNER_TEMP/tla2tools.jar"
+          curl --proto '=https' --tlsv1.2 -fsSL -o "$jar" "https://github.com/tlaplus/tlaplus/releases/download/v$TLA_VERSION/tla2tools.jar"
+          if ! echo "$TLA_SHA256  $jar" | sha256sum -c -; then
+            echo "::error::tla2tools.jar v$TLA_VERSION SHA-256 does not match the pinned checksum"
+            exit 1
+          fi
+          echo "TLA2TOOLS_JAR=$jar" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/reports"
+      - name: build TlaCheck
+        run: dotnet build codegen/src/Packet.Sdl.TlaCheck --configuration Release --nologo -v q
+      # Up to 8 runs per row: each run sets the differences already found aside
+      # and looks for the next one.
+      - name: lockstep, Ax25Meaning against Ax25MeaningIndependent
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cores=$(nproc)
+          parallel=$(( cores >= 8 ? 4 : 2 ))
+          dotnet run --no-build --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g \
+            --lockstep --meaning Ax25MeaningIndependent --lockstep-iterate 8 | tee "$RUNNER_TEMP/reports/lockstep.md"
+      - name: cross-check, explorer against TLC on Ax25MeaningIndependent
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cores=$(nproc)
+          parallel=$(( cores >= 8 ? 4 : 2 ))
+          dotnet run --no-build --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g \
+            --meaning Ax25MeaningIndependent | tee "$RUNNER_TEMP/reports/cross-check-independent.md"
+      - name: job summary
+        if: always()
+        run: cat "$RUNNER_TEMP"/reports/*.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tla-independent-reports
+          path: ${{ runner.temp }}/reports
+
   rust-drift:
     name: codegen drift — Rust + cargo build/test/fmt
     runs-on: [self-hosted, Linux, X64]
