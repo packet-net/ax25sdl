@@ -16,6 +16,8 @@ public class SimplexPhy_TransmitterStart_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => SimplexPhy_TransmitterStart.Transitions.Count.Should().Be(9);
 
+    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_TransmitterStart.Saves.Should().Equal(new Ax25Event[] {  });
+
     [Fact] public void t01_ph_expedited_data_request()
     {
         var t = SimplexPhy_TransmitterStart.Transitions.Single(x => x.Id == "t01_ph_expedited_data_request");

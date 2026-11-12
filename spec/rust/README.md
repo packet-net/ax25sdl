@@ -45,6 +45,10 @@ match t.actions[0].verb {
 
 Each state page is a `pub static` (e.g. `DATA_LINK_CONNECTED: StatePage`); the figc4.7 subroutines are a `SubroutinesPage`. The runtime types (`StatePage`, `TransitionSpec`, `ActionStep`, `GuardTerm`, …) live in the `types` module and are re-exported at the crate root.
 
+## Saves
+
+`StatePage::saves` lists the events a state saves (the figures' Save symbol, "Requeue"). A saved event has no transition in that state: hold it in arrival order, and each time the machine enters a state (the same state included) consume the first held event that state does not save. An explicit save beats the page's "all other" column. See `docs/golden-traces.md` ("Saves") in the repo.
+
 ## License
 
 [AGPL-3.0-or-later](LICENSE). Spec text and figures derive from the AX.25 v2.2 specification.

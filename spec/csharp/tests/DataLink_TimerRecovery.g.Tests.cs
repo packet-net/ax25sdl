@@ -16,6 +16,8 @@ public class DataLink_TimerRecovery_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DataLink_TimerRecovery.Transitions.Count.Should().Be(92);
 
+    [Fact] public void SavesAreAsTranscribed() => DataLink_TimerRecovery.Saves.Should().Equal(new Ax25Event[] {  });
+
     [Fact] public void t01_dl_disconnect_request()
     {
         var t = DataLink_TimerRecovery.Transitions.Single(x => x.Id == "t01_dl_disconnect_request");

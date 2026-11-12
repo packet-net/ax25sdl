@@ -16,6 +16,8 @@ public class DuplexPhy_ReceiverReady_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => DuplexPhy_ReceiverReady.Transitions.Count.Should().Be(2);
 
+    [Fact] public void SavesAreAsTranscribed() => DuplexPhy_ReceiverReady.Saves.Should().Equal(new Ax25Event[] {  });
+
     [Fact] public void t01_hw_aos_indication()
     {
         var t = DuplexPhy_ReceiverReady.Transitions.Single(x => x.Id == "t01_hw_aos_indication");

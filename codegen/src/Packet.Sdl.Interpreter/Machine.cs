@@ -44,6 +44,9 @@ public sealed record EventInput(
 /// </remarks>
 public sealed record DispatchResult(string TransitionId, string NextState, IReadOnlyList<Effect> Effects)
 {
+    /// <summary>The event this result answers (set by the machine; empty on a hand-built result).</summary>
+    public string Event { get; init; } = "";
+
     /// <summary>Held inputs consumed after this transition entered its next state, in the order they were consumed (docs/golden-traces.md, "Saves").</summary>
     public IReadOnlyList<DispatchResult> Replayed { get; init; } = Array.Empty<DispatchResult>();
 
@@ -314,10 +317,10 @@ public sealed class DataLinkMachine
         if (IsSavedHere(input.Event))
         {
             _held.Add(input);
-            return new DispatchResult(SaveTransitionId, State, Array.Empty<Effect>());
+            return new DispatchResult(SaveTransitionId, State, Array.Empty<Effect>()) { Event = input.Event };
         }
 
-        var result = DispatchInput(input);
+        var result = DispatchInput(input) with { Event = input.Event };
         var replayed = ReplayHeld();
         return replayed.Count == 0 ? result : result with { Replayed = replayed };
     }
@@ -342,7 +345,7 @@ public sealed class DataLinkMachine
             _held.RemoveAt(index);
             try
             {
-                replayed.Add(DispatchInput(input));
+                replayed.Add(DispatchInput(input) with { Event = input.Event });
             }
             catch (InvalidOperationException ex)
             {

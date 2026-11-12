@@ -16,6 +16,8 @@ public class ManagementDataLink_Ready_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => ManagementDataLink_Ready.Transitions.Count.Should().Be(4);
 
+    [Fact] public void SavesAreAsTranscribed() => ManagementDataLink_Ready.Saves.Should().Equal(new Ax25Event[] {  });
+
     [Fact] public void t01_mdl_negotiate_request()
     {
         var t = ManagementDataLink_Ready.Transitions.Single(x => x.Id == "t01_mdl_negotiate_request");

@@ -16,6 +16,8 @@ public class SimplexPhy_ReceiverStart_GeneratedTests
 
     [Fact] public void TransitionsArePresent() => SimplexPhy_ReceiverStart.Transitions.Count.Should().Be(3);
 
+    [Fact] public void SavesAreAsTranscribed() => SimplexPhy_ReceiverStart.Saves.Should().Equal(new Ax25Event[] {  });
+
     [Fact] public void t01_ph_expedited_data_request()
     {
         var t = SimplexPhy_ReceiverStart.Transitions.Single(x => x.Id == "t01_ph_expedited_data_request");

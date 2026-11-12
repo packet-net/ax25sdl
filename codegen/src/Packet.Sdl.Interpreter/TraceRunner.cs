@@ -119,6 +119,38 @@ public static class TraceRunner
         if (expect.Queue is not null && !expect.Queue.SequenceEqual(machine.Queue, StringComparer.Ordinal))
             return $"queue: expected [{string.Join(", ", expect.Queue)}], actual [{string.Join(", ", machine.Queue)}]";
 
+        if (expect.Held is not null)
+        {
+            var held = machine.HeldInputs.Select(h => h.Event).ToList();
+            if (!expect.Held.SequenceEqual(held, StringComparer.Ordinal))
+                return $"held inputs: expected [{string.Join(", ", expect.Held)}], actual [{string.Join(", ", held)}]";
+        }
+
+        if (expect.Replayed is not null)
+        {
+            var actual = result.Replayed;
+            var count = Math.Min(expect.Replayed.Count, actual.Count);
+            for (var i = 0; i < count; i++)
+            {
+                var want = expect.Replayed[i];
+                var got = actual[i];
+                if (!string.Equals(want.Event, got.Event, StringComparison.Ordinal))
+                    return $"replay {i + 1}: expected `{want.Event}` replayed, actual `{got.Event}` (via {got.TransitionId})";
+                if (want.Transition is not null && !string.Equals(want.Transition, got.TransitionId, StringComparison.Ordinal))
+                    return $"replay {i + 1} [{want.Event}]: expected transition {want.Transition}, took {got.TransitionId}";
+                if (want.State is not null && !string.Equals(want.State, got.NextState, StringComparison.Ordinal))
+                    return $"replay {i + 1} [{want.Event}]: expected state {want.State}, entered {got.NextState}";
+                if (want.Effects is not null)
+                {
+                    var failure = CheckEffects(want.Effects, got.Effects);
+                    if (failure is not null) return $"replay {i + 1} [{want.Event}]: {failure}";
+                }
+            }
+            if (expect.Replayed.Count != actual.Count)
+                return $"expected {expect.Replayed.Count} replayed input(s), machine replayed {actual.Count}: " +
+                       $"[{string.Join(", ", actual.Select(r => $"{r.Event} via {r.TransitionId}"))}]";
+        }
+
         return null;
     }
 

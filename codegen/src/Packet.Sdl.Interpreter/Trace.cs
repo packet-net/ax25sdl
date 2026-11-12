@@ -86,6 +86,36 @@ public sealed class ExpectDoc
 
     /// <summary>Full expected I-frame queue contents, head first.</summary>
     public List<string>? Queue { get; set; }
+
+    /// <summary>
+    /// Full expected list of held (saved) inputs after the step, head first,
+    /// as event names. <c>held: []</c> asserts nothing is held.
+    /// </summary>
+    public List<string>? Held { get; set; }
+
+    /// <summary>
+    /// Held inputs the step's transition released, in the order they were
+    /// consumed: exhaustive when present (<c>replayed: []</c> asserts none).
+    /// The step's own <see cref="Effects"/> cover the triggering transition
+    /// only; each entry here carries the replayed transition's effects.
+    /// </summary>
+    public List<ReplayDoc>? Replayed { get; set; }
+}
+
+/// <summary>One replayed (previously saved) input: the transition it took and, optionally, its exhaustive effects.</summary>
+public sealed class ReplayDoc
+{
+    /// <summary>Event name of the replayed input (required).</summary>
+    public string Event { get; set; } = "";
+
+    /// <summary>Exact transition id it took (optional).</summary>
+    public string? Transition { get; set; }
+
+    /// <summary>State it entered (optional).</summary>
+    public string? State { get; set; }
+
+    /// <summary>Exhaustive, ordered effects of the replayed transition (optional).</summary>
+    public List<EffectDoc>? Effects { get; set; }
 }
 
 /// <summary>
@@ -143,7 +173,8 @@ public static class TraceLoader
             var step = doc.Steps[i];
             if (string.IsNullOrWhiteSpace(step.Inject.Event))
                 throw new InvalidDataException($"{path}: step {i + 1} has no `inject.event:`");
-            foreach (var effect in step.Expect.Effects ?? Enumerable.Empty<EffectDoc>())
+            foreach (var effect in (step.Expect.Effects ?? Enumerable.Empty<EffectDoc>())
+                         .Concat((step.Expect.Replayed ?? new List<ReplayDoc>()).SelectMany(r => r.Effects ?? new List<EffectDoc>())))
             {
                 var kinds = new[] { effect.Frame, effect.Dl, effect.Lm, effect.Internal }.Count(k => k is not null);
                 if (kinds != 1)
