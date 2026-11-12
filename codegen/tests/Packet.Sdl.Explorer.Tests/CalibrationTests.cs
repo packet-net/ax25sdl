@@ -2345,10 +2345,11 @@ public class CalibrationTests(ITestOutputHelper output)
     [Theory]
     [InlineData(SeedKind.Connected, false, 333, "TimerRecovery/t23_rej_received_yes_no_no")]
     [InlineData(SeedKind.AwaitingV22Connection, false, 500, "TimerRecovery/t23_rej_received_yes_no_yes")]
+    [InlineData(SeedKind.Connected, true, 1374, "TimerRecovery/t19_rnr_received_no_no_no_no")]
     [InlineData(SeedKind.AwaitingV22Connection, true, 2233, "TimerRecovery/t19_rnr_received_yes_no_yes")]
     public void An_I_Frame_In_Sequence_Puts_The_Peers_N_r_Past_V_s(SeedKind seed, bool busy, int states, string arm)
     {
-        // ip-nr, ip-nr-v22, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
+        // ip-nr, ip-nr-v22, ip-nr-rnr, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
         // its poll lost, sends an I frame in sequence that its own machine
         // never numbered; then a frame ahead of sequence draws REJ F=1, or B's
         // busy condition draws RNR, each with N(r) = V(s) + 1 at A. Reject

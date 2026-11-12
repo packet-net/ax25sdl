@@ -666,6 +666,12 @@ public static class Scenarios
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, "clean");
+        // Since ax25spec#180 the RNR arm splits by version; this is the
+        // version 2.0 half (t19_rnr_received_no_no_no_no).
+        Add("ip-nr-rnr", "RNR, N(r) beyond V(s)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
+        {
+            T3 = true, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
+        }, "clean");
         Add("ip-nr-rnr-v22", "RNR, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
