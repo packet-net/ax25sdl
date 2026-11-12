@@ -879,9 +879,11 @@ public static class Scenarios
     /// 0..3 each way, budget 0..2, k in {2, 4}, SREJ off and on, faults
     /// drop, dup and drop+dup, all invariants on, visited-state cap 1.2
     /// million. Optionally with B's layer 3 flow-controlling, as the
-    /// explorer's flow-control grid does.
+    /// explorer's flow-control grid does, and with an extra option set
+    /// (<c>--grid-with</c>, <see cref="GridOptions"/>) applied to every cell,
+    /// whose tag is appended to each cell's name.
     /// </summary>
-    public static IReadOnlyList<Scenario> Grid(string currentDir, bool flowB)
+    public static IReadOnlyList<Scenario> Grid(string currentDir, bool flowB, Func<ExplorerOptions, ExplorerOptions>? with = null, string tag = "")
     {
         var list = new List<Scenario>();
         foreach (var ab in new[] { 0, 1, 2, 3 })
@@ -891,12 +893,41 @@ public static class Scenarios
         foreach (var srej in new[] { false, true })
         foreach (var (faults, fname) in new[] { (FaultKinds.Drop, "drop"), (FaultKinds.Duplicate, "dup"), (FaultKinds.Drop | FaultKinds.Duplicate, "drop+dup") })
         {
-            var name = $"g-ab{ab}-ba{ba}-b{b}-k{k}-{(srej ? "srej" : "nosrej")}-{fname}{(flowB ? "-flowB" : "")}";
-            list.Add(new Scenario(name, "grid", TableSetKind.Current, new ExplorerOptions
+            var name = $"g-ab{ab}-ba{ba}-b{b}-k{k}-{(srej ? "srej" : "nosrej")}-{fname}{(flowB ? "-flowB" : "")}{(tag.Length > 0 ? "@" + tag : "")}";
+            var o = new ExplorerOptions
             {
                 TablesDir = currentDir, FramesAb = ab, FramesBa = ba, Budget = b, K = k, Srej = srej, Faults = faults,
                 FlowControl = flowB ? FlowControlAt.B : FlowControlAt.None, MaxStates = 1_200_000,
-            }, null));
+            };
+            list.Add(new Scenario(name, "grid", TableSetKind.Current, with is null ? o : with(o), null));
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// The explorer's v2.0 stub-peer grid (docs/explorer.md, "Grid with the
+    /// v2.0 stub peer"): the two connect-phase seeds (cold, A at modulo 128,
+    /// as <c>--seed disconnected --mod128</c>; and A in AwaitingV22Connection
+    /// with its SABME in flight, <c>--seed awaiting-v22</c>), B the
+    /// <c>v20-frmr</c> or <c>v20-dm</c> stub, no data, budget 0..2, faults
+    /// drop, dup and drop+dup, timer-free progress off and on: 72 cells.
+    /// </summary>
+    public static IReadOnlyList<Scenario> StubGrid(string currentDir, Func<ExplorerOptions, ExplorerOptions>? with = null, string tag = "")
+    {
+        var list = new List<Scenario>();
+        foreach (var (seed, mod128, sname) in new[] { (SeedKind.Disconnected, true, "cold"), (SeedKind.AwaitingV22Connection, false, "v22") })
+        foreach (var (peer, pname) in new[] { (PeerKind.V20Frmr, "frmr"), (PeerKind.V20Dm, "dm") })
+        foreach (var b in new[] { 0, 1, 2 })
+        foreach (var (faults, fname) in new[] { (FaultKinds.Drop, "drop"), (FaultKinds.Duplicate, "dup"), (FaultKinds.Drop | FaultKinds.Duplicate, "drop+dup") })
+        foreach (var sp in new[] { false, true })
+        {
+            var name = $"s-{sname}-{pname}-b{b}-{fname}{(sp ? "-sp" : "")}{(tag.Length > 0 ? "@" + tag : "")}";
+            var o = new ExplorerOptions
+            {
+                TablesDir = currentDir, Seed = seed, Modulo128A = mod128, Peer = peer, FramesAb = 0, FramesBa = 0, Budget = b, Faults = faults,
+                Invariants = sp ? Invariants.Default | Invariants.SelectiveProgress : Invariants.Default,
+            };
+            list.Add(new Scenario(name, "stub grid", TableSetKind.Current, with is null ? o : with(o), null));
         }
         return list;
     }

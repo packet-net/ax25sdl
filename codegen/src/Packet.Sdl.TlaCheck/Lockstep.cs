@@ -24,14 +24,47 @@ public static class Lockstep
     private static readonly Regex Sig = new(@"lockstep\{([^}]*)\}");
     private static readonly string[] Seeding = ["(while seeding)"];
 
-    public static int Run(IReadOnlyList<Scenario> scenarios, Tlc tlc, string work, int iterate, int parallel, string meaning)
+    /// <param name="grid">
+    /// A grid run: a cell that throws is recorded as an error and the run
+    /// goes on, and a cell's model directory is deleted once it shows no
+    /// difference.
+    /// </param>
+    /// <param name="resultsFile">With a grid run, the results file: cells it records with a verdict are skipped, the others appended.</param>
+    /// <param name="cellIndex">With a grid run, each cell's index in the whole grid.</param>
+    public static int Run(IReadOnlyList<Scenario> scenarios, Tlc tlc, string work, int iterate, int parallel, string meaning,
+        bool grid = false, ResultsFile? resultsFile = null, IReadOnlyDictionary<string, int>? cellIndex = null)
     {
         var results = new ConcurrentDictionary<int, LockstepRow>();
+        var skipped = 0;
         Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
         {
-            var row = One(scenarios[idx], tlc, work, iterate);
-            results[idx] = row;
             var s = scenarios[idx];
+            if (resultsFile?.Done(s.Name, "lockstep") is { } done)
+            {
+                results[idx] = GridRecords.LockstepRow(done);
+                Interlocked.Increment(ref skipped);
+                return;
+            }
+            LockstepRow row;
+            if (grid)
+            {
+                try { row = One(s, tlc, work, iterate); }
+                catch (Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or UnauthorizedAccessException)
+                {
+                    row = new LockstepRow(Array.Empty<LockstepDiff>(), 0, false, $"{ex.GetType().Name}: {ex.Message}", 0);
+                }
+                resultsFile?.Append(GridRecords.Lockstep(s.Name, cellIndex is not null && cellIndex.TryGetValue(s.Name, out var i) ? i : idx, row));
+                if (row.Error.Length == 0 && row.Diffs.Count == 0)
+                {
+                    var dir = Path.Combine(work, s.Name);
+                    if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+                }
+            }
+            else
+            {
+                row = One(s, tlc, work, iterate);
+            }
+            results[idx] = row;
             Console.Error.WriteLine(row.Error.Length > 0 ? $"ERROR    {s.Name}: {row.Error}"
                 : row.Diffs.Count == 0 ? $"same     {s.Name}: {row.States} states ({row.Seconds:0.0} s)"
                 : $"DIFFER   {s.Name}: {string.Join("; ", row.Diffs.Select(d => d.Signature + " (" + d.Steps.Count + " steps)"))}");
@@ -75,6 +108,7 @@ public static class Lockstep
         var same = results.Values.Count(r => r.Error.Length == 0 && r.Diffs.Count == 0);
         var errors = results.Values.Count(r => r.Error.Length > 0);
         sb.Append(CultureInfo.InvariantCulture, $"\nRows run: {scenarios.Count}; the same throughout: {same}; with a difference: {scenarios.Count - same - errors}; errors: {errors}; distinct differences: {bySig.Count}.\n");
+        if (grid) sb.Append(CultureInfo.InvariantCulture, $"Grid: {skipped} cell(s) read from the results file; {results.Values.Sum(r => r.Seconds):0} s of TLC in all; largest cell {results.Values.Select(r => r.States).DefaultIfEmpty(0).Max()} distinct states.\n");
         foreach (var (sig, list) in bySig)
         {
             var (row, first) = list.OrderBy(x => x.Diff.Steps.Count).First();

@@ -5,7 +5,7 @@ using Packet.Sdl.Explorer;
 using Packet.Sdl.Interpreter;
 using Packet.Sdl.TlaCheck;
 
-var usage = """
+var usageText = """
 usage: dotnet run --project codegen/src/Packet.Sdl.TlaCheck -- --jar PATH [options]
 
 Runs the explorer and TLC on every calibration scenario and reports, row by
@@ -23,6 +23,23 @@ its expectation fails, even where the two tools agree.
   --list            print the scenario names and exit
   --grid            the explorer's 576-cell data-phase grid instead of the calibration suite
   --grid-flow       the same grid with B's layer 3 flow-controlling
+  --grid-stub       the explorer's 72-cell v2.0 stub-peer grid (connect phase)
+  --grid-with LIST  apply an option set to every grid cell: a comma list of
+                    the explorer's option names without the dashes, bare or
+                    NAME=VALUE (a list value joined with +), for example
+                    t3,release=A or frame-errors=control+info; repeatable.
+                    Refused combinations fail before anything runs. The
+                    grid-compatible options (docs/tla.md, "Grid runs"):
+{GRIDHELP}
+  --grid-cells SPEC run only these grid cells: a comma list of indices (12),
+                    ranges (0-143), strides (%4=1: index mod 4 = 1) and name
+                    patterns (g-ab3-*); indices are those --list prints
+  --results FILE    grid runs: append one JSON line per cell to FILE, flushed
+                    as each cell completes; refuses an existing FILE unless
+                    --resume
+  --resume          with --results: skip the cells FILE already records with
+                    a verdict (a cell with none, a timeout or a failed run,
+                    runs again)
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
@@ -44,11 +61,16 @@ A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
 not fired, each with its status and reason.
 
+A grid run deletes each cell's model directory once the cell agrees (or,
+with --lockstep, shows no difference), so the disk holds only the cells in
+progress and the ones worth reading.
+
 exit code: 0 every row agrees and meets its expectation (and the accounting
 holds), 1 some row disagrees, misses its expectation, a run failed, or the
 accounting does not hold; with --lockstep,
 0 the two meanings never differed on any row, 1 they did or a run failed
 """;
+var usage = usageText.Replace("{GRIDHELP}", GridOptions.Help(), StringComparison.Ordinal);
 
 string? jar = Environment.GetEnvironmentVariable("TLA2TOOLS_JAR");
 var work = Path.Combine(Path.GetTempPath(), "ax25sdl-tlacheck");
@@ -56,6 +78,11 @@ HashSet<string>? only = null;
 var list = false;
 var grid = false;
 var gridFlow = false;
+var gridStub = false;
+var gridWith = new List<string>();
+string? gridCells = null;
+string? resultsPath = null;
+var resume = false;
 int parallel = 1, workers = 1, timeout = 600;
 var heap = "2g";
 var meaning = Tlc.DefaultMeaning;
@@ -74,6 +101,11 @@ for (var i = 0; i < args.Length; i++)
         case "--list": list = true; break;
         case "--grid": grid = true; break;
         case "--grid-flow": grid = true; gridFlow = true; break;
+        case "--grid-stub": gridStub = true; break;
+        case "--grid-with": gridWith.Add(Next()); break;
+        case "--grid-cells": gridCells = Next(); break;
+        case "--results": resultsPath = Next(); break;
+        case "--resume": resume = true; break;
         case "--parallel": parallel = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--workers": workers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--heap": heap = Next(); break;
@@ -124,10 +156,58 @@ string Dir(TableSetKind t) => t switch
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
-var scenarios = (grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow) : Scenarios.Calibration(Dir)).Where(s => only is null || only.Contains(s.Name)).ToList();
+var gridMode = grid || gridStub;
+if (grid && gridStub)
+{
+    Console.Error.WriteLine("--grid-stub is a grid of its own: not with --grid or --grid-flow");
+    return 1;
+}
+if (!gridMode && (gridWith.Count > 0 || gridCells is not null || resultsPath is not null || resume))
+{
+    Console.Error.WriteLine("--grid-with, --grid-cells, --results and --resume need a grid (--grid, --grid-flow or --grid-stub)");
+    return 1;
+}
+if (resume && resultsPath is null)
+{
+    Console.Error.WriteLine("--resume needs --results FILE");
+    return 1;
+}
+Func<ExplorerOptions, ExplorerOptions>? gridApply = null;
+var gridTag = "";
+Func<int, string, bool>? cellFilter = null;
+try
+{
+    if (gridMode) (gridApply, gridTag) = GridOptions.Parse(gridWith, gridStub);
+    if (gridCells is not null) cellFilter = GridOptions.CellFilter(gridCells);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine(ex.Message);
+    return 1;
+}
+var allScenarios = gridStub ? Scenarios.StubGrid(Dir(TableSetKind.Current), gridApply, gridTag)
+    : grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow, gridApply, gridTag)
+    : Scenarios.Calibration(Dir);
+var cellIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+for (var i = 0; i < allScenarios.Count; i++) cellIndex[allScenarios[i].Name] = i;
+var scenarios = allScenarios.Where((s, i) => (only is null || only.Contains(s.Name)) && (cellFilter is null || cellFilter(i, s.Name))).ToList();
+if (gridMode)
+{
+    if (scenarios.Count == 0)
+    {
+        Console.Error.WriteLine("no grid cell selected");
+        return 1;
+    }
+    // Every cell against the stepper's refusals before anything runs.
+    if (GridOptions.FirstRefusal(scenarios) is { } refused)
+    {
+        Console.Error.WriteLine(refused);
+        return 1;
+    }
+}
 if (list)
 {
-    foreach (var s in scenarios) Console.WriteLine($"{s.Name,-22} {s.Defect,-18} {s.Tables,-8} {s.Expect?.Label}");
+    foreach (var s in scenarios) Console.WriteLine(gridMode ? $"{cellIndex[s.Name],4} {s.Name}" : $"{s.Name,-22} {s.Defect,-18} {s.Tables,-8} {s.Expect?.Label}");
     return 0;
 }
 if (jar is null || !File.Exists(jar))
@@ -150,12 +230,51 @@ var tlc = new Tlc(jar,
     meaning,
     workers, heap, TimeSpan.FromSeconds(timeout), lockstep);
 
-if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meaning);
+ResultsFile? resultsFile = null;
+if (resultsPath is not null)
+{
+    try { resultsFile = ResultsFile.Open(resultsPath, resume); }
+    catch (IOException ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
+    }
+}
+using var resultsOwner = resultsFile;
+
+if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meaning, gridMode, resultsFile, cellIndex);
 
 var results = new ConcurrentDictionary<int, Row>();
+var skipped = 0;
 Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>
 {
-    var row = Compare(scenarios[idx]);
+    var s = scenarios[idx];
+    if (resultsFile?.Done(s.Name, "cross") is { } done)
+    {
+        results[idx] = GridRecords.Row(done);
+        Interlocked.Increment(ref skipped);
+        return;
+    }
+    Row row;
+    if (gridMode)
+    {
+        // An unattended grid run records a cell that throws and carries on.
+        try { row = Compare(s); }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            row = new Row("", $"error: {ex.GetType().Name}: {ex.Message}", false, "the run failed", new HashSet<string>(), new HashSet<string>(), TlcKind: "error");
+        }
+        resultsFile?.Append(GridRecords.Cross(s.Name, cellIndex[s.Name], row));
+        if (row.Agree)
+        {
+            var dir = Path.Combine(work, s.Name);
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+    else
+    {
+        row = Compare(s);
+    }
     results[idx] = row;
     Console.Error.WriteLine($"{(row.Agree ? "agree   " : "DISAGREE")} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}");
     if (row.Unexpected is { } unexpected) Console.Error.WriteLine($"UNEXPECTED {scenarios[idx].Name}: {unexpected}");
@@ -185,6 +304,7 @@ if (only is null && !grid)
 }
 var unexpectedRows = results.Values.Count(r => r.Unexpected is not null);
 if (unexpectedRows > 0) Console.WriteLine($"{unexpectedRows} row(s) differ from their expected verdict (the Expected column).");
+if (gridMode) Console.WriteLine(GridRecords.Summary(results.Values.ToList(), skipped));
 return results.Values.All(r => r.Agree && r.Unexpected is null) && accounted ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
@@ -192,7 +312,9 @@ return results.Values.All(r => r.Agree && r.Unexpected is null) && accounted ? 0
 Row Compare(Scenario s)
 {
     var o = s.Options;
+    var exClock = System.Diagnostics.Stopwatch.StartNew();
     var ex = Explorer.Run(o, TableLoader.Load(o.TablesDir));
+    var exSeconds = exClock.Elapsed.TotalSeconds;
     var exKind = ex.Outcome switch
     {
         Outcome.NoViolation => "clean",
@@ -297,7 +419,8 @@ Row Compare(Scenario s)
     // length is the one the expectation states, TLC's lasso differs).
     var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.CounterexampleLength, ex.StatesExplored);
     if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
-    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why), ex.FiredTransitions, tlcArms, unexpected);
+    return new Row(exText, tlcText, why.Count == 0, string.Join("; ", why), ex.FiredTransitions, tlcArms, unexpected,
+        exKind, kind, ex.StatesExplored, states, exSeconds, elapsed.TotalSeconds);
 }
 
 static (string Kind, string Station, int Steps, List<string> Tids, string Note) Verdict(TlcResult r, Phase phase, ExplorerOptions o, bool depthBound)
@@ -380,4 +503,7 @@ static string RepoRoot()
     return d?.FullName ?? throw new InvalidOperationException("run from inside the ax25sdl checkout: no spec-sdl/ in any ancestor of the working directory");
 }
 
-internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null);
+/// <param name="ExplorerKind">The explorer's verdict kind (clean, bound, or the invariant).</param>
+/// <param name="TlcKind">TLC's verdict kind; "error" or "timeout" when it gave none.</param>
+internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null,
+    string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0);
