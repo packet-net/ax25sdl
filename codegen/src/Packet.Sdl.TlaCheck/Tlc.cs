@@ -101,15 +101,32 @@ public sealed class Tlc
             module = Path.GetFileNameWithoutExtension(_meaning);
             File.Copy(_meaning, Path.Combine(workDir, module + ".tla"), overwrite: true);
         }
-        else if (!File.Exists(Path.Combine(_tlaDir, module + ".tla")))
+        else if (CheckMeaning(_tlaDir, _meaning, _harness) is { } why)
         {
-            throw new FileNotFoundException($"meaning module {module}.tla not found in {_tlaDir}");
+            throw new InvalidOperationException(why);
         }
         File.WriteAllText(Path.Combine(workDir, SemanticsFile), SelectMeaning(File.ReadAllText(Path.Combine(_tlaDir, SemanticsFile)), module));
         File.Copy(_harness, Path.Combine(workDir, Path.GetFileName(_harness)), overwrite: true);
     }
 
     private const string SemanticsFile = TlaEmitter.SemanticsModule + ".tla";
+
+    /// <summary>
+    /// Why <paramref name="meaning"/> cannot be selected, or null when it can: a module
+    /// name must exist in <paramref name="tlaDir"/>; a .tla path must exist and must not
+    /// share its name with a module in <paramref name="tlaDir"/> (it would replace that
+    /// module in the model directory) or with the generated tables or the harness.
+    /// </summary>
+    public static string? CheckMeaning(string tlaDir, string meaning, string harness)
+    {
+        if (!meaning.EndsWith(".tla", StringComparison.Ordinal))
+            return File.Exists(Path.Combine(tlaDir, meaning + ".tla")) ? null : $"meaning module {meaning}.tla not found in {tlaDir}";
+        if (!File.Exists(meaning)) return $"meaning file {meaning} not found";
+        var name = Path.GetFileName(meaning);
+        if (File.Exists(Path.Combine(tlaDir, name)) || name == TlaEmitter.FileName || name == Path.GetFileName(harness))
+            return $"meaning file {name} has the name of a module the model already uses; rename it (and its MODULE line)";
+        return null;
+    }
 
     /// <summary>Ax25Semantics.tla with its EXTENDS line naming <paramref name="module"/> instead of the default meaning.</summary>
     public static string SelectMeaning(string semantics, string module)

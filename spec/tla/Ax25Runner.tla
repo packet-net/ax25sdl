@@ -5,22 +5,20 @@
 (* the one transition whose guard holds, running its action chain box by   *)
 (* box with its loop regions, calling subroutines through the call-site    *)
 (* binding map, moving to the next state, and the frame around one         *)
-(* dispatch (the queue pop for I_frame_pops_off_queue, a pre-emption the   *)
-(* meaning may claim, the settle step). A port of the reference            *)
-(* interpreter's Dispatch, ExecuteActions, RunLoop and InvokeSubroutine    *)
+(* dispatch (the event's own effect, a pre-emption the meaning may claim,  *)
+(* the settle step). A port of the reference interpreter's Dispatch,       *)
+(* ExecuteActions, RunLoop and InvokeSubroutine                            *)
 (* (codegen/src/Packet.Sdl.Interpreter/Machine.cs).                        *)
 (*                                                                         *)
 (* What each verb, atom and signal means comes from a meaning module,      *)
 (* through the constant operators declared below. Ax25Semantics.tla binds  *)
-(* them to a meaning by instantiating this module; the interface, field by *)
-(* field and operator by operator, is documented in the header of          *)
-(* Ax25Meaning.tla, and docs/tla.md says how to select another meaning.    *)
+(* them to a meaning by instantiating this module. The interface a meaning *)
+(* implements is spec/tla/MeaningInterface.md.                             *)
 (*                                                                         *)
 (* The runner reads and writes these fields of the dispatch context and    *)
-(* nothing else: st (the Data Link state, a page name), q (the I frame     *)
-(* queue, a sequence, head first; only for the pop), hasPop and pop (the   *)
-(* popped head), err (the error, "" for none), tid (the transition that    *)
-(* fired) and arms (every table row the dispatch ran, for coverage).       *)
+(* nothing else: st (the Data Link state, a page name), err (the error,    *)
+(* "" for none), tid (the transition that fired) and arms (every table row *)
+(* the dispatch ran, for coverage).                                        *)
 (***************************************************************************)
 EXTENDS Ax25DataLinkTables
 
@@ -194,15 +192,8 @@ DispatchState(c, e) ==
 (* Around the table (Dispatch)                                             *)
 (***************************************************************************)
 
-\* Open the context, let the event itself act (Arrive), then, unless that
-\* failed, pop the queue head for I_frame_pops_off_queue. The pop is the
-\* event's own mechanics: the table arms for it then read the popped entry
-\* (hasPop, pop). An empty queue pops nothing.
-Prepare(m, e) ==
-    LET c1 == Arrive(Begin(m, e), e)
-    IN  IF c1.err = "" /\ e.ev = "I_frame_pops_off_queue" /\ c1.q # <<>>
-        THEN [c1 EXCEPT !.hasPop = TRUE, !.pop = Head(c1.q), !.q = Tail(c1.q)]
-        ELSE c1
+\* Open the context and let the event itself act (Arrive) before the table.
+Prepare(m, e) == Arrive(Begin(m, e), e)
 
 \* After the transition: the meaning's bookkeeping, unless the dispatch failed.
 Settle(c) == IF c.err # "" THEN c ELSE AfterTransition(c)

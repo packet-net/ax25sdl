@@ -110,10 +110,18 @@ if (jar is null || !File.Exists(jar))
     return 1;
 }
 
+var harness = Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "TwoStation.tla");
+var tlaDir = Path.Combine(root, "spec", "tla");
+if (meaning.EndsWith(".tla", StringComparison.Ordinal)) meaning = Path.GetFullPath(meaning);
+if (Tlc.CheckMeaning(tlaDir, meaning, harness) is { } badMeaning)
+{
+    Console.Error.WriteLine(badMeaning);
+    return 1;
+}
 var tlc = new Tlc(jar,
-    Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "TwoStation.tla"),
-    Path.Combine(root, "spec", "tla"),
-    meaning.EndsWith(".tla", StringComparison.Ordinal) ? Path.GetFullPath(meaning) : meaning,
+    harness,
+    tlaDir,
+    meaning,
     workers, heap, TimeSpan.FromSeconds(timeout));
 
 var results = new ConcurrentDictionary<int, Row>();

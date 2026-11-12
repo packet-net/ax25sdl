@@ -1,17 +1,17 @@
 ---------------------------- MODULE Ax25Values -----------------------------
 (***************************************************************************)
 (* Hand-written. The value shapes that cross the interface between the     *)
-(* harness, the runner (Ax25Runner.tla) and a meaning module               *)
-(* (Ax25Meaning.tla): what an event, a frame on the air and an effect look *)
-(* like, the error convention, and the map helpers for the two maps the    *)
-(* harness reads. Every meaning module EXTENDS this one and must not       *)
-(* redefine anything in it. The interface itself is documented in the      *)
-(* header of Ax25Meaning.tla.                                              *)
+(* harness, the runner (Ax25Runner.tla) and a meaning module: what an      *)
+(* event, a frame on the air and an effect look like, the error            *)
+(* convention, and helpers for finite maps kept as sets of pairs (the      *)
+(* harness reads the receive buffer with Has). Every meaning module        *)
+(* EXTENDS this one and must not redefine anything in it. The interface is *)
+(* spec/tla/MeaningInterface.md.                                           *)
 (***************************************************************************)
 EXTENDS Integers, Sequences, FiniteSets, TLC
 
-\* An absent number: the N(r)/N(s) of a frame that carries none, an unstaged
-\* register, an unassigned X.
+\* An absent value: the N(r) or N(s) of a frame that carries none, or a pf
+\* or cmd of a stimulus that is not a frame.
 None == -1
 
 \* A frame on the air (Frame.cs): type, command (else response), P/F, N(r),
@@ -27,8 +27,9 @@ FrameFx(f) == [kind |-> "frame", frame |-> f, prim |-> "", detail |-> ""]
 UpperFx(p, d) == [kind |-> "dl", frame |-> NoFrm, prim |-> p, detail |-> d]
 LmFx(p) == [kind |-> "lm", frame |-> NoFrm, prim |-> p, detail |-> ""]
 
-\* One injected stimulus (EventInput). pf and cmd are 1, 0 or None (the
-\* stimulus is not a frame); able and info are the two environment atoms.
+\* One injected stimulus (EventInput). pf and cmd are 1 or 0 for a frame,
+\* None otherwise; able and info are the environment's answers to the two
+\* environment atoms.
 \* ftype is the received frame's type, "" when the stimulus is not a frame
 \* (the harness's UI check keys on it). fe is the corrupted form when the
 \* harness injected a frame error, "" otherwise (its FrameError check and
