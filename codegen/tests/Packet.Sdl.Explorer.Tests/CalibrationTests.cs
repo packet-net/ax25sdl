@@ -1268,26 +1268,324 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData(SeedKind.Disconnected, "t11_all_other_primitives__from_upper_layer", "t04_ua_received_yes_yes")]
-    [InlineData(SeedKind.AwaitingV22Connection, "t06_all_other_primitives__from_upper_layer", "t12_ua_received_yes_yes")]
-    public void Release_While_Connecting_Is_Dropped_Because_Codegen_Does_Not_Emit_The_Requeue(SeedKind seed, string dropped, string connect)
+    [InlineData(SeedKind.Disconnected, "AwaitingConnection", "t04_ua_received_yes_yes")]
+    [InlineData(SeedKind.AwaitingV22Connection, "AwaitingV22Connection", "t12_ua_received_yes_yes")]
+    public void Release_While_Connecting_Is_Held_And_Acted_On_Once_Connected(SeedKind seed, string holding, string connect)
     {
         // packet-net/ax25sdl#97. Figures C4.2 and C4.6 draw a Save (Requeue)
-        // for DL-DISCONNECT Request while awaiting the connection; the
-        // generated tables have no arm for it, so it goes to the upper-layer
-        // catch-all, which does nothing, and the link comes up regardless. The
-        // layer 3 asked for the link down and it ends up.
-        var result = Run(new ExplorerOptions
+        // for DL-DISCONNECT Request while awaiting the connection. Until the
+        // explorer routed through saves the request went to the upper-layer
+        // catch-all and the link came up regardless (a 3-step deadlock); now
+        // it is held, and replayed once the link is up (pinned semantic 19).
+        var options = new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = seed, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
+        };
+        var result = Run(options);
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(8);
+
+        var trace = Walk(options, MoveKind.Release, MoveKind.Deliver, MoveKind.Deliver);
+        trace[0].Transition.Should().Be(DataLinkMachine.SaveTransitionId);
+        trace[0].SummaryA.Should().StartWith(holding).And.Contain("held=[DL_DISCONNECT_request]");
+        trace[2].Transition.Should().Be(connect);
+        trace[2].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
+        trace[2].Effects.Should().Contain(e => e.Contains("DL_CONNECT_confirm", StringComparison.Ordinal))
+            .And.Contain(e => e.Contains("DISC", StringComparison.Ordinal));
+        trace[2].SummaryA.Should().StartWith("AwaitingRelease");
+    }
+
+    // ─── Abandoning a connect (ExplorerOptions.Abandon, packet-net/ax25sdl#97) ──
+
+    private static ExplorerOptions AbandonCold(string tables) => new()
+    {
+        TablesDir = tables, Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
+    };
+
+    private static ExplorerOptions AbandonFallback(string tables) => new()
+    {
+        TablesDir = tables, Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Peer = PeerKind.V20Frmr, Abandon = ReleaseBy.A,
+    };
+
+    private static ExplorerOptions AbandonGivesUp(string tables) => new()
+    {
+        TablesDir = tables, Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
+        N2 = 1, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+    };
+
+    /// <summary>Apply the first enabled move of each kind in turn (A's before B's), from the seed.</summary>
+    private static List<StepRecord> Walk(ExplorerOptions options, params MoveKind[] kinds)
+    {
+        var stepper = new Stepper(options, Fixtures.Tables(options.TablesDir));
+        var state = stepper.Seed();
+        var trace = new List<StepRecord>();
+        foreach (var kind in kinds)
+        {
+            var move = stepper.EnabledMoves(state).First(m => m.Kind == kind);
+            var outcome = stepper.Apply(state, move, trace.Count + 1);
+            outcome.Violation.Should().BeNull(outcome.Record.Render());
+            trace.Add(outcome.Record);
+            state = outcome.Next;
+        }
+        return trace;
+    }
+
+    [Fact]
+    public void Abandon_Cold_The_Request_Is_Held_And_Acted_On_When_The_Link_Comes_Up()
+    {
+        // abandon-cold: A's layer 3 asks for the link, then abandons the
+        // attempt while figc4.2 waits for the UA. The request is held; the UA
+        // brings the link up (DL-CONNECT Confirm), Connected consumes the held
+        // request (DISC P = 1, Awaiting Release) and B's UA ends the release.
+        var result = Run(AbandonCold(Fixtures.CurrentDir));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(8);
+        result.FiredTransitions.Should().Contain("Connected/t01_dl_disconnect_request");
+
+        var trace = Walk(AbandonCold(Fixtures.CurrentDir), MoveKind.Abandon, MoveKind.Deliver, MoveKind.Deliver, MoveKind.Deliver, MoveKind.Deliver);
+        trace[0].Transition.Should().Be(DataLinkMachine.SaveTransitionId);
+        trace[2].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
+        trace[4].Transition.Should().Be("t03_ua_received_yes");
+        trace[4].Effects.Should().ContainSingle(e => e.Contains("DL_DISCONNECT_confirm", StringComparison.Ordinal));
+        trace[4].SummaryA.Should().StartWith("Disconnected");
+        trace[4].SummaryB.Should().StartWith("Disconnected");
+    }
+
+    [Fact]
+    public void Abandon_V22_The_Request_Is_Held_In_Awaiting_V22_Connection()
+    {
+        var options = AbandonCold(Fixtures.CurrentDir) with { Seed = SeedKind.AwaitingV22Connection };
+        var result = Run(options);
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(8);
+
+        var trace = Walk(options, MoveKind.Abandon, MoveKind.Deliver, MoveKind.Deliver);
+        trace[0].SummaryA.Should().StartWith("AwaitingV22Connection").And.Contain("held=[DL_DISCONNECT_request]");
+        trace[2].Transition.Should().Be("t12_ua_received_yes_yes");
+        trace[2].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
+    }
+
+    [Fact]
+    public void Abandon_The_Request_Is_Held_Across_The_V22_To_V20_Fallback()
+    {
+        // abandon-v20-fallback: held in Awaiting V2.2 Connection, still held
+        // after the FRMR from the v2.0 peer moves A to Awaiting Connection
+        // (figc4.6 t14), which saves it too; consumed once the SABM is
+        // answered, and the stub's UA to the DISC ends it.
+        var result = Run(AbandonFallback(Fixtures.CurrentDir));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(18);
+
+        var trace = Walk(AbandonFallback(Fixtures.CurrentDir), MoveKind.Abandon, MoveKind.Deliver, MoveKind.Deliver);
+        trace[2].Transition.Should().Be("t14_frmr_received");
+        trace[2].Replayed.Should().BeEmpty("Awaiting Connection saves the request too (pinned 19(a))");
+        trace[2].SummaryA.Should().StartWith("AwaitingConnection").And.Contain("held=[DL_DISCONNECT_request]");
+    }
+
+    [Fact]
+    public void Abandon_The_Request_Is_Confirmed_In_Disconnected_When_The_Connect_Fails()
+    {
+        // abandon-gives-up: the SABM is lost and A gives up (N2 = 1): figc4.2
+        // t05 goes to Disconnected with DL-DISCONNECT Indication, and
+        // Disconnected consumes the held request with DL-DISCONNECT Confirm.
+        var result = Run(AbandonGivesUp(Fixtures.CurrentDir));
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(23);
+        result.FiredTransitions.Should().Contain("Disconnected/t01_dl_disconnect_request");
+
+        var trace = Walk(AbandonGivesUp(Fixtures.CurrentDir), MoveKind.Abandon, MoveKind.Drop, MoveKind.T1Expiry);
+        trace[2].Transition.Should().Be("t05_t1_expiry_yes");
+        trace[2].Replayed.Should().Equal("Disconnected/t01_dl_disconnect_request");
+        trace[2].Effects.Should().ContainInOrder(
+            trace[2].Effects.First(e => e.Contains("DL_DISCONNECT_indication", StringComparison.Ordinal)),
+            trace[2].Effects.First(e => e.Contains("DL_DISCONNECT_confirm", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Abandon_With_Faults_A_Duplicated_Connect_UA_Answers_The_Disc()
+    {
+        // abandon-cold-faults (packethacking/ax25spec#99; release-cold-faults
+        // shows the same without a save).
+        // The duplicated UA of the connect reaches A in Awaiting Release,
+        // where figc4.3 t03 takes any UA F = 1 as the answer to its DISC; the
+        // DISC is then lost and B stays up with nothing to tell it otherwise.
+        var result = Run(AbandonCold(Fixtures.CurrentDir) with { Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate });
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[3].Transition.Should().Be("t03_ua_received_yes");
+        result.Trace[^1].SummaryA.Should().StartWith("Disconnected");
+        result.Trace[^1].SummaryB.Should().StartWith("Connected");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void Abandon_With_Faults_And_T3_The_Idle_Poll_Recovers()
+    {
+        // The same with T3: B's keepalive poll finds A Disconnected (DM).
+        var result = Run(AbandonCold(Fixtures.CurrentDir) with { Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(283);
+    }
+
+    [Fact]
+    public void Abandon_After_A_Reconnect_Is_Clean()
+    {
+        // abandon-reconnect: the gate's other half. A's layer 3 resets an
+        // established link once its data is delivered, then may abandon that
+        // connect while it is pending.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, FramesAb = 2, Reconnect = ReconnectBy.A, Abandon = ReleaseBy.A,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(74);
+    }
+
+    [Fact]
+    public void Abandon_By_Both_After_Reconnects_From_Cold_Is_Clean()
+    {
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.Both, Abandon = ReleaseBy.Both,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(140);
+    }
+
+    [Fact]
+    public void Abandon_Is_Only_Offered_While_Layer_3_Waits_For_Its_Own_Connect()
+    {
+        // Once the connect is reported (here the confirm), the gate is shut;
+        // and a station whose layer 3 never asked (B) is never offered it.
+        // (That it stays shut if the link later returns to a connect page
+        // without a new layer 3 connect is pinned only through the state
+        // count of abandon-cold-faults-t3.)
+        var options = AbandonCold(Fixtures.CurrentDir) with { Abandon = ReleaseBy.Both };
+        var stepper = new Stepper(options, Fixtures.Tables(options.TablesDir));
+        var seed = stepper.Seed();
+        stepper.EnabledMoves(seed).Should().Contain(new Move(MoveKind.Abandon, Station.A));
+        stepper.EnabledMoves(seed).Should().NotContain(new Move(MoveKind.Abandon, Station.B));
+
+        var sabm = stepper.Apply(seed, new Move(MoveKind.Deliver, Station.B), 1).Next;
+        var up = stepper.Apply(sabm, new Move(MoveKind.Deliver, Station.A), 2).Next;
+        up.A.State.Should().Be("Connected");
+        stepper.EnabledMoves(up).Should().NotContain(m => m.Kind == MoveKind.Abandon);
+    }
+
+    [Fact]
+    public void Abandon_Is_Refused_With_Data_After_The_Confirm_Or_Without_A_Connect()
+    {
+        ((Action)(() => Fixtures.Run(AbandonCold(Fixtures.CurrentDir) with { DataAfterConfirm = true, FramesAb = 1 }))).Should().Throw<ArgumentException>();
+        ((Action)(() => Fixtures.Run(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Abandon = ReleaseBy.A }))).Should().Throw<ArgumentException>();
+        ((Action)(() => Fixtures.Run(AbandonFallback(Fixtures.CurrentDir) with { Abandon = ReleaseBy.Both }))).Should().Throw<ArgumentException>();
+        // One layer 3, one DL-DISCONNECT Request: never abandon and release together.
+        ((Action)(() => Fixtures.Run(AbandonCold(Fixtures.CurrentDir) with { Release = ReleaseBy.A, ReleaseEarly = true }))).Should().Throw<ArgumentException>();
+    }
+
+    // Seeded defects for the save rules (fixtures/README.md).
+
+    [Fact]
+    public void Seeded_A_Request_The_Connect_Page_Does_Not_Save_Is_A_Lost_Disconnect()
+    {
+        // tables-disconnect-swallowed: neither connect page saves the request,
+        // so it falls to the upper-layer catch-all and is gone.
+        var result = Run(AbandonCold(Fixtures.DisconnectSwallowedDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.DisconnectKept);
+        result.Violation.Station.Should().Be(Station.A);
+        result.Trace[0].Transition.Should().Be("t11_all_other_primitives__from_upper_layer");
+        result.CounterexampleLength.Should().Be(1);
+    }
+
+    [Fact]
+    public void Seeded_A_Request_Released_At_The_Fallback_Is_A_Lost_Disconnect()
+    {
+        // tables-disconnect-released-early: Awaiting Connection does not save
+        // the request, so the FRMR fallback releases it there, early, into
+        // the catch-all.
+        var result = Run(AbandonFallback(Fixtures.DisconnectReleasedEarlyDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.DisconnectKept);
+        result.Trace[0].Transition.Should().Be(DataLinkMachine.SaveTransitionId);
+        result.Trace[2].Transition.Should().Be("t14_frmr_received");
+        result.Trace[2].Replayed.Should().Equal("AwaitingConnection/t11_all_other_primitives__from_upper_layer");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Seeded_A_Released_Request_Consumed_Without_Going_Down_Is_A_Lost_Disconnect()
+    {
+        // tables-disconnect-kept-connected: Connected's DL-DISCONNECT arm only
+        // discards the I frame queue and stays Connected. The held request is
+        // released into it once the link is up: the released branch of
+        // disconnect kept.
+        var result = Run(AbandonCold(Fixtures.DisconnectKeptConnectedDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.DisconnectKept);
+        result.Violation.Message.Should().Contain("Connected/t01_dl_disconnect_request (released from a save)");
+        result.Trace[2].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Abandon_A_Release_That_Gives_Up_Is_Answered_By_The_Indication()
+    {
+        // abandon-release-gives-up: both DISCs are lost and Awaiting Release
+        // gives up with DL-DISCONNECT Indication only, which answers the
+        // request (the Indication half of the answer rule).
+        var result = Run(AbandonCold(Fixtures.CurrentDir) with { N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(27);
+    }
+
+    [Fact]
+    public void Release_With_Faults_A_Duplicated_Connect_UA_Answers_The_Disc()
+    {
+        // release-cold-faults: the abandon-cold-faults deadlock without any
+        // save (packethacking/ax25spec#99): a plain release after the connect.
+        var result = Run(new ExplorerOptions
+        {
+            TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
         });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
-        result.Trace[0].Transition.Should().Be(dropped);
-        result.Trace[2].Transition.Should().Be(connect);
-        result.Trace[^1].SummaryA.Should().StartWith("Connected");
+        result.Trace[3].Transition.Should().Be("t03_ua_received_yes");
+        result.CounterexampleLength.Should().Be(5);
+    }
+
+    [Fact]
+    public void Seeded_A_Released_Request_Must_Be_Confirmed()
+    {
+        // tables-disconnect-unconfirmed: Disconnected consumes the released
+        // request without DL-DISCONNECT Confirm. The indication before it
+        // answered the connect, not the request, so the layer 3 never hears
+        // back.
+        var result = Run(AbandonGivesUp(Fixtures.DisconnectUnconfirmedDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[2].Replayed.Should().Equal("Disconnected/t01_dl_disconnect_request");
+        result.CounterexampleLength.Should().Be(3);
+    }
+
+    [Fact]
+    public void Seeded_A_Released_Request_Must_Take_The_Peer_Down_Too()
+    {
+        // tables-disconnect-silent: Connected answers the request with
+        // DL-DISCONNECT Confirm and goes Disconnected without sending DISC.
+        // The request is kept and answered, but the peer stays up.
+        var result = Run(AbandonCold(Fixtures.DisconnectSilentDir));
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        result.Trace[^1].Replayed.Should().Equal("Connected/t01_dl_disconnect_request");
         result.Trace[^1].SummaryB.Should().StartWith("Connected");
         result.CounterexampleLength.Should().Be(3);
+
+        // With the v2.0 stub as B: the stub stays connected.
+        var stub = Run(AbandonFallback(Fixtures.DisconnectSilentDir));
+        stub.Outcome.Should().Be(Outcome.Violation);
+        stub.Violation!.Kind.Should().Be(Invariants.Deadlock);
+        stub.Trace[^1].SummaryB.Should().Contain("connected, modulo 8");
+        stub.CounterexampleLength.Should().Be(8);
     }
 
     [Fact]

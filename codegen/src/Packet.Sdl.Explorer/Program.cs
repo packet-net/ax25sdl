@@ -26,6 +26,8 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --release A|both       that station's layer 3 (or either's) issues DL_DISCONNECT_request once, on an established
                          link, when everything both sides submitted is delivered; quiescence is then both Disconnected
   --release-early        with --release: the release may also come while the link is being set up
+  --abandon A|both       that station's layer 3 (or either's) may issue DL_DISCONNECT_request once while its own
+                         connect is still being set up (asked, not yet answered); the figures save (Requeue) it
   --reconnect A|both     that station's layer 3 (or either's) issues DL_CONNECT_request once, on a live or waiting
                          link, when everything both sides submitted is delivered, and must then get its confirm
   --accept-give-up       the give-up rule: a station that exhausts N2 after enough losses since its last progress
@@ -56,7 +58,7 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
   --flow-off-after N     frames a station must have delivered upward before FLOW_OFF is enabled (default 1)
   --disable LIST         comma list of invariants to switch off: defined-state, sequence, delivery,
                          reject-coherence, ack-coherence, quiescence, deadlock, flow-off-delivery, busy-tracks-flow,
-                         peer-busy-hold, busy-indication, unit-data, frame-error
+                         peer-busy-hold, busy-indication, unit-data, frame-error, disconnect-kept
   --selective-progress   quiescence must be reachable without any T1 expiry (off by default): selective-recovery
                          progress in the data phase, a timeout-free fallback in the connect phase
   --rej-may-equal-vs     accept a REJ whose N(r) equals the receiver's V(s); with --inject, also let the injected
@@ -89,6 +91,7 @@ var injectedFrame = InjectedFrame.None;
 var injectedThen = InjectedFrame.None;
 var release = ReleaseBy.None;
 var reconnect = ReconnectBy.None;
+var abandon = ReleaseBy.None;
 var invariants = Invariants.Default;
 
 try
@@ -204,6 +207,15 @@ try
                     var v => throw new ArgumentException($"unknown release station `{v}` (A, both, none)"),
                 };
                 break;
+            case "--abandon":
+                abandon = Next(args, ref i) switch
+                {
+                    "A" or "a" => ReleaseBy.A,
+                    "both" => ReleaseBy.Both,
+                    "none" => ReleaseBy.None,
+                    var v => throw new ArgumentException($"unknown abandoning station `{v}` (A, both, none)"),
+                };
+                break;
             case "--reconnect":
                 reconnect = Next(args, ref i) switch
                 {
@@ -281,6 +293,7 @@ try
                         "busy-indication" => Invariants.BusyIndication,
                         "unit-data" => Invariants.UnitData,
                         "frame-error" => Invariants.FrameError,
+                        "disconnect-kept" => Invariants.DisconnectKept,
                         _ => throw new ArgumentException($"unknown invariant `{name}`"),
                     });
                 }
@@ -319,6 +332,7 @@ try
         InjectedThen = injectedThen,
         Release = release,
         ReleaseEarly = releaseEarly,
+        Abandon = abandon,
         Reconnect = reconnect,
         DataBeforeConfirm = dataBeforeConfirm,
         AcceptGiveUp = acceptGiveUp,

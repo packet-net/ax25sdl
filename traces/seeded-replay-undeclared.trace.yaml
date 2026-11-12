@@ -1,0 +1,43 @@
+# SEEDED EXPECTED FAILURE (packet-net/ax25sdl#97). Not a figure defect: this
+# trace is deliberately wrong, to pin a rule of the trace format. A step with
+# no `replayed:` asserts that nothing was replayed, so a trace written before
+# saves existed cannot pass while held inputs fire behind its back (its
+# `effects:` cover the triggering transition only).
+#
+# It is dl-disconnect-saved-v22-connected with the second step's `replayed:`
+# block removed. Everything the step does declare is right (transition, state,
+# held, variables, timers, and no effects of its own beyond what t12 emits),
+# so the only thing that can fail it is the replay of the held DL-DISCONNECT
+# Request (DISC P=1, Awaiting Release) that the step does not declare. If the
+# rule were switched off in TraceRunner this trace would pass, and the strict
+# xfail would fail the suite. SaveTests pins the failure message.
+scenario: seeded-replay-undeclared
+description: >
+  A copy of dl-disconnect-saved-v22-connected whose UA step omits
+  `replayed:`. The held DL-DISCONNECT Request is replayed in Connected, so
+  the trace must fail with "declares no `replayed:`".
+citations:
+  - "ax.25.2.2.4_Oct_25.md C1.2 (SDL Symbol Definition: the save symbol)"
+  - "docs/golden-traces.md, Saves (a step without replayed: asserts none)"
+expected_failure: https://github.com/packet-net/ax25sdl/issues/97
+initial:
+  state: AwaitingV22Connection
+  variables: { modulo: 128, k: 32, version_2_2: true, layer_3_initiated: true, rc: 1 }
+  timers: { t1: running }
+steps:
+  - name: layer 3 asks to disconnect while the SABME is outstanding
+    inject: { event: DL_DISCONNECT_request }
+    expect:
+      transition: save
+      state: AwaitingV22Connection
+      effects: []
+      held: [DL_DISCONNECT_request]
+
+  - name: UA F=1 brings the link up; the replay of the held request goes undeclared
+    inject: { event: UA_received, pf: true }
+    expect:
+      transition: t12_ua_received_yes_yes
+      held: []
+      state: AwaitingRelease
+      variables: { rc: 0 }
+      timers: { t1: running, t3: stopped }

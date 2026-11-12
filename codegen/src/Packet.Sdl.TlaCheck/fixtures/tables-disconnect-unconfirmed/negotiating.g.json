@@ -1,0 +1,156 @@
+{
+  "$schema": "./schema.json",
+  "kind": "state",
+  "machine": "management_data_link",
+  "state": "Negotiating",
+  "source": {
+    "spec": "ax.25.2.2.4_Oct_25",
+    "figure": "figc5.2",
+    "url": ""
+  },
+  "transitions": [
+    {
+      "id": "t02_tm201_expiry_yes",
+      "from": "Negotiating",
+      "on": "TM201_expiry",
+      "guard": "AC_gt_NM201",
+      "actions": [
+        {
+          "verb": "RC := RC + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "MDL_ERROR_indicate_C",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t02_tm201_expiry_no",
+      "from": "Negotiating",
+      "on": "TM201_expiry",
+      "guard": "not AC_gt_NM201",
+      "actions": [
+        {
+          "verb": "RC := RC + 1",
+          "kind": "processing"
+        },
+        {
+          "verb": "Retransmit XID Command",
+          "kind": "signal_lower"
+        },
+        {
+          "verb": "Start TM201",
+          "kind": "processing"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_xid_response_received_yes",
+      "from": "Negotiating",
+      "on": "XID_response_received",
+      "guard": "F_eq_1",
+      "actions": [
+        {
+          "verb": "Complete Classes of Procedures Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Complete Optional Functions Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Complete N1 Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Complete Window Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Complete Retry Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Complete T1 Negotiation",
+          "kind": "subroutine"
+        },
+        {
+          "verb": "Stop TM201",
+          "kind": "processing"
+        },
+        {
+          "verb": "MDL_NEGOTIATE_confirm",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t04_xid_response_received_no",
+      "from": "Negotiating",
+      "on": "XID_response_received",
+      "guard": "not F_eq_1",
+      "actions": [
+        {
+          "verb": "MDL_ERROR_indicate_D",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Negotiating",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_frmr_response_received_yes",
+      "from": "Negotiating",
+      "on": "FRMR_response_received",
+      "guard": "XID_rejected",
+      "actions": [
+        {
+          "verb": "Set Segmentor Off",
+          "kind": "processing"
+        },
+        {
+          "verb": "Set Version 2.0 Defaults",
+          "kind": "processing"
+        },
+        {
+          "verb": "MDL_ERROR_indicate_E",
+          "kind": "signal_upper"
+        }
+      ],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    },
+    {
+      "id": "t05_frmr_response_received_no",
+      "from": "Negotiating",
+      "on": "FRMR_response_received",
+      "guard": "not XID_rejected",
+      "actions": [],
+      "next": "Ready",
+      "notes": "",
+      "references": [],
+      "loops": []
+    }
+  ],
+  "saves": [
+    "MDL_NEGOTIATE_request",
+    "XID_command_received"
+  ]
+}

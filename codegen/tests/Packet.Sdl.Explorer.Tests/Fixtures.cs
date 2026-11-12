@@ -83,6 +83,21 @@ internal static class Fixtures
 
     public static string ReconnectSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-reconnect-swallowed");
 
+    /// <summary>The TlaCheck seeded fixture in which neither connect page saves DL-DISCONNECT Request (it falls to the catch-all).</summary>
+    public static string DisconnectSwallowedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-swallowed");
+
+    /// <summary>The TlaCheck seeded fixture in which Awaiting Connection does not save DL-DISCONNECT Request (released at the v2.2 to v2.0 fallback).</summary>
+    public static string DisconnectReleasedEarlyDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-released-early");
+
+    /// <summary>The TlaCheck seeded fixture in which DL-DISCONNECT Request in Disconnected is not confirmed.</summary>
+    public static string DisconnectUnconfirmedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-unconfirmed");
+
+    /// <summary>The TlaCheck seeded fixture in which DL-DISCONNECT Request in Connected goes Disconnected without sending DISC.</summary>
+    public static string DisconnectSilentDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent");
+
+    /// <summary>The TlaCheck seeded fixture in which DL-DISCONNECT Request in Connected stays Connected (a released request is lost).</summary>
+    public static string DisconnectKeptConnectedDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-kept-connected");
+
     private static readonly Dictionary<string, TableSet> Cache = new(StringComparer.Ordinal);
 
     public static TableSet Tables(string dir)

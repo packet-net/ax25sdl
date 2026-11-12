@@ -133,8 +133,10 @@ public static class Explorer
             {
                 var outcome = stepper.Apply(state, move, node.Depth + 1);
                 edges++;
-                if (outcome.Record.Transition is { } tid && !tid.StartsWith("v20:", StringComparison.Ordinal) && !tid.StartsWith("pinned:", StringComparison.Ordinal))
+                if (outcome.Record.Transition is { } tid && !tid.StartsWith("v20:", StringComparison.Ordinal) && !tid.StartsWith("pinned:", StringComparison.Ordinal)
+                    && tid != DataLinkMachine.SaveTransitionId)
                     fired.Add(state.Machine(move.Station).State + "/" + tid);
+                foreach (var replayed in outcome.Record.Replayed) fired.Add(replayed);
                 if (outcome.Violation is not null)
                 {
                     var path = PathTo(nodes, idx);

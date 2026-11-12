@@ -59,6 +59,16 @@ public enum TableSetKind
     InjectedDelivered,
     /// <summary>A seeded-defect fixture (fixtures/tables-injected-undelivered): Connected accepts an in-sequence I frame with P = 1 without delivering it.</summary>
     InjectedUndelivered,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-swallowed): neither connect page saves DL-DISCONNECT Request, so it falls to the upper-layer catch-all.</summary>
+    DisconnectSwallowed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-released-early): Awaiting Connection does not save DL-DISCONNECT Request, so the v2.2 to v2.0 fallback releases it early.</summary>
+    DisconnectReleasedEarly,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-unconfirmed): DL-DISCONNECT Request in Disconnected is not confirmed.</summary>
+    DisconnectUnconfirmed,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-silent): DL-DISCONNECT Request in Connected confirms and goes Disconnected without sending DISC.</summary>
+    DisconnectSilent,
+    /// <summary>A seeded-defect fixture (fixtures/tables-disconnect-kept-connected): DL-DISCONNECT Request in Connected stays Connected, so a released request is lost.</summary>
+    DisconnectKeptConnected,
 }
 
 /// <summary>One cross-check row: a named explorer scenario and what the calibration suite says it shows.</summary>
@@ -386,16 +396,87 @@ public static class Scenarios
 
         // DL_DISCONNECT_request while the link is being set up
         // (ExplorerOptions.ReleaseEarly). Figures C4.2 and C4.6 draw a Save
-        // (Requeue); codegen does not emit it yet (packet-net/ax25sdl#97), so
-        // the generated tables drop the request and the link comes up.
-        Add("release-early-cold", "ax25sdl#97", TableSetKind.Current, o => o with
+        // (Requeue); since both tools route through saves (packet-net/ax25sdl#97,
+        // pinned semantic 19) the request is held and replayed once the link
+        // is up. Before, it went to the catch-all and these were Deadlock, 3.
+        Add("release-early-cold", "ax25sdl#97 (saved)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
-        }, "Deadlock, 3");
-        Add("release-early-v22", "ax25sdl#97", TableSetKind.Current, o => o with
+        }, "clean");
+        Add("release-early-v22", "ax25sdl#97 (saved)", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Release = ReleaseBy.A, ReleaseEarly = true,
+        }, "clean");
+
+        // Layer 3 abandons its own connect (ExplorerOptions.Abandon): the
+        // request is held by figc4.2's or figc4.6's save, and acted on when
+        // the link comes up (DISC, then the release), when the connect fails
+        // (DL-DISCONNECT Confirm in Disconnected) or across the v2.2 to v2.0
+        // fallback (still held in Awaiting Connection).
+        Add("abandon-cold", "ax25sdl#97 save", TableSetKind.Current, o => o with { Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A }, "clean");
+        Add("abandon-v22", "ax25sdl#97 save", TableSetKind.Current, o => o with { Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Abandon = ReleaseBy.A }, "clean");
+        Add("abandon-v20-fallback", "ax25sdl#97 save, across the fallback", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Peer = PeerKind.V20Frmr, Abandon = ReleaseBy.A,
+        }, "clean");
+        Add("abandon-gives-up", "ax25sdl#97 save, connect fails", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "clean");
+        // A duplicated UA of the connect answers the replayed DISC in
+        // Awaiting Release (figc4.3 t03 takes any UA F = 1); the DISC is then
+        // lost and B stays up. A finding, recovered by T3 (the next row).
+        Add("abandon-release-gives-up", "ax25sdl#97 save, release gives up", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, N2 = 1, Budget = 2, Faults = FaultKinds.Drop, AcceptGiveUp = true,
+        }, "clean");
+        Add("release-cold-faults", "ax25spec#99 (stale UA answers the DISC)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Release = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 5");
+        Add("abandon-cold-faults", "ax25spec#99 (stale UA answers the DISC)", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate,
+        }, "Deadlock, 5");
+        Add("abandon-cold-faults-t3", "ax25sdl#97 save, faults, T3", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, Budget = 2, Faults = FaultKinds.Drop | FaultKinds.Duplicate, T3 = true,
+        }, "clean");
+        Add("abandon-reconnect", "ax25sdl#97 save, after a reconnect", TableSetKind.Current, o => o with
+        {
+            FramesAb = 2, Reconnect = ReconnectBy.A, Abandon = ReleaseBy.A,
+        }, "clean");
+        Add("abandon-both-cold", "ax25sdl#97 save, both stations", TableSetKind.Current, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Reconnect = ReconnectBy.Both, Abandon = ReleaseBy.Both,
+        }, "clean");
+        // The seeded defects for the save rules (fixtures/README.md): a lost
+        // disconnect (DisconnectKept), a request released before the link is
+        // up, an unconfirmed request, and a release that never reaches the peer.
+        Add("seeded-disconnect-swallowed", "seeded (lost disconnect)", TableSetKind.DisconnectSwallowed, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
+        }, "DisconnectKept at A, 1");
+        Add("seeded-disconnect-released-early", "seeded (released early)", TableSetKind.DisconnectReleasedEarly, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Peer = PeerKind.V20Frmr, Abandon = ReleaseBy.A,
+        }, "DisconnectKept at A, 3");
+        Add("seeded-disconnect-kept-connected", "seeded (released request lost)", TableSetKind.DisconnectKeptConnected, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
+        }, "DisconnectKept at A, 3");
+        Add("seeded-disconnect-unconfirmed", "seeded (disconnect answer)", TableSetKind.DisconnectUnconfirmed, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A, N2 = 1, Budget = 1, Faults = FaultKinds.Drop, AcceptGiveUp = true,
         }, "Deadlock, 3");
+        Add("seeded-disconnect-silent", "seeded (abandon rest)", TableSetKind.DisconnectSilent, o => o with
+        {
+            Seed = SeedKind.Disconnected, FramesAb = 0, Abandon = ReleaseBy.A,
+        }, "Deadlock, 3");
+        Add("seeded-disconnect-silent-v20", "seeded (abandon rest, v2.0 peer)", TableSetKind.DisconnectSilent, o => o with
+        {
+            Seed = SeedKind.AwaitingV22Connection, FramesAb = 0, Peer = PeerKind.V20Frmr, Abandon = ReleaseBy.A,
+        }, "Deadlock, 8");
 
         // Data offered before the confirm as a move (ExplorerOptions.DataBeforeConfirm):
         // a0 offered while A awaits the UA is discarded (ax25spec#161), a1

@@ -72,6 +72,23 @@ public sealed record SystemState
 
     public bool ReleasedB { get; init; }
 
+    /// <summary>Station A's layer 3 abandoned its connect (<see cref="ExplorerOptions.Abandon"/>).</summary>
+    public bool AbandonedA { get; init; }
+
+    /// <summary>Station B's layer 3 abandoned its connect.</summary>
+    public bool AbandonedB { get; init; }
+
+    /// <summary>
+    /// A DL_DISCONNECT_request of station A's layer 3 was consumed by a
+    /// transition and has not yet been answered with DL_DISCONNECT_confirm or
+    /// DL_DISCONNECT_indication (a request still held by a save is not
+    /// pending). Never at rest while set.
+    /// </summary>
+    public bool DisconnectPendingA { get; init; }
+
+    /// <summary>The same for station B.</summary>
+    public bool DisconnectPendingB { get; init; }
+
     /// <summary>With <see cref="ExplorerOptions.Reconnect"/>: station A's layer 3 has issued its DL_CONNECT_request on a live or waiting link.</summary>
     public bool ReconnectedA { get; init; }
 
@@ -166,6 +183,10 @@ public sealed record SystemState
 
     public bool Released(Station s) => s == Station.A ? ReleasedA : ReleasedB;
 
+    public bool Abandoned(Station s) => s == Station.A ? AbandonedA : AbandonedB;
+
+    public bool DisconnectPending(Station s) => s == Station.A ? DisconnectPendingA : DisconnectPendingB;
+
     public bool Reconnected(Station s) => s == Station.A ? ReconnectedA : ReconnectedB;
 
     public bool ReconnectPending(Station s) => s == Station.A ? ReconnectPendingA : ReconnectPendingB;
@@ -226,6 +247,7 @@ public sealed record SystemState
           .Append("|f").Append(FlowOffA ? '1' : '0').Append(FlowOffB ? '1' : '0').Append(Inv(FlowRoundsA)).Append(',').Append(Inv(FlowRoundsB))
           .Append("|l").Append(LinkUpA ? '1' : '0').Append(LinkUpB ? '1' : '0').Append(Inv(OfferedA)).Append(',').Append(Inv(OfferedB))
           .Append("|r").Append(ReleasedA ? '1' : '0').Append(ReleasedB ? '1' : '0')
+          .Append(AbandonedA ? '1' : '0').Append(AbandonedB ? '1' : '0').Append(DisconnectPendingA ? '1' : '0').Append(DisconnectPendingB ? '1' : '0')
           .Append("|g").Append(Inv(LossesA)).Append(',').Append(Inv(LossesB)).Append(',').Append(Inv(GaveUpA)).Append(',').Append(Inv(GaveUpB))
           .Append(HeardGiveUpA ? '1' : '0').Append(HeardGiveUpB ? '1' : '0')
           .Append("|c").Append(ReconnectedA ? '1' : '0').Append(ReconnectedB ? '1' : '0').Append(ReconnectPendingA ? '1' : '0').Append(ReconnectPendingB ? '1' : '0')
@@ -257,6 +279,8 @@ public sealed record SystemState
         sb.Append(" q=[").Append(string.Join(",", m.Queue)).Append(']');
         if (m.SavedFrames.Count > 0)
             sb.Append(" saved={").Append(string.Join(",", m.SavedFrames.Keys.Order().Select(Inv))).Append('}');
+        if (m.HeldInputs.Count > 0)
+            sb.Append(" held=[").Append(string.Join(",", m.HeldInputs.Select(h => h.Event))).Append(']');
         return sb.ToString();
     }
 
@@ -286,6 +310,14 @@ public sealed record SystemState
         sb.Append(";r:");
         foreach (var (ns, data) in m.RetainedFrames.OrderBy(kv => kv.Key))
             sb.Append(Inv(ns)).Append('=').Append(data).Append(',');
+        // Inputs held by a save (pinned semantic 19), in order, with the
+        // fields they keep.
+        sb.Append(";h:");
+        foreach (var h in m.HeldInputs)
+            sb.Append(h.Event).Append('/').Append(h.Pf is null ? "-" : h.Pf.Value ? "1" : "0").Append('/')
+              .Append(h.Command is null ? "-" : h.Command.Value ? "c" : "r").Append('/')
+              .Append(h.Nr?.ToString(CultureInfo.InvariantCulture) ?? "-").Append('/').Append(h.Ns?.ToString(CultureInfo.InvariantCulture) ?? "-").Append('/')
+              .Append(h.Data ?? "-").Append(',');
     }
 
     private static string Inv(int v) => v.ToString(CultureInfo.InvariantCulture);
