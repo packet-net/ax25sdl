@@ -10,10 +10,10 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    # Manual trigger lets you validate the workflow shape from a branch.
-    # NOTE that npm now publishes via trusted publishing, which has no secret
-    # to leave unset, so a dispatch run WILL attempt a real npm upload. The
-    # NuGet leg still skips when NUGET_API_KEY is absent.
+    # Manual trigger: re-publish a version (override_version) to whichever
+    # registry is missing it. Both registries use trusted publishing, so a
+    # dispatch run WILL attempt real uploads; both legs skip a version the
+    # registry already has.
     inputs:
       override_version:
         description: 'Override version (only used for workflow_dispatch; tag wins for push events)'
@@ -111,15 +111,28 @@ jobs:
 
       - name: spec/ts — publish
         working-directory: spec/ts
-        run: npm publish --access public
+        # Idempotent like the NuGet leg's --skip-duplicate, so a re-run for one
+        # registry does not fail on the other.
+        run: |
+          if npm view "ax25sdl@${VERSION}" version >/dev/null 2>&1; then
+            echo "ax25sdl@${VERSION} is already on npm; skipping."
+          else
+            npm publish --access public
+          fi
 
   # ─── NuGet: Packet.Ax25.Sdl ─────────────────────────────────────────
   publish-nuget:
     name: publish Packet.Ax25.Sdl to nuget.org
     needs: resolve-version
     runs-on: [self-hosted, Linux, X64]
+    # Trusted publishing (OIDC), configured at nuget.org against
+    # packet-net/ax25sdl + this workflow file. NuGet/login exchanges the
+    # run's short-lived id-token for a temporary API key, so there is no
+    # NuGet secret to expire (the old NUGET_API_KEY secret expired at 0.13.0).
+    permissions:
+      contents: read
+      id-token: write
     env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       VERSION: ${{ needs.resolve-version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
@@ -153,16 +166,21 @@ jobs:
       - name: list artifacts
         run: ls -la ./artifacts/
 
+      - name: log in to nuget.org (trusted publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: tomf84
+
       - name: push to nuget.org
-        if: env.NUGET_API_KEY != ''
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
           dotnet nuget push "./artifacts/Packet.Ax25.Sdl.${VERSION}.nupkg" \
             --source https://api.nuget.org/v3/index.json \
             --api-key "${NUGET_API_KEY}" \
             --skip-duplicate
-          # Symbol package — best-effort. nuget.org's symbol server has
-          # accepted .snupkg sibling packages alongside the main one
-          # since ~2019; failure here shouldn't block the main publish.
+          # Symbol package, best-effort: a failure here should not block the main publish.
           if [ -f "./artifacts/Packet.Ax25.Sdl.${VERSION}.snupkg" ]; then
             dotnet nuget push "./artifacts/Packet.Ax25.Sdl.${VERSION}.snupkg" \
               --source https://api.nuget.org/v3/index.json \
@@ -170,8 +188,3 @@ jobs:
               --skip-duplicate || \
               echo "::warning::snupkg push failed; main nupkg still uploaded."
           fi
-
-      - name: warn if NUGET_API_KEY missing
-        if: env.NUGET_API_KEY == ''
-        run: |
-          echo "::warning::NUGET_API_KEY secret is not set — nuget push was skipped."
