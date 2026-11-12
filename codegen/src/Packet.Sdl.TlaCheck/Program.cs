@@ -120,6 +120,7 @@ string Dir(TableSetKind t) => t switch
     TableSetKind.DisconnectSilent => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-silent"),
     TableSetKind.DisconnectKeptConnected => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-disconnect-kept-connected"),
     TableSetKind.Reverted169 => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-169-reverted"),
+    TableSetKind.SetVersionFlagOnly => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-set-version-flag-only"),
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
@@ -368,6 +369,7 @@ static string Tables(TableSetKind t) => t switch
     TableSetKind.DisconnectSilent => "seeded disconnect-silent",
     TableSetKind.DisconnectKeptConnected => "seeded disconnect-kept-connected",
     TableSetKind.Reverted169 => "169-reverted",
+    TableSetKind.SetVersionFlagOnly => "set-version-flag-only",
     _ => "seeded livelock",
 };
 

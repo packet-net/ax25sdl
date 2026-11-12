@@ -339,18 +339,31 @@ public class CalibrationTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Defect54_Cold_V22_Connect_Breaks_When_A_Passes_Seven_Because_B_Stays_At_Modulo_8()
+    public void Defect54_Cold_V22_Connect_Wraps_Cleanly_Because_Set_Version_2_2_Sets_Modulo_128()
     {
-        // figc4.1's SABME arm says "Set Version 2.2" as a processing box,
-        // not a call of the Set_Version_2_2 subroutine (ax25spec#54), so B
-        // takes the v2.2 flag but keeps modulo 8 while A runs at 128. (A is
-        // at 128 only because the --mod128 seed sets it by hand: A's own
-        // connect path never applies the modulus either, the same #54
-        // defect on the initiator side.) With
+        // d54-cold-v22-wrap. figc4.1's SABME arm draws "Set Version 2.2" as a
+        // processing box named after the figc4.7b subroutine; since
+        // packet-net/ax25sdl#123 it sets the modulus and the reject mode as
+        // well as the flag (pinned 9), so B accepting SABME runs modulo 128,
+        // like A (seeded at 128 by hand: A's own connect path draws no Set
+        // Version box). Nine frames at k = 1 wrap cleanly, as over a SABM
+        // connect (d54-cold-v20-wrap).
+        var result = Run(ColdThenData(mod128: true) with { FramesAb = 9, K = 1 });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(192);
+        Run(ColdThenData(mod128: false) with { FramesAb = 9, K = 1 }).Outcome.Should().Be(Outcome.NoViolation);
+    }
+
+    [Fact]
+    public void Defect54_Under_The_Flag_Only_Reading_B_Stays_At_Modulo_8_And_A_Loses_A_Frame()
+    {
+        // set-version-flag-only-v22: the twin fixture puts back what the old
+        // flag-only reading did (B keeps modulo 8 and implicit reject after
+        // Set Version 2.2). With
         // k = 1 and nine frames, B acknowledges a7 with N(r) = 0; A expects
         // 8, takes it as an N(r) error (DL-ERROR J), re-establishes, and the
         // re-establishment discards a8: deadlock with 8 of 9 delivered.
-        var result = Run(ColdThenData(mod128: true) with { FramesAb = 9, K = 1 });
+        var result = Run(ColdThenData(mod128: true) with { TablesDir = Fixtures.SetVersionFlagOnlyDir, FramesAb = 9, K = 1 });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         result.Violation.Message.Should().Contain("at B: 8/9", "a8 is lost: 8 of 9 delivered");
@@ -358,9 +371,34 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[^3].Effects.Should().Contain(e => e.Contains("DL-ERROR Indication (J)", StringComparison.Ordinal));
         result.Trace[^1].SummaryA.Should().StartWith("Connected vs=0 va=0 vr=0").And.Contain("q=[]");
         result.CounterexampleLength.Should().Be(45);
+    }
 
-        // The same nine frames over a v2.0 connect: both at modulo 8, clean.
-        Run(ColdThenData(mod128: false) with { FramesAb = 9, K = 1 }).Outcome.Should().Be(Outcome.NoViolation);
+    [Fact]
+    public void A_Station_Configured_For_Modulo_128_That_Accepts_A_Sabm_Runs_Modulo_8()
+    {
+        // sabm-b-mod128-wrap (packet-net/ax25sdl#123): B is configured for
+        // modulo 128 and accepts A's SABM; Set Version 2.0 brings it to
+        // modulo 8 (4.3.3.1), so nine frames at k = 1 wrap cleanly. Its twin
+        // set-version-flag-only-v20 keeps B at 128 after the box, as the old
+        // flag-only reading did: B acknowledges a7 with N(r) = 8, which A,
+        // at modulo 8, takes as V(a) = 8.
+        var clean = Run(ColdThenData(mod128: false) with { Modulo128B = true, FramesAb = 9, K = 1 });
+        clean.Outcome.Should().Be(Outcome.NoViolation);
+        clean.StatesExplored.Should().Be(192);
+        clean.FiredTransitions.Should().Contain("Disconnected/t13_sabm_received_yes");
+
+        var flagOnly = Run(ColdThenData(mod128: false) with { TablesDir = Fixtures.SetVersionFlagOnlyDir, Modulo128B = true, FramesAb = 9, K = 1 });
+        flagOnly.Outcome.Should().Be(Outcome.Violation);
+        flagOnly.Violation!.Kind.Should().Be(Invariants.SequenceSanity);
+        flagOnly.Violation.Station.Should().Be(Station.A);
+        flagOnly.CounterexampleLength.Should().Be(42);
+    }
+
+    [Fact]
+    public void Seeding_B_At_Modulo_128_Is_For_The_Disconnected_Seed_With_The_Table_Peer()
+    {
+        var act = () => new Stepper(new ExplorerOptions { TablesDir = Fixtures.CurrentDir, Modulo128B = true }, Fixtures.Tables(Fixtures.CurrentDir));
+        act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
@@ -479,7 +517,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.CounterexampleLength.Should().Be(2);
 
         var lenient = Run(V20(SeedKind.Disconnected, PeerKind.V20Frmr, timerFree: false));
-        lenient.Outcome.Should().Be(Outcome.NoViolation, "the figc4.2 T1 retry sends SABM and the v2.0 peer accepts it; A stays at modulo 128 (never reassigned by the tables, the #54 blind spot), which this abstract frame model cannot see");
+        lenient.Outcome.Should().Be(Outcome.NoViolation, "the figc4.2 T1 retry sends SABM and the v2.0 peer accepts it; A stays at modulo 128 (figc4.2's UA arm draws no Set Version box: the initiator side of #54, which ax25sdl#123 does not change), which this abstract frame model cannot see");
     }
 
     [Fact]
@@ -1067,7 +1105,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         result.Trace[3].Transition.Should().Be("t17_ua_received_no");
         result.CounterexampleLength.Should().Be(7);
-        result.StatesExplored.Should().Be(3620);
+        result.StatesExplored.Should().Be(3644);
         result.FiredTransitions.Should().NotContain("Disconnected/t04_all_other_primitives__from_upper_layer",
             "a layer 3 told its link is down submits nothing until the link is reported up again");
     }
@@ -1128,7 +1166,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         result.CounterexampleLength.Should().Be(7);
-        result.StatesExplored.Should().Be(12394);
+        result.StatesExplored.Should().Be(12735);
     }
 
     [Fact]
@@ -1199,13 +1237,16 @@ public class CalibrationTests(ITestOutputHelper output)
     [Fact]
     public void Reconnect_Of_A_Mod128_Link_Crosses_Into_A_Dm_And_One_End_Goes_Down()
     {
-        // The #44/#54 link: A at modulo 128 with the version 2.2 flag clear, B
-        // with the flag set at modulo 8. B resets through Awaiting V2.2
-        // Connection but sends SABM (Establish_Data_Link follows the modulus),
-        // the SABM is lost, and B's T1 retry sends SABME (drawn as SABME). A
-        // resets too, through Awaiting Connection, sending SABME; B's SABME
-        // reaches it there and figc4.2 answers DM (the crossing of #115). B
-        // tears down on the DM (#48) while A comes up on B's UA.
+        // The #44 link: A at modulo 128 with the version 2.2 flag clear
+        // (seeded by hand), B at modulo 128 with the flag set (Set Version
+        // 2.2 on the SABME it accepted, pinned 9, packet-net/ax25sdl#123).
+        // Both reset. B resets through Awaiting V2.2 Connection sending SABME
+        // (Establish_Data_Link follows the modulus); A resets through
+        // Awaiting Connection, sending SABME too. B's SABME reaches A there
+        // and figc4.2 answers DM (the crossing of #115). B tears down on the
+        // DM (#48) while A comes up on B's UA. Until #123 B stayed at modulo
+        // 8, sent SABM first, and needed that SABM lost and a T1 retry to
+        // reach the same end (10 steps); now no fault is used.
         var result = Run(new ExplorerOptions
         {
             TablesDir = Fixtures.CurrentDir, Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0,
@@ -1213,15 +1254,14 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
-        result.Trace[2].Actor.Should().Be("B");
-        result.Trace[2].Transition.Should().Be("t07_dl_connect_request_yes");
-        result.Trace[2].Effects.Should().ContainSingle(e => e.Contains("SABM command", StringComparison.Ordinal));
-        result.Trace[4].Transition.Should().Be("t13_t1_expiry_no");
-        result.Trace[6].Transition.Should().Be("t17_sabme_received");
-        result.Trace[9].Transition.Should().Be("t11_dm_received_yes");
+        result.Trace[3].Actor.Should().Be("B");
+        result.Trace[3].Transition.Should().Be("t07_dl_connect_request_yes");
+        result.Trace[3].Effects.Should().ContainSingle(e => e.Contains("SABME command", StringComparison.Ordinal));
+        result.Trace[4].Transition.Should().Be("t17_sabme_received");
+        result.Trace[7].Transition.Should().Be("t11_dm_received_yes");
         result.Trace[^1].SummaryA.Should().StartWith("Connected");
         result.Trace[^1].SummaryB.Should().StartWith("Disconnected");
-        result.CounterexampleLength.Should().Be(10);
+        result.CounterexampleLength.Should().Be(8);
     }
 
     [Fact]
@@ -2642,14 +2682,16 @@ public class CalibrationTests(ITestOutputHelper output)
 
     [Theory]
     [InlineData(SeedKind.Connected, false, 333, "TimerRecovery/t23_rej_received_yes_no_no")]
-    [InlineData(SeedKind.AwaitingV22Connection, false, 500, "TimerRecovery/t23_rej_received_yes_no_yes")]
+    [InlineData(SeedKind.AwaitingV22Connection, false, 476, "TimerRecovery/t24_srej_received_yes_no_yes")]
     [InlineData(SeedKind.Connected, true, 1374, "TimerRecovery/t19_rnr_received_no_no_no_no")]
     [InlineData(SeedKind.AwaitingV22Connection, true, 2233, "TimerRecovery/t19_rnr_received_yes_no_yes")]
     public void An_I_Frame_In_Sequence_Puts_The_Peers_N_r_Past_V_s(SeedKind seed, bool busy, int states, string arm)
     {
         // ip-nr, ip-nr-v22, ip-nr-rnr, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
         // its poll lost, sends an I frame in sequence that its own machine
-        // never numbered; then a frame ahead of sequence draws REJ F=1, or B's
+        // never numbered; then a frame ahead of sequence draws REJ F=1 (SREJ
+        // F=1 at version 2.2: B accepted SABME, so Set Version 2.2 enabled
+        // selective reject, packet-net/ax25sdl#123), or B's
         // busy condition draws RNR, each with N(r) = V(s) + 1 at A. Reject
         // coherence is off for the REJ rows: that reject is incoherent by
         // construction.
@@ -2660,6 +2702,23 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Outcome.Should().Be(Outcome.NoViolation);
         result.StatesExplored.Should().Be(states);
         result.FiredTransitions.Should().Contain(arm);
+    }
+
+    [Fact]
+    public void At_Version_2_2_The_Initiators_Implicit_Reject_Reaches_The_Rej_N_r_Error_Arms()
+    {
+        // ip-nr-v22-b: ip-nr-v22 with the injector at B. A, the initiator on
+        // the awaiting-v22 seed, keeps its configured implicit reject (its UA
+        // arm runs no Set Version box), so it answers B's frame ahead with
+        // REJ F=1; B, at version 2.2, takes the N(r) error on the REJ arms.
+        var result = Run(Ip(InjectedFrame.IFrame, InjectedFrame.IPollAhead) with
+        {
+            Inject = FlowControlAt.B, Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(466);
+        result.FiredTransitions.Should().Contain(["Connected/t25_rej_received_no_yes", "TimerRecovery/t23_rej_received_yes_no_yes"]);
     }
 
     [Theory]

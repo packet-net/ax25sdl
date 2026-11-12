@@ -973,8 +973,15 @@ public sealed class DataLinkMachine
             case "Clear Acknowledge Pending": AcknowledgePending = false; return;
 
             // Version / parameter assignments.
-            case "Set Version 2.2": Version22 = true; return;
-            case "set_version_2_0": Version22 = false; return;
+            // The pages draw "Set Version 2.0" / "Set Version 2.2" as processing
+            // boxes named after figc4.7b's subroutines; they are calls of them
+            // (4.3.3.1, 4.3.3.2, 6.3.2): the version flag, the modulus and the
+            // reject mode change. k and N2 stay as configured (6.7.1), because
+            // figc4.7b's k := 8 at modulo 8 is a figure defect (ax25spec#54);
+            // N1, T2 and half duplex are not applied either. Pinned semantic,
+            // docs/tla-meaning-policies.md policy 9; ax25sdl#123.
+            case "Set Version 2.2": Version22 = true; Modulo = 128; SrejEnabled = true; return;
+            case "set_version_2_0": Version22 = false; Modulo = 8; SrejEnabled = false; return;
             case "Set Half Duplex": HalfDuplex = true; return;
             case "Set Selective Reject": SrejEnabled = true; return;
             case "Set Implicit Reject": SrejEnabled = false; return;

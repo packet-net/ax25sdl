@@ -131,6 +131,8 @@ public sealed class Stepper
         _o = options ?? throw new ArgumentNullException(nameof(options));
         _tables = tables ?? throw new ArgumentNullException(nameof(tables));
         if (_o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
+        if (_o.Modulo128B && (_o.Seed != SeedKind.Disconnected || _o.Peer != PeerKind.Tables))
+            throw new ArgumentException("seeding B at modulo 128 is for the Disconnected seed with the table-driven peer only", nameof(options));
         if (_o.DataAfterConfirm && _o.Seed != SeedKind.Disconnected)
             throw new ArgumentException("data after the connect confirm is for the Disconnected seed only (the other seeds never report a connect to layer 3)", nameof(options));
         if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0 && !_o.DataAfterConfirm)
@@ -256,7 +258,7 @@ public sealed class Stepper
     private DataLinkMachine NewMachine(Station station, string initialState)
     {
         var m = new DataLinkMachine(_tables, initialState);
-        m.SetVariable("modulo", _o.Modulo128A && station == Station.A ? "128" : "8");
+        m.SetVariable("modulo", (_o.Modulo128A && station == Station.A) || (_o.Modulo128B && station == Station.B) ? "128" : "8");
         m.SetVariable("k", Inv(_o.K));
         m.SetVariable("n2", Inv(_o.N2));
         // A link actually using SREJ has negotiated v2.2 (§4.3.2.4, §6.3.2).

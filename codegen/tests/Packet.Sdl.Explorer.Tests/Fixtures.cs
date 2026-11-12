@@ -20,6 +20,9 @@ internal static class Fixtures
     /// <summary>The current tables with ax25spec#169 reverted: Timer Recovery's SABM and SABME arms with V(s) = V(a) skip the reset box (codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
     public static string Reverted169Dir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-169-reverted");
 
+    /// <summary>The current tables with the flag-only reading of the Set Version boxes restored on figc4.1's SABM and SABME arms (packet-net/ax25sdl#123; codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
+    public static string SetVersionFlagOnlyDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-set-version-flag-only");
+
     /// <summary>The TlaCheck seeded fixture in which Connected answers DISC with UA but stays Connected (codegen/src/Packet.Sdl.TlaCheck/fixtures/README.md).</summary>
     public static string ReleaseStuckDir => Path.Combine(RepoRoot.Value, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-release-stuck");
 

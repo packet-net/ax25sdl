@@ -106,7 +106,7 @@ Rules of thumb:
 | `modulo` | sequence modulus (8 or 128) | 8 |
 | `k` | window size | 4 |
 | `n1`, `n2` | max I-field length / max retries | 256 / 10 |
-| `version_2_2` | "Set Version 2.2" flag | false |
+| `version_2_2` | version 2.2 flag ("Set Version 2.2" sets it) | false |
 | `srej_enabled` | selective-reject enabled | false |
 | `half_duplex` | "Set Half Duplex" flag | false |
 | `layer_3_initiated` | Layer 3 Initiated flag | false |
@@ -174,6 +174,14 @@ raise it rather than encoding around it:
   variable, unclamped. A runtime may grant a narrower window (packet.net
   clamps SREJ links to half the modulus); a trace that depends on that
   should seed `k` accordingly.
+- **Set Version boxes.** The pages draw "Set Version 2.0" and "Set Version
+  2.2" as processing boxes named after figc4.7b's subroutines. They set the
+  version flag, the modulus and the reject mode as those subroutines do
+  (2.0: modulo 8, implicit reject; 2.2: modulo 128, selective reject), per
+  4.3.3.1, 4.3.3.2 and 6.3.2. k and N2 keep their configured values
+  (figc4.7b's k := 8 at modulo 8 is a figure defect, ax25spec#54; 6.7.1
+  makes them configurable); N1, T2 and half duplex are not applied
+  (packet-net/ax25sdl#123, pinned semantic 9 in `docs/explorer.md`).
 - **Subroutine binding.** Call-site verbs bind to subroutine tables via an
   explicit alias map in `Machine.cs` (`"N(r) Recovery"` →
   `N_r_Error_Recovery`, `"Select_T1_Value"` → `Select_T1`, `"Transmit

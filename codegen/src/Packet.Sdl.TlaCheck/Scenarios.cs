@@ -72,6 +72,8 @@ public enum TableSetKind
     DisconnectKeptConnected,
     /// <summary>The current tables with ax25spec#169 reverted (fixtures/tables-169-reverted): Timer Recovery's SABM and SABME arms with V(s) = V(a) skip the reset box.</summary>
     Reverted169,
+    /// <summary>The current tables with the flag-only reading of the Set Version boxes restored on figc4.1 (fixtures/tables-set-version-flag-only): after the box, SABM puts the modulus back to 128 and SABME puts it back to 8 with implicit reject (packet-net/ax25sdl#123).</summary>
+    SetVersionFlagOnly,
 }
 
 /// <summary>
@@ -195,9 +197,11 @@ public static class Scenarios
         // Cold connect, then data: each layer 3 submits only once its link is
         // up (DL_CONNECT_confirm at A, DL_CONNECT_indication at B), so #161
         // does not apply. The v2.2 connect comes up through figc4.2 (#44), and
-        // B, accepting SABME, sets the version 2.2 flag but never modulo 128
-        // (#54): invisible until A's V(s) passes 7, then B's N(r) wraps and A
-        // takes it as an N(r) error, re-establishes and loses its queue.
+        // B, accepting SABME, runs Set Version 2.2, which sets modulo 128
+        // (pinned 9, packet-net/ax25sdl#123). Under the old flag-only reading
+        // B stayed at modulo 8 (#54): invisible until A's V(s) passed 7, then
+        // B's N(r) wrapped and A took it as an N(r) error, re-established and
+        // lost its queue. set-version-flag-only-v22 keeps that failure.
         ExplorerOptions Cold(ExplorerOptions o, bool mod128) => o with { Seed = SeedKind.Disconnected, Modulo128A = mod128, DataAfterConfirm = true, Budget = 0 };
         Add("cold-v20-data", "#102 control", TableSetKind.Current, o => Cold(o, false) with
         {
@@ -207,8 +211,16 @@ public static class Scenarios
         {
             FramesAb = 2, FramesBa = 1, Invariants = Default | Invariants.SelectiveProgress,
         }, Clean());
-        Add("d54-cold-v22-wrap", "#54", TableSetKind.Current, o => Cold(o, true) with { FramesAb = 9, K = 1 }, Fails(Invariants.Deadlock, steps: 45));
+        Add("d54-cold-v22-wrap", "#54 (clean since the Set Version reading, ax25sdl#123)", TableSetKind.Current, o => Cold(o, true) with { FramesAb = 9, K = 1 }, Clean(192));
         Add("d54-cold-v20-wrap", "#54 control", TableSetKind.Current, o => Cold(o, false) with { FramesAb = 9, K = 1 }, Clean());
+        Add("set-version-flag-only-v22", "ax25sdl#123 reverted (SABME)", TableSetKind.SetVersionFlagOnly, o => Cold(o, true) with { FramesAb = 9, K = 1 }, Fails(Invariants.Deadlock, steps: 45));
+        // The SABM side (packet-net/ax25sdl#123): B is configured for modulo
+        // 128 and accepts A's SABM. Set Version 2.0 brings it to modulo 8, so
+        // nine frames at k = 1 wrap cleanly. Under the flag-only reading B
+        // stayed at 128 and acknowledged a7 with N(r) = 8, which A, at modulo
+        // 8, took as V(a) = 8 (set-version-flag-only-v20: SequenceSanity).
+        Add("sabm-b-mod128-wrap", "ax25sdl#123 (SABM at modulo 128)", TableSetKind.Current, o => Cold(o, false) with { Modulo128B = true, FramesAb = 9, K = 1 }, Clean(192));
+        Add("set-version-flag-only-v20", "ax25sdl#123 reverted (SABM)", TableSetKind.SetVersionFlagOnly, o => Cold(o, false) with { Modulo128B = true, FramesAb = 9, K = 1 }, Fails(Invariants.SequenceSanity, Station.A, 42));
 
         // #43: DL-FLOW-OFF on the wrong branch.
         ExplorerOptions S43(ExplorerOptions o) => o with { FramesAb = 2, FramesBa = 0, K = 4, Budget = 0, FlowControl = FlowControlAt.B };
@@ -425,14 +437,16 @@ public static class Scenarios
         {
             FramesAb = 1, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.A,
         }, Fails(Invariants.Deadlock, steps: 12));
-        // A reset of the #44/#54 mod-128 link: B (version 2.2 flag, modulo 8)
-        // sends SABM from Awaiting V2.2 Connection and retries with SABME, A
-        // (modulo 128, flag clear) waits in Awaiting Connection and answers
-        // that SABME with DM (#115's crossing), B tears down on it (#48).
-        Add("reconnect-cold-mod128", "#44/#54, #115, #48", TableSetKind.Current, o => o with
+        // A reset of the #44 mod-128 link: B (version 2.2 flag, modulo 128
+        // since packet-net/ax25sdl#123) sends SABME from Awaiting V2.2
+        // Connection, A (modulo 128, flag clear) waits in Awaiting Connection
+        // and answers that SABME with DM (#115's crossing), B tears down on
+        // it (#48). Until #123 B was at modulo 8, sent SABM first and needed
+        // it lost and a T1 retry (10 steps); now no fault is used (8).
+        Add("reconnect-cold-mod128", "#44, #115, #48", TableSetKind.Current, o => o with
         {
             Seed = SeedKind.Disconnected, Modulo128A = true, FramesAb = 0, Budget = 1, Faults = FaultKinds.Drop, Reconnect = ReconnectBy.Both,
-        }, Fails(Invariants.Deadlock, steps: 10));
+        }, Fails(Invariants.Deadlock, steps: 8));
 
         // DL_DISCONNECT_request while the link is being set up
         // (ExplorerOptions.ReleaseEarly). Figures C4.2 and C4.6 draw a Save
@@ -783,10 +797,20 @@ public static class Scenarios
         {
             T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, Clean());
-        Add("ip-nr-v22", "REJ F=1, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
+        Add("ip-nr-v22", "SREJ F=1, N(r) beyond V(s), v2.2 (REJ before ax25sdl#123)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
-        }, Clean());
+        }, Clean(476));
+        // The same with the injector at B (packet-net/ax25sdl#123's review):
+        // A, the initiator on the awaiting-v22 seed, has the version 2.2 flag
+        // with its configured implicit reject (its UA arm runs no Set Version
+        // box), so it answers B's frame ahead with REJ F=1, and B (Set Version
+        // 2.2 on the SABME) takes the N(r) error on the REJ arms of version
+        // 2.2 that ip-nr-v22 reached before #123.
+        Add("ip-nr-v22-b", "REJ F=1, N(r) beyond V(s), v2.2, injector at B", TableSetKind.Current, o => Ip(o, FlowControlAt.B, InjectedFrame.IFrame, Ahead) with
+        {
+            Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, Clean(466));
         // Since ax25spec#180 the RNR arm splits by version; this is the
         // version 2.0 half (t19_rnr_received_no_no_no_no).
         Add("ip-nr-rnr", "RNR, N(r) beyond V(s)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
