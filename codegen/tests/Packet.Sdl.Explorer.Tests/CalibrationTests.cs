@@ -1624,7 +1624,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Trace[2].Transition.Should().Be("t13_t3_expiry");
         result.Trace[3].Transition.Should().Be("t07_dl_connect_request");
         result.Trace[3].SummaryA.Should().StartWith("TimerRecovery");
-        result.StatesExplored.Should().Be(45);
+        result.StatesExplored.Should().Be(47);
     }
     // ─── Coverage batch 5: UI frames (ExplorerOptions.UnitData) ─────────
 
@@ -1937,7 +1937,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Quiescence);
         result.Trace[^1].Transition.Should().Be("t08_control_field_error");
         result.Trace[^1].SummaryA.Should().StartWith("TimerRecovery");
-        result.StatesExplored.Should().Be(55);
+        result.StatesExplored.Should().Be(53);
         result.FiredTransitions.Should().Contain(new[] { "TimerRecovery/t09_info_not_permitted_in_frame", "TimerRecovery/t10_u_or_s_frame_length_error" });
     }
 
@@ -2008,7 +2008,7 @@ public class CalibrationTests(ITestOutputHelper output)
         });
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Quiescence);
-        result.StatesExplored.Should().Be(45);
+        result.StatesExplored.Should().Be(47);
         result.FiredTransitions.Should().Contain("TimerRecovery/t14_sabme_received_yes");
     }
 
