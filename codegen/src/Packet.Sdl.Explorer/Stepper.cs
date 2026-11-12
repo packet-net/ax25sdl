@@ -126,63 +126,76 @@ public sealed class Stepper
     private readonly string[] _submittedA;
     private readonly string[] _submittedB;
 
+    /// <summary>
+    /// The option combinations the stepper refuses, checked without building
+    /// anything: throws <see cref="ArgumentException"/> with the reason. The
+    /// constructor runs it first; TlaCheck runs it over every grid cell before
+    /// it starts, so a refused combination fails at once rather than per cell.
+    /// </summary>
+    public static void Validate(ExplorerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var o = options;
+        if (o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
+        if (o.Modulo128B && (o.Seed != SeedKind.Disconnected || o.Peer != PeerKind.Tables))
+            throw new ArgumentException("seeding B at modulo 128 is for the Disconnected seed with the table-driven peer only", nameof(options));
+        if (o.DataAfterConfirm && o.Seed != SeedKind.Disconnected)
+            throw new ArgumentException("data after the connect confirm is for the Disconnected seed only (the other seeds never report a connect to layer 3)", nameof(options));
+        if (o.Seed == SeedKind.Disconnected && o.FramesBa > 0 && !o.DataAfterConfirm)
+            throw new ArgumentException("the Disconnected seed supports A-to-B data only (B has no DL_DATA_request arm while Disconnected)", nameof(options));
+        if (o.Seed == SeedKind.AwaitingV22Connection && (o.FramesAb > 0 || o.FramesBa > 0))
+            throw new ArgumentException("the AwaitingV22Connection seed is a connect-phase seed: no data (figc4.6 discards DL_DATA_request while layer 3 initiated)", nameof(options));
+        if (o.Peer != PeerKind.Tables && o.Seed == SeedKind.Connected)
+            throw new ArgumentException("the v2.0 stub peer is for the connect-phase seeds only (--seed disconnected or awaiting-v22)", nameof(options));
+        if (o.Peer != PeerKind.Tables && (o.FramesAb > 0 || o.FramesBa > 0))
+            throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
+        if (o.Release != ReleaseBy.None && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the orderly release is for the table-driven peer only (the v2.0 stub has no data phase to complete)", nameof(options));
+        if (o.ReleaseEarly && o.Release == ReleaseBy.None)
+            throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
+        if (o.Abandon == ReleaseBy.Both && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("with the v2.0 stub as B only station A can abandon its connect (--abandon A)", nameof(options));
+        if (o.Abandon != ReleaseBy.None && o.Release != ReleaseBy.None)
+            throw new ArgumentException("abandon and release at once could have one layer 3 issue two DL_DISCONNECT_requests (abandon, then release while still connecting); use one or the other", nameof(options));
+        if (o.Abandon != ReleaseBy.None && o.DataAfterConfirm)
+            throw new ArgumentException("abandoning a connect is for scenarios whose data is submitted up front: a layer 3 that abandons its connect never offers data after a confirm, so that data could never be delivered", nameof(options));
+        if (o.Abandon != ReleaseBy.None && o.Seed == SeedKind.Connected && o.Reconnect == ReconnectBy.None)
+            throw new ArgumentException("abandoning a connect needs one to abandon: a connect-phase seed or a reconnect (--reconnect)", nameof(options));
+        if (o.Reconnect != ReconnectBy.None && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
+        if (o.LocalBusy != FlowControlAt.None && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
+        if (o.LongBusy && o.LocalBusy == FlowControlAt.None)
+            throw new ArgumentException("a long busy period needs a busy station (--local-busy)", nameof(options));
+        if (o.UnitData != FlowControlAt.None && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("UI datagrams are for the table-driven peer only (the v2.0 stub ignores UI)", nameof(options));
+        if (o.UiForm != UiForm.Plain && o.UnitData == FlowControlAt.None)
+            throw new ArgumentException("a UI form needs a station that sends UI (--unit-data)", nameof(options));
+        if (o.FrameErrors != FrameErrors.None && o.Peer != PeerKind.Tables)
+            throw new ArgumentException("frame errors are for the table-driven peer only (the v2.0 stub has no frame-error inputs)", nameof(options));
+        if (o.Inject != FlowControlAt.None && (o.Peer != PeerKind.Tables || o.InjectedFrame == InjectedFrame.None))
+            throw new ArgumentException("an injected frame needs the table-driven peer and a form (--inject-frame)", nameof(options));
+        if (o.InjectedFrame != InjectedFrame.None && o.Inject == FlowControlAt.None)
+            throw new ArgumentException("an injected frame form needs a station that injects it (--inject)", nameof(options));
+        if (o.InjectedThen != InjectedFrame.None && o.InjectedFrame == InjectedFrame.None)
+            throw new ArgumentException("a second injected frame needs a first (--inject-frame FIRST,SECOND)", nameof(options));
+        if (o.Srej && (o.InjectedFrame is InjectedFrame.IPollAhead or InjectedFrame.IPollStale || o.InjectedThen is InjectedFrame.IPollAhead or InjectedFrame.IPollStale))
+            throw new ArgumentException("the out-of-sequence injected I frames are for links without SREJ (with SREJ the receiver saves the frame, and it would collide with the sender's own frame of that number)", nameof(options));
+        if (o.DataBeforeConfirm && !o.DataAfterConfirm)
+            throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
+        if (o.DataAfterReconnect && (o.Reconnect == ReconnectBy.None || o.Seed != SeedKind.Connected || o.DataAfterConfirm))
+            throw new ArgumentException("data after a reconnect needs a reconnecting station (--reconnect) on the connected seed, without data offered by moves (--data-after-confirm)", nameof(options));
+        if (o.T3At != FlowControlAt.Both && !o.T3)
+            throw new ArgumentException("choosing the stations whose T3 expires needs T3 modelled (--t3)", nameof(options));
+        if (o.FlowRounds < 0 || o.FlowOffAfterDelivered < 0)
+            throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
+    }
+
     public Stepper(ExplorerOptions options, TableSet tables)
     {
         _o = options ?? throw new ArgumentNullException(nameof(options));
         _tables = tables ?? throw new ArgumentNullException(nameof(tables));
-        if (_o.K is < 1 or > 7) throw new ArgumentException("k must be 1..7 at modulo 8", nameof(options));
-        if (_o.Modulo128B && (_o.Seed != SeedKind.Disconnected || _o.Peer != PeerKind.Tables))
-            throw new ArgumentException("seeding B at modulo 128 is for the Disconnected seed with the table-driven peer only", nameof(options));
-        if (_o.DataAfterConfirm && _o.Seed != SeedKind.Disconnected)
-            throw new ArgumentException("data after the connect confirm is for the Disconnected seed only (the other seeds never report a connect to layer 3)", nameof(options));
-        if (_o.Seed == SeedKind.Disconnected && _o.FramesBa > 0 && !_o.DataAfterConfirm)
-            throw new ArgumentException("the Disconnected seed supports A-to-B data only (B has no DL_DATA_request arm while Disconnected)", nameof(options));
-        if (_o.Seed == SeedKind.AwaitingV22Connection && (_o.FramesAb > 0 || _o.FramesBa > 0))
-            throw new ArgumentException("the AwaitingV22Connection seed is a connect-phase seed: no data (figc4.6 discards DL_DATA_request while layer 3 initiated)", nameof(options));
-        if (_o.Peer != PeerKind.Tables && _o.Seed == SeedKind.Connected)
-            throw new ArgumentException("the v2.0 stub peer is for the connect-phase seeds only (--seed disconnected or awaiting-v22)", nameof(options));
-        if (_o.Peer != PeerKind.Tables && (_o.FramesAb > 0 || _o.FramesBa > 0))
-            throw new ArgumentException("the v2.0 stub peer has no data phase: both frame counts must be 0 (the scenario ends at link establishment)", nameof(options));
-        if (_o.Release != ReleaseBy.None && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("the orderly release is for the table-driven peer only (the v2.0 stub has no data phase to complete)", nameof(options));
-        if (_o.ReleaseEarly && _o.Release == ReleaseBy.None)
-            throw new ArgumentException("an early release needs a releasing station (--release)", nameof(options));
-        if (_o.Abandon == ReleaseBy.Both && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("with the v2.0 stub as B only station A can abandon its connect (--abandon A)", nameof(options));
-        if (_o.Abandon != ReleaseBy.None && _o.Release != ReleaseBy.None)
-            throw new ArgumentException("abandon and release at once could have one layer 3 issue two DL_DISCONNECT_requests (abandon, then release while still connecting); use one or the other", nameof(options));
-        if (_o.Abandon != ReleaseBy.None && _o.DataAfterConfirm)
-            throw new ArgumentException("abandoning a connect is for scenarios whose data is submitted up front: a layer 3 that abandons its connect never offers data after a confirm, so that data could never be delivered", nameof(options));
-        if (_o.Abandon != ReleaseBy.None && _o.Seed == SeedKind.Connected && _o.Reconnect == ReconnectBy.None)
-            throw new ArgumentException("abandoning a connect needs one to abandon: a connect-phase seed or a reconnect (--reconnect)", nameof(options));
-        if (_o.Reconnect != ReconnectBy.None && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("the layer-3 reconnect is for the table-driven peer only", nameof(options));
-        if (_o.LocalBusy != FlowControlAt.None && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("the local busy condition is for the table-driven peer only (the v2.0 stub has no data phase)", nameof(options));
-        if (_o.LongBusy && _o.LocalBusy == FlowControlAt.None)
-            throw new ArgumentException("a long busy period needs a busy station (--local-busy)", nameof(options));
-        if (_o.UnitData != FlowControlAt.None && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("UI datagrams are for the table-driven peer only (the v2.0 stub ignores UI)", nameof(options));
-        if (_o.UiForm != UiForm.Plain && _o.UnitData == FlowControlAt.None)
-            throw new ArgumentException("a UI form needs a station that sends UI (--unit-data)", nameof(options));
-        if (_o.FrameErrors != FrameErrors.None && _o.Peer != PeerKind.Tables)
-            throw new ArgumentException("frame errors are for the table-driven peer only (the v2.0 stub has no frame-error inputs)", nameof(options));
-        if (_o.Inject != FlowControlAt.None && (_o.Peer != PeerKind.Tables || _o.InjectedFrame == InjectedFrame.None))
-            throw new ArgumentException("an injected frame needs the table-driven peer and a form (--inject-frame)", nameof(options));
-        if (_o.InjectedFrame != InjectedFrame.None && _o.Inject == FlowControlAt.None)
-            throw new ArgumentException("an injected frame form needs a station that injects it (--inject)", nameof(options));
-        if (_o.InjectedThen != InjectedFrame.None && _o.InjectedFrame == InjectedFrame.None)
-            throw new ArgumentException("a second injected frame needs a first (--inject-frame FIRST,SECOND)", nameof(options));
-        if (_o.Srej && (_o.InjectedFrame is InjectedFrame.IPollAhead or InjectedFrame.IPollStale || _o.InjectedThen is InjectedFrame.IPollAhead or InjectedFrame.IPollStale))
-            throw new ArgumentException("the out-of-sequence injected I frames are for links without SREJ (with SREJ the receiver saves the frame, and it would collide with the sender's own frame of that number)", nameof(options));
-        if (_o.DataBeforeConfirm && !_o.DataAfterConfirm)
-            throw new ArgumentException("data before the confirm is a variant of data offered by moves (--data-after-confirm)", nameof(options));
-        if (_o.DataAfterReconnect && (_o.Reconnect == ReconnectBy.None || _o.Seed != SeedKind.Connected || _o.DataAfterConfirm))
-            throw new ArgumentException("data after a reconnect needs a reconnecting station (--reconnect) on the connected seed, without data offered by moves (--data-after-confirm)", nameof(options));
-        if (_o.T3At != FlowControlAt.Both && !_o.T3)
-            throw new ArgumentException("choosing the stations whose T3 expires needs T3 modelled (--t3)", nameof(options));
-        if (_o.FlowRounds < 0 || _o.FlowOffAfterDelivered < 0)
-            throw new ArgumentException("flow-control rounds and the delivered-frames threshold must be non-negative", nameof(options));
+        Validate(_o);
         foreach (var (state, page) in tables.States)
             _eventsByState[state] = new HashSet<string>(page.Transitions.Select(t => t.On), StringComparer.Ordinal);
         // With DataAfterReconnect a reconnecting station has one more frame,
