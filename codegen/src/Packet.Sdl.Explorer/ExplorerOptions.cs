@@ -309,6 +309,13 @@ public sealed record ExplorerOptions
     public bool Modulo128A { get; init; }
 
     /// <summary>
+    /// Disconnected seed only: station B is seeded at modulo 128 (version 2.2 configured), so a SABM it
+    /// accepts must bring it down to modulo 8 (4.3.3.1). The row that proves the Set Version boxes set the
+    /// modulus (packet-net/ax25sdl#123).
+    /// </summary>
+    public bool Modulo128B { get; init; }
+
+    /// <summary>
     /// Disconnected seed only: each station's layer 3 holds its data until
     /// its data link has reported the link up (DL_CONNECT_confirm at A,
     /// DL_CONNECT_indication at B), as a well-behaved layer 3 would, then

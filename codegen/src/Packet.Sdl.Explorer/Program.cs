@@ -19,6 +19,7 @@ usage: dotnet run --project codegen/src/Packet.Sdl.Explorer -- [options]
                          SABME with FRMR or with DM F=1, accepts SABM; connect-phase seeds only, no data
   --peer-declines-sabme  the table-driven B answers SABME with DM but accepts SABM (able_to_establish = false)
   --mod128               seed A at modulo 128 so DL_CONNECT_request sends SABME
+  --mod128b              disconnected seed: seed B at modulo 128 (a SABM it accepts must bring it to modulo 8)
   --data-after-confirm   disconnected seed: each station's layer 3 submits its data only once the link is up
                          (DL_CONNECT_confirm at A, DL_CONNECT_indication at B); B may then have data too
   --data-before-confirm  with the disconnected seed: A's layer 3 submits its data by moves from the start, without
@@ -77,7 +78,7 @@ exit code: 0 no violation, 1 violation, 2 bound hit
 string tables = "spec/json";
 int framesAb = 2, framesBa = 0, k = 4, n2 = 4, budget = 0, maxDepth = 80, maxStates = 400_000, flowRounds = 1, flowOffAfter = 1;
 bool fired = false;
-bool srej = false, peerDeclines = false, mod128 = false, dataAfterConfirm = false, dataBeforeConfirm = false, releaseEarly = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
+bool srej = false, peerDeclines = false, mod128 = false, mod128B = false, dataAfterConfirm = false, dataBeforeConfirm = false, releaseEarly = false, acceptGiveUp = false, selective = false, rejMayEqualVs = false, trQuiescent = false;
 var faults = FaultKinds.Drop | FaultKinds.Duplicate;
 var dropScope = DropScope.Any;
 var seed = SeedKind.Connected;
@@ -252,6 +253,7 @@ try
             case "--srej": srej = true; break;
             case "--peer-declines-sabme": peerDeclines = true; break;
             case "--mod128": mod128 = true; break;
+            case "--mod128b": mod128B = true; break;
             case "--data-after-confirm": dataAfterConfirm = true; break;
             case "--data-before-confirm": dataAfterConfirm = true; dataBeforeConfirm = true; break;
             case "--release-early": releaseEarly = true; break;
@@ -333,6 +335,7 @@ try
         Seed = seed,
         PeerDeclinesSabme = peerDeclines,
         Modulo128A = mod128,
+        Modulo128B = mod128B,
         DataAfterConfirm = dataAfterConfirm,
         Peer = peer,
         FlowControl = flowControl,

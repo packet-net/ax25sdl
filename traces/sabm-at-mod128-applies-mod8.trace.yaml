@@ -1,0 +1,43 @@
+# Accepting a SABM puts the link into mod-8 operation with implicit reject,
+# whatever the station ran before.
+#
+# §4.3.3.1: "The SABM command places two Terminal Node Controllers (TNC) in
+# the asynchronous balanced mode (modulo 8)."
+# §6.3.2: a station that falls back to the defaults "compatible with
+# previous versions of AX.25" makes "a version 2.0 connection"; selective
+# reject is enabled only on a version 2.2 connection.
+#
+# figc4.1 t13 draws "Set Version 2.0" as a processing box named after the
+# figc4.7b subroutine; the interpreter reads it as that call for the version
+# flag, the modulus and the reject mode (pinned semantic 9,
+# packet-net/ax25sdl#123). Before #123 the box set only the flag, so a
+# station configured for modulo 128 kept running modulo 128 on a v2.0 link.
+# k and N2 stay as configured (6.7.1; figc4.7b's k := 8 is a figure defect,
+# packethacking/ax25spec#54).
+scenario: sabm-at-mod128-applies-mod8
+description: >
+  Disconnected, configured for v2.2 (modulo 128, selective reject): accepting
+  a SABM answers UA F=1 and leaves the machine at modulo 8 with implicit
+  reject and the version 2.2 flag clear (figc4.1 t13 yes, figc4.7b
+  Set Version 2.0); k and N2 keep their configured values.
+citations:
+  - "ax.25.2.2.4_Oct_25.md §4.3.3.1 (SABM Command)"
+  - "ax.25.2.2.4_Oct_25.md §6.3.2 (Parameter Negotiation Phase)"
+  - "figc4.1 t13, figc4.7b Set_Version_2_0"
+initial:
+  state: Disconnected
+  variables: { modulo: 128, k: 4, n2: 4, version_2_2: true, srej_enabled: true }
+steps:
+  - name: SABM arrives and we accept, the modulus becomes 8
+    inject:
+      event: SABM_received
+      pf: true
+      atoms: { able_to_establish: true }
+    expect:
+      transition: t13_sabm_received_yes
+      state: Connected
+      effects:
+        - { frame: UA, command: false, pf: true }
+        - { dl: DL_CONNECT_indication }
+      variables: { vs: 0, va: 0, vr: 0, modulo: 8, srej_enabled: false, version_2_2: false, k: 4, n2: 4 }
+      timers: { t3: running }

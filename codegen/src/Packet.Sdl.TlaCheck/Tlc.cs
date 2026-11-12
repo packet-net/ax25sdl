@@ -286,6 +286,7 @@ public sealed class Tlc
             _ => "\"awaiting-v22\"",
         });
         C("Mod128A", Bool(o.Modulo128A));
+        C("Mod128B", Bool(o.Modulo128B));
         C("DataAfterConfirm", Bool(o.DataAfterConfirm));
         C("PeerDeclinesSabme", Bool(o.PeerDeclinesSabme));
         C("Peer", o.Peer switch

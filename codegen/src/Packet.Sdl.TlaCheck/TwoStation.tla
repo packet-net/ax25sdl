@@ -23,6 +23,7 @@ CONSTANTS
     InteriorDropsOnly, \* a drop may only hit an I frame that is not the last its sender submitted
     Seed,              \* "connected", "disconnected" or "awaiting-v22"
     Mod128A,           \* disconnected seed: A starts at modulo 128, so it sends SABME
+    Mod128B,           \* disconnected seed: B starts at modulo 128 (a SABM it accepts must bring it to 8)
     DataAfterConfirm,  \* disconnected seed: layer 3 submits its data only once its link is up
     PeerDeclinesSabme, \* table-driven B refuses SABME (able_to_establish false) but accepts SABM
     Peer,              \* what plays B: "tables", "v20-frmr" or "v20-dm"
@@ -489,7 +490,7 @@ StubReceive(S, f, newIn, newBudget) ==
 
 SeedMachine(s) ==
     LET st == IF Seed = "connected" THEN "Connected" ELSE "Disconnected"
-    IN  [NewMachine(st) EXCEPT !.mod = IF Mod128A /\ s = "A" THEN 128 ELSE 8, !.k = K, !.n2 = N2,
+    IN  [NewMachine(st) EXCEPT !.mod = IF (Mod128A /\ s = "A") \/ (Mod128B /\ s = "B") THEN 128 ELSE 8, !.k = K, !.n2 = N2,
                                 !.srej = Srej, !.v22 = Srej, !.t3 = IF st = "Connected" THEN "running" ELSE "stopped"]
 
 \* figc4.6's own entry state, as the golden trace frmr-fallback-downgrades-to-sabm
