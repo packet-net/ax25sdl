@@ -1105,7 +1105,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         result.Trace[3].Transition.Should().Be("t17_ua_received_no");
         result.CounterexampleLength.Should().Be(7);
-        result.StatesExplored.Should().Be(3620);
+        result.StatesExplored.Should().Be(3644);
         result.FiredTransitions.Should().NotContain("Disconnected/t04_all_other_primitives__from_upper_layer",
             "a layer 3 told its link is down submits nothing until the link is reported up again");
     }
@@ -1166,7 +1166,7 @@ public class CalibrationTests(ITestOutputHelper output)
         result.Outcome.Should().Be(Outcome.Violation);
         result.Violation!.Kind.Should().Be(Invariants.Deadlock);
         result.CounterexampleLength.Should().Be(7);
-        result.StatesExplored.Should().Be(12394);
+        result.StatesExplored.Should().Be(12735);
     }
 
     [Fact]
@@ -2682,14 +2682,16 @@ public class CalibrationTests(ITestOutputHelper output)
 
     [Theory]
     [InlineData(SeedKind.Connected, false, 333, "TimerRecovery/t23_rej_received_yes_no_no")]
-    [InlineData(SeedKind.AwaitingV22Connection, false, 500, "TimerRecovery/t23_rej_received_yes_no_yes")]
+    [InlineData(SeedKind.AwaitingV22Connection, false, 476, "TimerRecovery/t24_srej_received_yes_no_yes")]
     [InlineData(SeedKind.Connected, true, 1374, "TimerRecovery/t19_rnr_received_no_no_no_no")]
     [InlineData(SeedKind.AwaitingV22Connection, true, 2233, "TimerRecovery/t19_rnr_received_yes_no_yes")]
     public void An_I_Frame_In_Sequence_Puts_The_Peers_N_r_Past_V_s(SeedKind seed, bool busy, int states, string arm)
     {
         // ip-nr, ip-nr-v22, ip-nr-rnr, ip-nr-rnr-v22: A, in Timer Recovery after T3 with
         // its poll lost, sends an I frame in sequence that its own machine
-        // never numbered; then a frame ahead of sequence draws REJ F=1, or B's
+        // never numbered; then a frame ahead of sequence draws REJ F=1 (SREJ
+        // F=1 at version 2.2: B accepted SABME, so Set Version 2.2 enabled
+        // selective reject, packet-net/ax25sdl#123), or B's
         // busy condition draws RNR, each with N(r) = V(s) + 1 at A. Reject
         // coherence is off for the REJ rows: that reject is incoherent by
         // construction.

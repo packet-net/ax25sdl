@@ -797,7 +797,7 @@ public static class Scenarios
         {
             T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, Clean());
-        Add("ip-nr-v22", "REJ F=1, N(r) beyond V(s), v2.2", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
+        Add("ip-nr-v22", "SREJ F=1, N(r) beyond V(s), v2.2 (REJ before ax25sdl#123)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
         }, Clean());

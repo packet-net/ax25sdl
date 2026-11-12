@@ -13,13 +13,13 @@
 # The rows under a group line are table keys, State/transition or
 # Subroutine:path.
 
-group never-called: spec: the subroutines no page calls (ax25spec#54)
+group never-called: spec: the subroutines no page calls (ax25spec#54); since packet-net/ax25sdl#123 the Set Version boxes apply the modulus and reject mode of the first two, but these paths themselves never run
 Set_Version_2_2:t01_set_version_2_2
 Set_Version_2_0:t01_set_version_2_0
 Establish_Extended_Data_Link:t01_establish_extended_data_link_yes
 Establish_Extended_Data_Link:t02_establish_extended_data_link_no
 
-group mod128-srej: spec: Enquiry Response's modulo 128 SREJ paths need a responder at modulo 128, which the tables never set (ax25spec#54)
+group mod128-srej: not-yet: Enquiry Response's modulo 128 SREJ paths need a responder at modulo 128 with selective reject answering a poll; since packet-net/ax25sdl#123 a station that accepts SABME is one (d54-cold-v22-wrap), but no row polls it there
 Enquiry_Response:t04_enquiry_response_yes_no_yes_no_yes
 Enquiry_Response:t05_enquiry_response_yes_no_yes_no_no
 
@@ -85,3 +85,7 @@ TimerRecovery/t24_srej_received_yes_yes_no_yes
 
 group tr-srej-out-of-sequence: not-yet: an out-of-sequence I frame two or more ahead reaching a station in Timer Recovery with SREJ and no SREJ outstanding; masked by #42/#47 with the checks on, it fires in the explorer with reject coherence, sequence sanity and delivery off at 1 + 3 frames, SREJ, four drops (38 621 states), which TLC does not finish within its 600 s limit, so it is not in the suite (its sibling with an SREJ outstanding fires in tr-srej-rc-off)
 TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes
+
+group rej-nr-error-v22: not-yet: REJ with N(r) out of range at version 2.2; since packet-net/ax25sdl#123 every version 2.2 link in calibration runs selective reject (Set Version 2.2 on SABME; the seeds tie SREJ to version 2.2), so B answers a frame ahead of sequence with SREJ, not REJ; ip-nr-v22 fired both while the flag-only reading left B with the flag and implicit reject. An injected REJ response would reach them
+Connected/t25_rej_received_no_yes
+TimerRecovery/t23_rej_received_yes_no_yes
