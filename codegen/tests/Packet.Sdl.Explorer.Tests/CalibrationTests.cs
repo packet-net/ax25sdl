@@ -2704,6 +2704,23 @@ public class CalibrationTests(ITestOutputHelper output)
         result.FiredTransitions.Should().Contain(arm);
     }
 
+    [Fact]
+    public void At_Version_2_2_The_Initiators_Implicit_Reject_Reaches_The_Rej_N_r_Error_Arms()
+    {
+        // ip-nr-v22-b: ip-nr-v22 with the injector at B. A, the initiator on
+        // the awaiting-v22 seed, keeps its configured implicit reject (its UA
+        // arm runs no Set Version box), so it answers B's frame ahead with
+        // REJ F=1; B, at version 2.2, takes the N(r) error on the REJ arms.
+        var result = Run(Ip(InjectedFrame.IFrame, InjectedFrame.IPollAhead) with
+        {
+            Inject = FlowControlAt.B, Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop,
+            Invariants = Invariants.Default & ~Invariants.RejectCoherence,
+        });
+        result.Outcome.Should().Be(Outcome.NoViolation);
+        result.StatesExplored.Should().Be(466);
+        result.FiredTransitions.Should().Contain(["Connected/t25_rej_received_no_yes", "TimerRecovery/t23_rej_received_yes_no_yes"]);
+    }
+
     [Theory]
     [InlineData(InjectedFrame.RejPoll, 1, false, 75, "TimerRecovery/t23_rej_received_no_yes_yes_yes")]
     [InlineData(InjectedFrame.SrejCommand, 0, true, 25, "TimerRecovery/t24_srej_received_no_yes_no_yes")]

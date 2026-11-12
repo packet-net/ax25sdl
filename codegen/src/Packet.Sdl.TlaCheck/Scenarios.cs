@@ -800,7 +800,17 @@ public static class Scenarios
         Add("ip-nr-v22", "SREJ F=1, N(r) beyond V(s), v2.2 (REJ before ax25sdl#123)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame, Ahead) with
         {
             Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
-        }, Clean());
+        }, Clean(476));
+        // The same with the injector at B (packet-net/ax25sdl#123's review):
+        // A, the initiator on the awaiting-v22 seed, has the version 2.2 flag
+        // with its configured implicit reject (its UA arm runs no Set Version
+        // box), so it answers B's frame ahead with REJ F=1, and B (Set Version
+        // 2.2 on the SABME) takes the N(r) error on the REJ arms of version
+        // 2.2 that ip-nr-v22 reached before #123.
+        Add("ip-nr-v22-b", "REJ F=1, N(r) beyond V(s), v2.2, injector at B", TableSetKind.Current, o => Ip(o, FlowControlAt.B, InjectedFrame.IFrame, Ahead) with
+        {
+            Seed = SeedKind.AwaitingV22Connection, T3 = true, Budget = 1, Faults = FaultKinds.Drop, Invariants = Default & ~Invariants.RejectCoherence,
+        }, Clean(466));
         // Since ax25spec#180 the RNR arm splits by version; this is the
         // version 2.0 half (t19_rnr_received_no_no_no_no).
         Add("ip-nr-rnr", "RNR, N(r) beyond V(s)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IFrame) with
