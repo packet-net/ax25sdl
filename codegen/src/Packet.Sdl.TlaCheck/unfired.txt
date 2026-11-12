@@ -66,30 +66,12 @@ TimerRecovery/t25_all_other_primitives__from_lower_layer
 group sabm-declined: harness: able_to_establish false for a SABM; missing: a peer that declines SABM (the harness declines only SABME)
 Disconnected/t13_sabm_received_no
 
-group i-frame-p1: not-yet: an I frame with P = 1, which no table sends (ax25spec#60 proposes one), and the REJ with F = 1 only such a frame draws (the last two also need an N(r) out of range); needs an injected I frame with P = 1
-Connected/t26_i_received_yes_yes_yes_yes_yes
-Connected/t26_i_received_yes_yes_yes_no_yes_yes
-Connected/t26_i_received_yes_yes_yes_no_no_yes_yes_yes
-Connected/t26_i_received_yes_yes_yes_no_no_no_yes
-TimerRecovery/t22_i_received_yes_yes_yes_yes_yes
-TimerRecovery/t22_i_received_yes_yes_yes_no_yes_yes
-TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_yes_yes
-TimerRecovery/t22_i_received_yes_yes_yes_no_no_no_yes
-TimerRecovery/t23_rej_received_yes_yes_yes
-TimerRecovery/t23_rej_received_yes_yes_no
-TimerRecovery/t23_rej_received_yes_no_yes
-TimerRecovery/t23_rej_received_yes_no_no
-
-group nr-error-reordering: not-yet: an N(r) outside [V(a), V(s)] on these arms; on a FIFO channel none arrives, so they need channel reordering at more positions and with SREJ than the ro rows use (ax25spec#95)
-Connected/t22_rnr_received_no_yes
+group nr-error-reordering: not-yet: an N(r) outside [V(a), V(s)] on these arms; on a FIFO channel no table sends one, and an injected I frame in sequence (which takes a number the sender never used, ip-nr*) reaches four of the N(r)-error arms but not these: a poll (RR, RNR or REJ command) or a REJ with F = 0 from a peer whose V(r) is past the station's V(s) while the station is in Timer Recovery, and the SREJ arms (the out-of-sequence injected frames are for links without SREJ); left for channel reordering (ax25spec#95)
 Connected/t24_srej_received_no_no
-Connected/t25_rej_received_no_yes
 TimerRecovery/t18_rr_received_no_yes_no_yes
 TimerRecovery/t18_rr_received_no_yes_no_no
-TimerRecovery/t19_rnr_received_yes_no_yes
 TimerRecovery/t19_rnr_received_no_yes_no_yes
 TimerRecovery/t19_rnr_received_no_yes_no_no
-TimerRecovery/t19_rnr_received_no_no_no
 TimerRecovery/t23_rej_received_no_yes_no_yes
 TimerRecovery/t23_rej_received_no_yes_no_no
 TimerRecovery/t23_rej_received_no_no_no_yes
@@ -97,11 +79,8 @@ TimerRecovery/t24_srej_received_yes_no_no
 TimerRecovery/t24_srej_received_no_no_yes
 TimerRecovery/t24_srej_received_no_no_no
 
-group reject-naming-vs: not-yet: a REJ or SREJ naming no outstanding frame (N(r) = V(s), or V(s) = V(a)); three are REJ or SREJ command arms, unreached mainly because no table sends those commands and the injection gate excludes N(r) = V(s) by construction; on a FIFO channel a table only sends such a reject from a stale duplicate (#40, fixed) or with a window above half the modulus (#13)
-TimerRecovery/t23_rej_received_no_yes_yes_yes
+group reject-naming-vs: not-yet: an SREJ response with F = 0 naming the receiver's V(s) with nothing outstanding; only a table sends SREJ responses, and on a FIFO channel it names V(s) only from a stale duplicate (#40, fixed) or with a window above half the modulus (#13); the three command arms of this group fire with injected commands naming V(s) (rnv-*)
 TimerRecovery/t24_srej_received_yes_yes_no_yes
-TimerRecovery/t24_srej_received_no_yes_yes_yes
-TimerRecovery/t24_srej_received_no_yes_no_yes
 
 group tr-srej-out-of-sequence: not-yet: an out-of-sequence I frame two or more ahead reaching a station in Timer Recovery with SREJ and no SREJ outstanding; masked by #42/#47 with the checks on, it fires in the explorer with reject coherence, sequence sanity and delivery off at 1 + 3 frames, SREJ, four drops (38 621 states), which TLC does not finish within its 600 s limit, so it is not in the suite (its sibling with an SREJ outstanding fires in tr-srej-rc-off)
 TimerRecovery/t22_i_received_yes_yes_yes_no_no_yes_no_yes_no_yes

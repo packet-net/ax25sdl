@@ -202,15 +202,21 @@ public sealed class Tlc
         });
         C("FrameErrors", Set(frameErrors));
         C("InjectAt", Set(injectAt));
-        C("InjectForm", o.InjectedFrame switch
+        static string Form(InjectedFrame f) => f switch
         {
             InjectedFrame.RejPoll => "\"rej-poll\"",
             InjectedFrame.SrejCommand => "\"srej-command\"",
             InjectedFrame.SrejPoll => "\"srej-poll\"",
             InjectedFrame.UaF0 => "\"ua-f0\"",
             InjectedFrame.Frmr => "\"frmr\"",
+            InjectedFrame.IFrame => "\"i-frame\"",
+            InjectedFrame.IPoll => "\"i-poll\"",
+            InjectedFrame.IPollAhead => "\"i-poll-ahead\"",
+            InjectedFrame.IPollStale => "\"i-poll-stale\"",
             _ => "\"none\"",
-        });
+        };
+        C("InjectForm", Form(o.InjectedFrame));
+        C("InjectThen", Form(o.InjectedThen));
         C("FlowRounds", Inv(o.FlowRounds));
         C("FlowOffAfter", Inv(o.FlowOffAfterDelivered));
         C("StepChecks", Set(stepChecks));

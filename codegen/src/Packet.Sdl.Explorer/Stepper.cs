@@ -675,7 +675,19 @@ public sealed class Stepper
             InjectedFrame.IPollStale => true,
             InjectedFrame.RejPoll or InjectedFrame.SrejCommand or InjectedFrame.SrejPoll => IsDataState(m.State)
                 && (_o.InjectedFrame == InjectedFrame.RejPoll ? r.State == "TimerRecovery" : IsDataState(r.State))
-                && Distance(r.Va, m.Vr, r.Modulo) < Distance(r.Va, r.Vs, r.Modulo),
+                && (Distance(r.Va, m.Vr, r.Modulo) < Distance(r.Va, r.Vs, r.Modulo)
+                    // With RejMayEqualVs the reject may also name the
+                    // receiver's V(s), no outstanding frame (the
+                    // reject-naming-vs arms of figc4.5): only while the
+                    // receiver is in TimerRecovery with both channels empty,
+                    // so the reject reaches it there. In Connected, figc4.4
+                    // takes N(r) = V(s) as in range and Invoke Retransmission
+                    // runs round the whole modulus. An SREJ command does not
+                    // move V(a), so it names V(s) coherently only with
+                    // nothing outstanding at all (V(a) = V(s)); otherwise it
+                    // asks for a frame never sent.
+                    || (_o.RejMayEqualVs && m.Vr == r.Vs && r.State == "TimerRecovery" && s.ToA.Count == 0 && s.ToB.Count == 0
+                        && (_o.InjectedFrame == InjectedFrame.RejPoll || r.Va == r.Vs))),
             InjectedFrame.UaF0 => r.State is "AwaitingConnection" or "AwaitingV22Connection" or "AwaitingRelease",
             InjectedFrame.Frmr => IsDataState(r.State),
             _ => false,
