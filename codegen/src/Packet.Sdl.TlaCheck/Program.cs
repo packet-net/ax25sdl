@@ -26,13 +26,23 @@ deadlock), and the same number of distinct states (clean runs).
   --meaning M       the meaning module the runner is instantiated with: a
                     module name in spec/tla or a path to a .tla file
                     (default Ax25Meaning; see docs/tla.md)
+  --lockstep        run Ax25Meaning and the --meaning module side by side
+                    instead of the cross-check: every dispatch goes through
+                    both, and a row stops at the first dispatch on which their
+                    effects, error flag or fixed fields differ (docs/tla.md,
+                    "Lockstep"); the explorer is not run
+  --lockstep-iterate N
+                    with --lockstep, look past each difference found and run
+                    the row again, up to N runs, to find the next distinct
+                    difference (default 1: the first difference only)
 
 A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
 not fired, each with its status and reason.
 
 exit code: 0 every row agrees (and the accounting holds), 1 some row
-disagrees, a run failed, or the accounting does not hold
+disagrees, a run failed, or the accounting does not hold; with --lockstep,
+0 the two meanings never differed on any row, 1 they did or a run failed
 """;
 
 string? jar = Environment.GetEnvironmentVariable("TLA2TOOLS_JAR");
@@ -44,6 +54,8 @@ var gridFlow = false;
 int parallel = 1, workers = 1, timeout = 600;
 var heap = "2g";
 var meaning = Tlc.DefaultMeaning;
+var lockstep = false;
+var iterate = 1;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -62,6 +74,8 @@ for (var i = 0; i < args.Length; i++)
         case "--heap": heap = Next(); break;
         case "--timeout": timeout = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--meaning": meaning = Next(); break;
+        case "--lockstep": lockstep = true; break;
+        case "--lockstep-iterate": iterate = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         default: Console.Error.WriteLine($"unknown option {args[i]}\n\n{usage}"); return 1;
     }
 }
@@ -127,7 +141,9 @@ var tlc = new Tlc(jar,
     harness,
     tlaDir,
     meaning,
-    workers, heap, TimeSpan.FromSeconds(timeout));
+    workers, heap, TimeSpan.FromSeconds(timeout), lockstep);
+
+if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meaning);
 
 var results = new ConcurrentDictionary<int, Row>();
 Parallel.For(0, scenarios.Count, new ParallelOptions { MaxDegreeOfParallelism = parallel }, idx =>

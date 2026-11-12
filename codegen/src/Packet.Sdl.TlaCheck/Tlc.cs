@@ -47,6 +47,11 @@ public enum Phase
     /// first violation, as the explorer does.
     /// </summary>
     Coverage,
+    /// <summary>
+    /// Two meanings side by side (Lockstep.tla over LockstepSemantics.tla):
+    /// breadth-first, stopping at the first dispatch on which they differ.
+    /// </summary>
+    Lockstep,
 }
 
 /// <summary>Writes a TLC model for an explorer scenario and runs it.</summary>
@@ -59,6 +64,7 @@ public sealed class Tlc
     private readonly int _workers;
     private readonly string _heap;
     private readonly TimeSpan _timeout;
+    private readonly bool _lockstep;
 
     /// <summary>The meaning module Ax25Semantics.tla names when no other is selected.</summary>
     public const string DefaultMeaning = "Ax25Meaning";
@@ -68,8 +74,14 @@ public sealed class Tlc
     /// The meaning module the runner is instantiated with: a module name in
     /// <paramref name="tlaDir"/>, or a path to a .tla file elsewhere.
     /// </param>
-    public Tlc(string jar, string harness, string tlaDir, string meaning, int workers, string heap, TimeSpan timeout)
+    /// <param name="lockstep">
+    /// Run <see cref="DefaultMeaning"/> and <paramref name="meaning"/> side by side
+    /// (LockstepSemantics.tla, Lockstep.tla, next to the harness) instead of
+    /// <paramref name="meaning"/> alone.
+    /// </param>
+    public Tlc(string jar, string harness, string tlaDir, string meaning, int workers, string heap, TimeSpan timeout, bool lockstep = false)
     {
+        _lockstep = lockstep;
         _jar = jar;
         _harness = harness;
         _tlaDir = tlaDir;
@@ -105,11 +117,37 @@ public sealed class Tlc
         {
             throw new InvalidOperationException(why);
         }
-        File.WriteAllText(Path.Combine(workDir, SemanticsFile), SelectMeaning(File.ReadAllText(Path.Combine(_tlaDir, SemanticsFile)), module));
+        if (_lockstep)
+        {
+            // The lockstep semantics stand in for Ax25Semantics.tla, so the harness extends them unchanged.
+            var dir = Path.GetDirectoryName(_harness)!;
+            File.WriteAllText(Path.Combine(workDir, SemanticsFile), LockstepSemantics(File.ReadAllText(Path.Combine(dir, LockstepTemplate)), module));
+            File.Copy(Path.Combine(dir, LockstepRoot), Path.Combine(workDir, LockstepRoot), overwrite: true);
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(workDir, SemanticsFile), SelectMeaning(File.ReadAllText(Path.Combine(_tlaDir, SemanticsFile)), module));
+        }
         File.Copy(_harness, Path.Combine(workDir, Path.GetFileName(_harness)), overwrite: true);
     }
 
     private const string SemanticsFile = TlaEmitter.SemanticsModule + ".tla";
+    private const string LockstepTemplate = "LockstepSemantics.tla";
+    private const string LockstepRoot = "Lockstep.tla";
+
+    /// <summary>
+    /// LockstepSemantics.tla renamed to Ax25Semantics, with its second meaning
+    /// (the one INSTANCE line for MB) naming <paramref name="module"/>.
+    /// </summary>
+    public static string LockstepSemantics(string template, string module)
+    {
+        var header = new Regex("^-+ MODULE LockstepSemantics -+(?=\\r?$)", RegexOptions.Multiline);
+        var mb = new Regex("^MB == INSTANCE \\w+(?=\\r?$)", RegexOptions.Multiline);
+        if (header.Count(template) != 1 || mb.Count(template) != 1)
+            throw new InvalidOperationException($"{LockstepTemplate} must contain exactly one MODULE LockstepSemantics line and one 'MB == INSTANCE ...' line");
+        var renamed = header.Replace(template, "---------------------------- MODULE " + TlaEmitter.SemanticsModule + " ----------------------------");
+        return mb.Replace(renamed, "MB == INSTANCE " + module);
+    }
 
     /// <summary>
     /// Why <paramref name="meaning"/> cannot be selected, or null when it can: a module
@@ -152,7 +190,7 @@ public sealed class Tlc
     private static bool OneShotFair(ExplorerOptions o) => o.T3 || o.LocalBusy != FlowControlAt.None || o.UnitData != FlowControlAt.None;
 
     /// <summary>The TLC configuration for <paramref name="o"/> in one phase.</summary>
-    public static string Config(ExplorerOptions o, Phase phase, bool depthBound)
+    public static string Config(ExplorerOptions o, Phase phase, bool depthBound, IReadOnlyCollection<string>? known = null)
     {
         bool On(Invariants i) => o.Invariants.HasFlag(i);
         var faults = new List<string>();
@@ -290,6 +328,7 @@ public sealed class Tlc
         C("TimerRecoveryQuiescent", Bool(o.TimerRecoveryIsQuiescent));
         C("RejMayEqualVs", Bool(o.RejMayEqualVs));
         C("MaxDepth", Inv(o.MaxDepth));
+        if (phase == Phase.Lockstep) C("LockstepKnown", Set(known ?? Array.Empty<string>()));
 
         switch (phase)
         {
@@ -305,6 +344,16 @@ public sealed class Tlc
                 // The VIEW leaves out `last`, so distinct states are the explorer's.
                 if (phase != Phase.Coverage) sb.Append("VIEW View\n");
                 break;
+            case Phase.Lockstep:
+                // Only the lockstep check; other violations end a path but are not reported.
+                // The row's state invariants become constraints too: a state that breaks one is not
+                // explored further, as the safety search would have stopped there.
+                sb.Append("INIT Init\nNEXT Next\nINVARIANT LockstepAgree\nCONSTRAINT LockstepGo");
+                if (On(Invariants.DefinedState)) sb.Append(" DefinedState");
+                if (On(Invariants.SequenceSanity)) sb.Append(" SequenceSanity");
+                if (On(Invariants.AckCoherence)) sb.Append(" AckCoherence");
+                sb.Append("\nVIEW View\n");
+                break;
             case Phase.Quiescence:
                 sb.Append("SPECIFICATION Spec\nPROPERTY ").Append(OneShotFair(o) ? "QuiescenceLiveL3" : "QuiescenceLive").Append('\n');
                 break;
@@ -318,10 +367,10 @@ public sealed class Tlc
         return sb.ToString();
     }
 
-    public TlcResult Run(string workDir, ExplorerOptions o, Phase phase, bool depthBound)
+    public TlcResult Run(string workDir, ExplorerOptions o, Phase phase, bool depthBound, IReadOnlyCollection<string>? known = null)
     {
         var cfgName = "MC_" + phase + ".cfg";
-        File.WriteAllText(Path.Combine(workDir, cfgName), Config(o, phase, depthBound));
+        File.WriteAllText(Path.Combine(workDir, cfgName), Config(o, phase, depthBound, known));
         var meta = Path.Combine(workDir, "meta_" + phase);
         if (Directory.Exists(meta)) Directory.Delete(meta, recursive: true);
         var tmp = Path.Combine(workDir, "jtmp");
@@ -358,7 +407,7 @@ public sealed class Tlc
             psi.ArgumentList.Add("-lncheck");
             psi.ArgumentList.Add("final");
         }
-        psi.ArgumentList.Add("TwoStation.tla");
+        psi.ArgumentList.Add(phase == Phase.Lockstep ? LockstepRoot : Path.GetFileName(_harness));
 
         var sw = Stopwatch.StartNew();
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
@@ -369,11 +418,25 @@ public sealed class Tlc
             try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             p.WaitForExit();
             File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), stdout.Result + stderr.Result);
+            Tidy(meta, tmp);
+            if (phase == Phase.Coverage) File.Delete(Path.Combine(workDir, "states.dump"));
             return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s");
         }
         var text = stdout.Result + stderr.Result;
         File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
+        Tidy(meta, tmp);
         return Parse(text, sw.Elapsed);
+    }
+
+    /// <summary>
+    /// TLC's fingerprint and queue files and its extracted standard modules are not read
+    /// again once a run is over; on a shared self-hosted runner, kept for every row, they
+    /// fill the disk. (A Coverage run's states.dump is deleted by <see cref="ReadArms"/>.)
+    /// </summary>
+    private static void Tidy(params string[] dirs)
+    {
+        foreach (var d in dirs)
+            if (Directory.Exists(d)) Directory.Delete(d, recursive: true);
     }
 
     private static readonly Regex Quoted = new(@"""((?:[^""\\]|\\.)*)""");

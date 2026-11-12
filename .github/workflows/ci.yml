@@ -308,7 +308,8 @@ jobs:
           cores=$(nproc)
           parallel=$(( cores >= 8 ? 4 : 2 ))
           echo "runner has $cores cores: --parallel $parallel"
-          dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g
+          dotnet run --project codegen/src/Packet.Sdl.TlaCheck --configuration Release -- --jar "$TLA2TOOLS_JAR" --parallel "$parallel" --heap 1g \
+            --work "$RUNNER_TEMP/tlacheck"
 
   rust-drift:
     name: codegen drift — Rust + cargo build/test/fmt
