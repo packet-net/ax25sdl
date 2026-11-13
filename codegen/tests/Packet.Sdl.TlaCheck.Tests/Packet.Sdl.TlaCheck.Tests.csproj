@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Packet.Sdl.TlaCheck\Packet.Sdl.TlaCheck.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -141,7 +141,9 @@ internal static class GridRecords
             .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count().ToString(CultureInfo.InvariantCulture)}"))).Append(".\n");
         if (capped.Count > 0)
         {
-            sb.Append(CultureInfo.InvariantCulture, $"Capped, not compared: {capped.Count(r => r.Capped == "states")} at the explorer's state cap, {capped.Count(r => r.Capped == "depth")} at its depth limit (TLC has neither).\n");
+            sb.Append(CultureInfo.InvariantCulture, $"Capped, states not compared: {capped.Count(r => r.Capped == "states")} at the explorer's state cap, {capped.Count(r => r.Capped == "depth")} at its depth limit (TLC has neither); raise them with --grid-max-states and --grid-max-depth.\n");
+            foreach (var (name, r) in cells.Where(c => c.Row.Capped.Length > 0 && c.Row.Why.Length > 0))
+                sb.Append(CultureInfo.InvariantCulture, $"DISAGREE although capped: {name}: {r.Why}\n");
             foreach (var (name, r) in cells.Where(c => c.Row.CappedFinding))
                 sb.Append(CultureInfo.InvariantCulture, $"FINDING to look at: {name} is capped in the explorer, and TLC found {r.Tlc}\n");
         }

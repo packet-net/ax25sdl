@@ -1,0 +1,36 @@
+# Unfinished cross grid cells in 2026-11-13, written by scripts/grid-leftovers.py: 23.
+# flow-behind43.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup-flowB@disable=busy-tracks-flow+flow-off-delivery  # explorer state cap (bound)
+# frame-errors.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@frame-errors=control+info+length+n1+i-response  # explorer state cap (ResetLoss)
+# inj-frmr-b01.jsonl: 2
+g-ab3-ba3-b1-k4-nosrej-drop+dup@inject=both,inject-frame=frmr  # explorer state cap (Deadlock)
+g-ab3-ba3-b1-k4-srej-dup@inject=both,inject-frame=frmr  # explorer state cap (Deadlock)
+# inj-i-poll.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@inject=both,inject-frame=i-poll  # TLC timed out
+# inj-srej-b01.jsonl: 4
+g-ab3-ba3-b1-k4-nosrej-drop@inject=both,inject-frame=srej-command  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k4-nosrej-dup@inject=both,inject-frame=srej-command  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k4-nosrej-drop+dup@inject=both,inject-frame=srej-command  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k4-srej-dup@inject=both,inject-frame=srej-command  # TLC timed out, explorer state cap (bound)
+# local-busy-b01.jsonl: 5
+g-ab3-ba3-b1-k2-nosrej-drop@local-busy=both  # TLC timed out, explorer state cap (Deadlock)
+g-ab3-ba3-b1-k2-nosrej-dup@local-busy=both  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k2-nosrej-drop+dup@local-busy=both  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k4-nosrej-drop@local-busy=both  # TLC timed out, explorer state cap (bound)
+g-ab3-ba3-b1-k4-nosrej-dup@local-busy=both  # TLC timed out, explorer state cap (bound)
+# reconnect-data.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@reconnect=both,data-after-reconnect  # explorer state cap (Deadlock)
+# release-give-up.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@release=both,accept-give-up  # TLC timed out
+# release.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@release=both  # TLC timed out
+# t3-give-up.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@t3,accept-give-up  # TLC timed out
+# t3.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup@t3  # TLC timed out
+# unit-data-b01.jsonl: 4
+g-ab3-ba3-b1-k4-nosrej-drop@unit-data=both  # TLC timed out
+g-ab3-ba3-b1-k4-nosrej-dup@unit-data=both  # TLC timed out
+g-ab3-ba3-b1-k4-nosrej-drop+dup@unit-data=both  # TLC timed out
+g-ab3-ba3-b1-k4-srej-dup@unit-data=both  # TLC timed out
