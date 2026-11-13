@@ -264,7 +264,7 @@ public static class Explorer
             {
                 foreach (var (target, kind) in e)
                 {
-                    if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
+                    if (IsLivenessFault(kind)) continue;
                     if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                     if (target != i) { stuck = false; break; }
                 }
@@ -273,6 +273,16 @@ public static class Explorer
         }
         return first;
     }
+
+    /// <summary>
+    /// An edge the liveness checks may not count on: every fault (<see cref="Move.IsFault"/>),
+    /// the channel faults and also the injected frame and the frame errors, as
+    /// TwoStation.tla leaves them out of <c>ProgressKinds</c>. Until
+    /// packet-net/ax25sdl#112 only drop, duplicate and reorder were left out,
+    /// so a station's still-unused injection could be the "fault-free" way out
+    /// of a state that is otherwise stuck.
+    /// </summary>
+    private static bool IsLivenessFault(MoveKind kind) => new Move(kind, default).IsFault;
 
     private static bool[] CanReachQuiescence(List<Node> nodes, bool excludeT1)
     {
@@ -284,7 +294,7 @@ public static class Explorer
             if (e is null) continue;
             foreach (var (target, kind) in e)
             {
-                if (kind is MoveKind.Drop or MoveKind.Duplicate or MoveKind.Reorder) continue;
+                if (IsLivenessFault(kind)) continue;
                 if (excludeT1 && kind is MoveKind.T1Expiry or MoveKind.T3Expiry) continue;
                 reverse[target].Add(i);
             }

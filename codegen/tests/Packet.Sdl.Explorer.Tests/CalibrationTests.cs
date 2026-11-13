@@ -2792,6 +2792,30 @@ public class CalibrationTests(ITestOutputHelper output)
         result.FiredTransitions.Should().Contain("TimerRecovery/t18_rr_received_no_no_no_no");
     }
 
+    [Fact]
+    public void An_Unused_Injection_Is_No_Way_Out_Of_Timer_Recovery()
+    {
+        // ip-tr-inseq-both (packet-net/ax25sdl#112): A's I poll acknowledges
+        // B's retransmission while B is in Timer Recovery, which stops T1
+        // and starts T3 but stays there (#91, H1), and B's RR F=1 answer is
+        // lost. B's own injected I poll would draw A's F=1 and free it, but an
+        // injection is a fault, so the liveness check may not count on it.
+        // Before #112 it did, and this row was clean where TLC reported the
+        // stranded state.
+        var o = Ip(InjectedFrame.IPoll) with { Inject = FlowControlAt.Both, FramesBa = 1, K = 2, Budget = 2, Faults = FaultKinds.Drop };
+        var result = Run(o);
+        result.Outcome.Should().Be(Outcome.Violation);
+        result.Violation!.Kind.Should().Be(Invariants.Quiescence);
+        result.CounterexampleLength.Should().Be(12);
+        result.StatesExplored.Should().Be(1059);
+
+        // Control: with Timer Recovery counted as quiescent the row is clean,
+        // so H1 is the only thing it finds.
+        var control = Run(o with { TimerRecoveryIsQuiescent = true });
+        control.Outcome.Should().Be(Outcome.NoViolation);
+        control.StatesExplored.Should().Be(1059);
+    }
+
     // ax25spec#169 (packet-net/ax25sdl#119): A sends a0; B's T3 (only B's,
     // so #167 does not end the run with A in Timer Recovery) takes B to Timer
     // Recovery holding V(r) = 1 with V(s) = V(a); A's layer 3 resets the link
