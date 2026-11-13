@@ -153,8 +153,8 @@ public static class GridOptions
         ["data-after-confirm"] = "a Disconnected-seed option; the grids do not start there",
         ["data-before-confirm"] = "a Disconnected-seed option; the grids do not start there",
         ["flow-control"] = "use --grid-flow for the flow-control grid (B flow-controlling)",
-        ["max-depth"] = "the grid keeps the explorer's depth bound, and TLC applies it only to depth-bounded rows",
-        ["max-states"] = "the grid fixes the explorer's state cap at 1.2 million (TLC has none)",
+        ["max-depth"] = "use --grid-max-depth N, which keeps the cell names as they are",
+        ["max-states"] = "use --grid-max-states N, which keeps the cell names as they are",
         ["tables"] = "the grids run the current tables",
         ["fired"] = "an explorer report option; the coverage report covers it",
     };
@@ -192,6 +192,80 @@ public static class GridOptions
             steps.Add((known.Apply, value));
         }
         return (o => steps.Aggregate(o, (acc, s) => s.Apply(acc, s.Value)), string.Join(",", items.Select(i => i.TrimStart('-'))));
+    }
+
+    /// <summary>
+    /// <c>--grid-max-states N</c> and <c>--grid-max-depth N</c>: the
+    /// explorer's limits for every grid cell, 0 meaning none. Null when
+    /// neither is given, so the grids keep their own. The limits are not part
+    /// of a cell's name: a cell rerun with larger limits is the same cell.
+    /// </summary>
+    public static Func<ExplorerOptions, ExplorerOptions>? Caps(int? maxStates, int? maxDepth)
+    {
+        if (maxStates is null && maxDepth is null) return null;
+        static int Limit(int n) => n == 0 ? int.MaxValue : n;
+        return o => o with
+        {
+            MaxStates = maxStates is { } s ? Limit(s) : o.MaxStates,
+            MaxDepth = maxDepth is { } d ? Limit(d) : o.MaxDepth,
+        };
+    }
+
+    /// <summary><paramref name="first"/> then <paramref name="then"/>, either of which may be null.</summary>
+    public static Func<ExplorerOptions, ExplorerOptions>? Then(Func<ExplorerOptions, ExplorerOptions>? first, Func<ExplorerOptions, ExplorerOptions>? then) =>
+        first is null ? then : then is null ? first : o => then(first(o));
+
+    /// <summary>
+    /// <c>--grid-cells-from FILE</c>: the cells named, one full name per line
+    /// (blank lines and <c># comments</c> skipped), from any of the grids and
+    /// option sets. The name says the grid (<c>s-</c>: the stub grid;
+    /// <c>g-</c>: the data-phase grid, with B flow-controlling when the part
+    /// before any <c>@</c> ends <c>-flowB</c>) and the option set (the
+    /// <c>@</c> suffix, parsed as <c>--grid-with</c>), so each cell runs as
+    /// it did in its own grid, then with <paramref name="caps"/>. Each comes
+    /// with its index in its own grid. Throws <see cref="ArgumentException"/>
+    /// on a name no grid has, or one given twice.
+    /// </summary>
+    public static IReadOnlyList<(Scenario Cell, int Index)> FromNames(IEnumerable<string> lines, string currentDir, Func<ExplorerOptions, ExplorerOptions>? caps = null)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in lines)
+        {
+            var hash = raw.IndexOf('#', StringComparison.Ordinal);
+            var name = (hash >= 0 ? raw[..hash] : raw).Trim();
+            if (name.Length == 0) continue;
+            if (!seen.Add(name)) throw new ArgumentException($"--grid-cells-from: {name} is named twice");
+            names.Add(name);
+        }
+        if (names.Count == 0) throw new ArgumentException("--grid-cells-from: no cells named");
+
+        var grids = new Dictionary<(bool Stub, bool FlowB, string Tag), Dictionary<string, (Scenario Cell, int Index)>>();
+        var result = new List<(Scenario, int)>();
+        foreach (var name in names)
+        {
+            var at = name.IndexOf('@', StringComparison.Ordinal);
+            var stem = at < 0 ? name : name[..at];
+            var tag = at < 0 ? "" : name[(at + 1)..];
+            var stub = stem.StartsWith("s-", StringComparison.Ordinal);
+            if (!stub && !stem.StartsWith("g-", StringComparison.Ordinal))
+                throw new ArgumentException($"--grid-cells-from: {name} is not a grid cell name (g-... or s-...)");
+            var key = (stub, !stub && stem.EndsWith("-flowB", StringComparison.Ordinal), tag);
+            if (!grids.TryGetValue(key, out var cells))
+            {
+                var (with, parsedTag) = Parse(tag.Length > 0 ? [tag] : [], stub);
+                // The tag a grid run would have written: options given with
+                // dashes or spaces would make a name no run ever recorded.
+                if (parsedTag != tag) throw new ArgumentException($"--grid-cells-from: {name}: write the options as a grid run names them, @{parsedTag}");
+                with = Then(with, caps);
+                var grid = stub ? Scenarios.StubGrid(currentDir, with, tag) : Scenarios.Grid(currentDir, key.Item2, with, tag);
+                cells = grid.Select((c, i) => (c, i)).ToDictionary(x => x.c.Name, x => x, StringComparer.Ordinal);
+                grids[key] = cells;
+            }
+            if (!cells.TryGetValue(name, out var found)) throw new ArgumentException($"--grid-cells-from: no grid has a cell named {name}");
+            result.Add(found);
+        }
+        return result;
     }
 
     /// <summary>

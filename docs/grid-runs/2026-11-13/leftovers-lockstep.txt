@@ -1,0 +1,3 @@
+# Unfinished lockstep grid cells in 2026-11-13, written by scripts/grid-leftovers.py: 1.
+# lockstep.jsonl: 1
+g-ab3-ba3-b2-k4-nosrej-drop+dup  # timed out

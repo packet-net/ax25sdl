@@ -31,6 +31,20 @@ its expectation fails, even where the two tools agree.
                     Refused combinations fail before anything runs. The
                     grid-compatible options (docs/tla.md, "Grid runs"):
 {GRIDHELP}
+  --grid-max-states N
+                    grid runs: the explorer's visited-state cap for every cell
+                    (default 1200000 on --grid and --grid-flow, 400000 on
+                    --grid-stub); 0 for no cap. The cell names do not change
+  --grid-max-depth N
+                    grid runs: the explorer's depth limit for every cell
+                    (default 80); 0 for no limit
+  --grid-cells-from FILE
+                    run the cells FILE names, one full cell name per line
+                    (with its @options suffix; # starts a comment), from any
+                    mix of --grid, --grid-flow and --grid-stub cells and
+                    option sets: each cell runs with the options its name
+                    carries. Not with --grid, --grid-flow, --grid-stub,
+                    --grid-with or --grid-cells
   --grid-cells SPEC run only these grid cells: a comma list of indices (12),
                     ranges (0-143), strides (%4=1: index mod 4 = 1) and name
                     patterns (g-ab3-*); indices are those --list prints
@@ -45,7 +59,7 @@ its expectation fails, even where the two tools agree.
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
-  --timeout S       seconds per TLC run (default 600)
+  --timeout S       seconds per TLC run (default 600; 0 for no limit)
   --meaning M       the meaning module the runner is instantiated with: a
                     module name in spec/tla or a path to a .tla file
                     (default Ax25Meaning; see docs/tla.md)
@@ -65,9 +79,12 @@ not fired, each with its status and reason.
 
 A grid run deletes each cell's model directory once the cell agrees (or,
 with --lockstep, shows no difference), so the disk holds only the cells in
-progress and the ones worth reading. A grid cell the explorer cut off at its
-state cap or depth limit (TLC has neither) is "capped, not compared": it does
-not count as a disagreement, but one where TLC found a violation is flagged.
+progress and the ones worth reading. A grid cell whose explorer search was
+cut short by its state cap or depth limit (TLC has neither) is "capped",
+whatever the explorer's verdict: the state counts and counterexamples are not
+compared, only the verdict kinds where both tools found a violation. It does
+not count as a disagreement unless those kinds differ; one where TLC found a
+violation the explorer did not is flagged.
 
 exit code: 0 every row agrees and meets its expectation (and the accounting
 holds), 1 some row disagrees, misses its expectation, a run failed, or the
@@ -85,6 +102,8 @@ var gridFlow = false;
 var gridStub = false;
 var gridWith = new List<string>();
 string? gridCells = null;
+string? gridCellsFrom = null;
+int? gridMaxStates = null, gridMaxDepth = null;
 string? resultsPath = null;
 var resume = false;
 var retryTimeouts = false;
@@ -109,6 +128,9 @@ for (var i = 0; i < args.Length; i++)
         case "--grid-stub": gridStub = true; break;
         case "--grid-with": gridWith.Add(Next()); break;
         case "--grid-cells": gridCells = Next(); break;
+        case "--grid-cells-from": gridCellsFrom = Next(); break;
+        case "--grid-max-states": gridMaxStates = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+        case "--grid-max-depth": gridMaxDepth = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--results": resultsPath = Next(); break;
         case "--resume": resume = true; break;
         case "--retry-timeouts": retryTimeouts = true; break;
@@ -162,15 +184,25 @@ string Dir(TableSetKind t) => t switch
     _ => Path.Combine(root, "codegen", "src", "Packet.Sdl.TlaCheck", "fixtures", "tables-livelock"),
 };
 
-var gridMode = grid || gridStub;
+var gridMode = grid || gridStub || gridCellsFrom is not null;
 if (grid && gridStub)
 {
     Console.Error.WriteLine("--grid-stub is a grid of its own: not with --grid or --grid-flow");
     return 1;
 }
-if (!gridMode && (gridWith.Count > 0 || gridCells is not null || resultsPath is not null || resume || retryTimeouts))
+if (gridCellsFrom is not null && (grid || gridStub || gridWith.Count > 0 || gridCells is not null))
 {
-    Console.Error.WriteLine("--grid-with, --grid-cells, --results and --resume need a grid (--grid, --grid-flow or --grid-stub)");
+    Console.Error.WriteLine("--grid-cells-from takes each cell's grid and options from its name: not with --grid, --grid-flow, --grid-stub, --grid-with or --grid-cells");
+    return 1;
+}
+if (!gridMode && (gridWith.Count > 0 || gridCells is not null || resultsPath is not null || resume || retryTimeouts || gridMaxStates is not null || gridMaxDepth is not null))
+{
+    Console.Error.WriteLine("--grid-with, --grid-cells, --grid-max-states, --grid-max-depth, --results and --resume need a grid (--grid, --grid-flow, --grid-stub or --grid-cells-from)");
+    return 1;
+}
+if (gridMaxStates < 0 || gridMaxDepth < 0 || timeout < 0)
+{
+    Console.Error.WriteLine("--grid-max-states, --grid-max-depth and --timeout take a non-negative number (0: no limit)");
     return 1;
 }
 if (retryTimeouts && !resume)
@@ -186,21 +218,33 @@ if (resume && resultsPath is null)
 Func<ExplorerOptions, ExplorerOptions>? gridApply = null;
 var gridTag = "";
 Func<int, string, bool>? cellFilter = null;
+var caps = GridOptions.Caps(gridMaxStates, gridMaxDepth);
+IReadOnlyList<Scenario> allScenarios;
+var cellIndex = new Dictionary<string, int>(StringComparer.Ordinal);
 try
 {
-    if (gridMode) (gridApply, gridTag) = GridOptions.Parse(gridWith, gridStub);
-    if (gridCells is not null) cellFilter = GridOptions.CellFilter(gridCells);
+    if (gridCellsFrom is not null)
+    {
+        var named = GridOptions.FromNames(File.ReadLines(gridCellsFrom), Dir(TableSetKind.Current), caps);
+        allScenarios = named.Select(c => c.Cell).ToList();
+        foreach (var (cell, index) in named) cellIndex[cell.Name] = index;
+    }
+    else
+    {
+        if (gridMode) (gridApply, gridTag) = GridOptions.Parse(gridWith, gridStub);
+        if (gridCells is not null) cellFilter = GridOptions.CellFilter(gridCells);
+        var withCaps = GridOptions.Then(gridApply, caps);
+        allScenarios = gridStub ? Scenarios.StubGrid(Dir(TableSetKind.Current), withCaps, gridTag)
+            : grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow, withCaps, gridTag)
+            : Scenarios.Calibration(Dir);
+        for (var i = 0; i < allScenarios.Count; i++) cellIndex[allScenarios[i].Name] = i;
+    }
 }
-catch (ArgumentException ex)
+catch (Exception ex) when (ex is ArgumentException or IOException)
 {
     Console.Error.WriteLine(ex.Message);
     return 1;
 }
-var allScenarios = gridStub ? Scenarios.StubGrid(Dir(TableSetKind.Current), gridApply, gridTag)
-    : grid ? Scenarios.Grid(Dir(TableSetKind.Current), gridFlow, gridApply, gridTag)
-    : Scenarios.Calibration(Dir);
-var cellIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-for (var i = 0; i < allScenarios.Count; i++) cellIndex[allScenarios[i].Name] = i;
 var scenarios = allScenarios.Where((s, i) => (only is null || only.Contains(s.Name)) && (cellFilter is null || cellFilter(i, s.Name))).ToList();
 if (gridMode)
 {
@@ -239,7 +283,7 @@ var tlc = new Tlc(jar,
     harness,
     tlaDir,
     meaning,
-    workers, heap, TimeSpan.FromSeconds(timeout), lockstep);
+    workers, heap, timeout == 0 ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(timeout), lockstep);
 
 ResultsFile? resultsFile = null;
 if (resultsPath is not null)
@@ -292,7 +336,7 @@ Each(idx =>
         row = Compare(s);
     }
     results[idx] = row;
-    var label = row.Capped.Length == 0 ? (row.Agree ? "agree   " : !gridMode ? "DISAGREE" : row.TlcKind == "timeout" ? "TIMEOUT " : row.TlcKind == "error" || row.ExplorerKind.Length == 0 ? "ERROR   " : "DISAGREE") : row.CappedFinding ? "CAPPED, TLC FOUND A VIOLATION (look at it):" : "capped, not compared:";
+    var label = gridMode ? GridVerdict.Label(row) : row.Agree ? "agree   " : "DISAGREE";
     Console.Error.WriteLine($"{label} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}");
     if (row.Unexpected is { } unexpected) Console.Error.WriteLine($"UNEXPECTED {scenarios[idx].Name}: {unexpected}");
 });
@@ -304,7 +348,7 @@ for (var idx = 0; idx < scenarios.Count; idx++)
     var s = scenarios[idx];
     var r = results[idx];
     var expected = s.Expect is null ? "" : r.Unexpected is null ? "yes" : "**no**: " + r.Unexpected;
-    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Capped.Length > 0 ? (r.CappedFinding ? "capped, not compared; **TLC found a violation**" : "capped, not compared") : r.Agree ? "yes" : "**no**: " + r.Why)} | {expected} |\n");
+    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Capped.Length > 0 ? (r.Why.Length > 0 ? "capped; **verdicts differ**: " + r.Why : r.CappedFinding ? "capped, not compared; **TLC found a violation**" : "capped, not compared") : r.Agree ? "yes" : "**no**: " + r.Why)} | {expected} |\n");
 }
 Console.WriteLine(sb.ToString());
 var currentRuns = scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList();
@@ -322,7 +366,7 @@ if (only is null && !gridMode)
 var unexpectedRows = results.Values.Count(r => r.Unexpected is not null);
 if (unexpectedRows > 0) Console.WriteLine($"{unexpectedRows} row(s) differ from their expected verdict (the Expected column).");
 if (gridMode) Console.WriteLine(GridRecords.Summary(scenarios.Select((s, i) => (s.Name, results[i])).ToList(), skipped));
-return results.Values.All(r => (r.Agree || r.Capped.Length > 0) && r.Unexpected is null) && accounted ? 0 : 1;
+return results.Values.All(r => GridVerdict.Passes(r) && r.Unexpected is null) && accounted ? 0 : 1;
 
 // ─── One row ──────────────────────────────────────────────────────────
 
@@ -346,7 +390,9 @@ Row Compare(Scenario s)
         // A grid cell says which limit it hit; calibration keeps its wording.
         Outcome.BoundHit when gridMode && !s.DepthBound => $"{(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.StatesExplored} states",
         Outcome.BoundHit => $"depth bound hit, {ex.StatesExplored} states",
-        _ => $"{exKind}{(exStation.Length > 0 ? " at " + exStation : "")}, {ex.CounterexampleLength} steps",
+        _ => $"{exKind}{(exStation.Length > 0 ? " at " + exStation : "")}, {ex.CounterexampleLength} steps"
+            // A violation found after a limit was hit (a deadlock or a loss, found in the part explored).
+            + (gridMode && !s.DepthBound && (ex.DepthBoundHit || ex.StateBoundHit) ? $" ({(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.StatesExplored} states)" : ""),
     };
 
     var dir = Path.Combine(work, s.Name);
@@ -443,9 +489,12 @@ Row Compare(Scenario s)
     // length is the one the expectation states, TLC's lasso differs).
     var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.CounterexampleLength, ex.StatesExplored);
     if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
-    // A grid cell the explorer cut off at a limit (TLC has none) is not compared.
-    var capped = gridMode && !s.DepthBound && ex.Outcome == Outcome.BoundHit ? (ex.DepthBoundHit ? "depth" : "states") : "";
-    return new Row(exText, tlcText, capped.Length == 0 && why.Count == 0, capped.Length > 0 ? "" : string.Join("; ", why), ex.FiredTransitions, tlcArms, unexpected,
+    // A grid cell whose explorer search a limit cut short (TLC has none) is
+    // capped: whatever the explorer's verdict, only the verdict kinds are
+    // compared, and only where both tools found a violation.
+    var capped = GridVerdict.Cap(gridMode, s.DepthBound, ex.DepthBoundHit, ex.StateBoundHit);
+    var (agree, whyText) = GridVerdict.Judge(capped, exKind, kind, why);
+    return new Row(exText, tlcText, agree, whyText, ex.FiredTransitions, tlcArms, unexpected,
         exKind, kind, ex.StatesExplored, states, exSeconds, elapsed.TotalSeconds, capped);
 }
 
@@ -534,6 +583,6 @@ static string RepoRoot()
 internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null,
     string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0, string Capped = "")
 {
-    /// <summary>A capped cell on which TLC, which has no cap, found a violation: a finding, not noise.</summary>
-    public bool CappedFinding => Capped.Length > 0 && TlcKind is not ("clean" or "bound" or "error" or "timeout" or "");
+    /// <summary>A capped cell on which TLC, which has no cap, found a violation the explorer did not: a finding, not noise.</summary>
+    public bool CappedFinding => Capped.Length > 0 && GridVerdict.IsViolation(TlcKind) && !GridVerdict.IsViolation(ExplorerKind);
 }

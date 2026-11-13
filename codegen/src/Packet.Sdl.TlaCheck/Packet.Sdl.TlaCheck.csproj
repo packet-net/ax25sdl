@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Packet.Sdl.TlaCheck.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Packet.Sdl.Explorer\Packet.Sdl.Explorer.csproj" />
     <ProjectReference Include="..\Packet.Sdl.CodeGen.Tla\Packet.Sdl.CodeGen.Tla.csproj" />
   </ItemGroup>
