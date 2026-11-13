@@ -784,6 +784,25 @@ public static class Scenarios
         }, Clean());
         Add("ip-tr-inseq", "I poll in sequence, TR", TableSetKind.Current, o => Ip(o, FlowControlAt.A, InjectedFrame.IPoll) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop }, Clean());
         Add("ip-tr-stale", "#91 (H1)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with { FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop }, Fails(Invariants.Deadlock, steps: 12));
+        // packet-net/ax25sdl#112: the same I poll with both stations able to
+        // inject and a second drop (the grid's g-ab0-ba1-b2-k2-nosrej-drop
+        // with inject=both,inject-frame=i-poll). A's I poll acknowledges B's
+        // retransmission in TimerRecovery and B's RR F=1 answer is lost, so B
+        // is left in TimerRecovery with T1 stopped (#91, H1). B's own unused
+        // injection would poll A and A's F=1 answer would free it; the
+        // explorer counted that injection as a fault-free way out and called
+        // the row clean, while TwoStation.tla (inject is not a progress move)
+        // reported the stranded state. Both now report quiescence. The
+        // control counts TimerRecovery as quiescent and is clean: H1 is the
+        // only thing the row finds.
+        Add("ip-tr-inseq-both", "#91 (H1); ax25sdl#112 (an injection is no way out)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IPoll) with
+        {
+            FramesBa = 1, K = 2, Budget = 2, Faults = FaultKinds.Drop,
+        }, Fails(Invariants.Quiescence, steps: 12));
+        Add("ip-tr-inseq-both-trq", "ax25sdl#112 control (TimerRecovery quiescent)", TableSetKind.Current, o => Ip(o, FlowControlAt.Both, InjectedFrame.IPoll) with
+        {
+            FramesBa = 1, K = 2, Budget = 2, Faults = FaultKinds.Drop, TimerRecoveryIsQuiescent = true,
+        }, Clean(1059));
         Add("ip-tr-busy", "I poll to a busy TR (behind ip-busy)", TableSetKind.Current, o => Ip(o, FlowControlAt.A, Stale) with
         {
             FramesBa = 1, Budget = 1, Faults = FaultKinds.Drop, LocalBusy = FlowControlAt.B,
