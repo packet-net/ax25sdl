@@ -82,9 +82,10 @@ with --lockstep, shows no difference), so the disk holds only the cells in
 progress and the ones worth reading. A grid cell whose explorer search was
 cut short by its state cap or depth limit (TLC has neither) is "capped",
 whatever the explorer's verdict: the state counts and counterexamples are not
-compared, only the verdict kinds where both tools found a violation. It does
-not count as a disagreement unless those kinds differ; one where TLC found a
-violation the explorer did not is flagged.
+compared, only the verdict kinds where the explorer found a violation (a
+reachable state, so TLC must report the same kind). It does not count as a
+disagreement unless TLC then reports clean or another kind; one where TLC
+found a violation the explorer did not is flagged.
 
 exit code: 0 every row agrees and meets its expectation (and the accounting
 holds), 1 some row disagrees, misses its expectation, a run failed, or the
@@ -491,7 +492,7 @@ Row Compare(Scenario s)
     if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
     // A grid cell whose explorer search a limit cut short (TLC has none) is
     // capped: whatever the explorer's verdict, only the verdict kinds are
-    // compared, and only where both tools found a violation.
+    // compared, and only where the explorer found a violation.
     var capped = GridVerdict.Cap(gridMode, s.DepthBound, ex.DepthBoundHit, ex.StateBoundHit);
     var (agree, whyText) = GridVerdict.Judge(capped, exKind, kind, why);
     return new Row(exText, tlcText, agree, whyText, ex.FiredTransitions, tlcArms, unexpected,

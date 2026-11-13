@@ -7,7 +7,7 @@ namespace Packet.Sdl.TlaCheck.Tests;
 /// How a grid cell is judged when the explorer's search was cut short by its
 /// state cap or depth limit (packet-net/ax25sdl#112, the 13 November grid
 /// runs): capped whatever the explorer's verdict, state counts not compared,
-/// verdict kinds compared where both tools found a violation.
+/// verdict kinds compared where the explorer found a violation.
 /// </summary>
 public class GridVerdictTests
 {
@@ -55,11 +55,17 @@ public class GridVerdictTests
         GridVerdict.Label(Judged("states", "bound", "timeout")).Should().Be("capped, not compared:");
     }
 
-    [Fact]
-    public void A_capped_cell_with_different_violations_disagrees()
+    // A violation the explorer reports under its cap is a reachable state:
+    // TLC, searching the whole graph, must report the same one.
+    [Theory]
+    [InlineData("Deadlock", "ResetLoss")]
+    [InlineData("Deadlock", "clean")]
+    [InlineData("ResetLoss", "clean")]
+    public void A_capped_cell_where_TLC_does_not_find_the_explorers_violation_disagrees(string explorer, string tlc)
     {
-        var r = Judged("states", "Deadlock", "ResetLoss");
-        r.Why.Should().Be("verdict Deadlock vs ResetLoss");
+        var r = Judged("states", explorer, tlc);
+        r.Why.Should().Be($"verdict {explorer} vs {tlc}");
+        r.CappedFinding.Should().BeFalse();
         GridVerdict.Passes(r).Should().BeFalse();
         GridVerdict.Label(r).Should().Be("CAPPED, VERDICTS DIFFER:");
     }

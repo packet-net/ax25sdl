@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """List the grid cells a run did not finish, for TlaCheck --grid-cells-from. Stdlib only.
 
-Usage: python3 scripts/grid-leftovers.py DIR [--cap N]
+Usage: python3 scripts/grid-leftovers.py DIR [--cap N] [--stub-cap N]
 
 Reads every DIR/*.jsonl that TlaCheck --results wrote and prints a leftover
 when its last record for a cell is a timeout (timedOut), a failure (done
@@ -13,7 +13,8 @@ Cross-check cells go to DIR/leftovers.txt and lockstep cells to
 DIR/leftovers-lockstep.txt, grouped by results file, each line a full cell
 name and a comment saying why. Cells the run never reached are not listed:
 resume those from their own results file. --cap is the explorer's state cap
-the run used (default 1200000, the data-phase grids' cap).
+the data-phase grids used (default 1200000); a stub-grid cell (s-...) is
+judged against the stub grid's own cap, --stub-cap (default 400000).
 """
 import argparse
 import glob
@@ -27,7 +28,8 @@ def reason(r, cap):
         return "failed"
     if r.get("mode") == "lockstep":
         return "timed out" if r.get("timedOut") else None
-    capped = r.get("capped") or ("states" if r.get("explorerStates", 0) >= cap else "")
+    limit = cap[1] if r["cell"].startswith("s-") else cap[0]
+    capped = r.get("capped") or ("states" if r.get("explorerStates", 0) >= limit else "")
     why = []
     if r.get("timedOut"):
         why.append("TLC timed out")
@@ -40,6 +42,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("dir")
     ap.add_argument("--cap", type=int, default=1_200_000)
+    ap.add_argument("--stub-cap", type=int, default=400_000)
     a = ap.parse_args()
     out = {"cross": [], "lockstep": []}
     for path in sorted(glob.glob(os.path.join(a.dir, "*.jsonl"))):
@@ -56,7 +59,7 @@ def main():
                 last[r["cell"]] = r
         rows = {"cross": [], "lockstep": []}
         for cell, r in sorted(last.items(), key=lambda kv: kv[1].get("index", 0)):
-            why = reason(r, a.cap)
+            why = reason(r, (a.cap, a.stub_cap))
             if why:
                 rows["lockstep" if r.get("mode") == "lockstep" else "cross"].append(f"{cell}  # {why}")
         for mode, lines in rows.items():

@@ -5,9 +5,10 @@ namespace Packet.Sdl.TlaCheck;
 /// its state cap or depth limit; TLC has neither. A cell whose explorer search
 /// was cut short by either is "capped": its state count is not compared, and
 /// neither is a counterexample's length or path, since the explorer's search
-/// was not the whole graph. The verdict kind is still compared where both
-/// tools found a violation (the explorer finds a deadlock in the part it
-/// explored even when the cap cuts the rest off).
+/// was not the whole graph. The verdict kind is still compared where the
+/// explorer found a violation (a deadlock or loss in the part it explored
+/// even when the cap cuts the rest off): that state is reachable, so TLC
+/// must report the same kind.
 /// </summary>
 internal static class GridVerdict
 {
@@ -26,14 +27,16 @@ internal static class GridVerdict
     /// <summary>
     /// The agreement and its reason. An uncapped cell agrees when the full
     /// comparison found no difference (<paramref name="differences"/>). A
-    /// capped cell never counts as agreeing; its reason is set only when both
-    /// tools found a violation and the kinds differ, which makes it a
-    /// disagreement.
+    /// capped cell never counts as agreeing; its reason is set only when the
+    /// explorer found a violation and TLC gave a verdict other than the same
+    /// one (clean, or another violation), which makes it a disagreement: a
+    /// violation the explorer reports under a cap is a reachable state, so
+    /// TLC's search of the whole graph must find it too.
     /// </summary>
     public static (bool Agree, string Why) Judge(string capped, string explorerKind, string tlcKind, IReadOnlyList<string> differences)
     {
         if (capped.Length == 0) return (differences.Count == 0, string.Join("; ", differences));
-        return IsViolation(explorerKind) && IsViolation(tlcKind) && explorerKind != tlcKind
+        return IsViolation(explorerKind) && explorerKind != tlcKind && tlcKind is not ("timeout" or "error" or "")
             ? (false, $"verdict {explorerKind} vs {tlcKind}")
             : (false, "");
     }
