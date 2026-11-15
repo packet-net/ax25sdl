@@ -12,7 +12,7 @@ namespace Packet.Sdl.TlaCheck;
 /// <c>--resume</c> the cells already recorded with a verdict are skipped; a
 /// cell whose run failed (or, with <c>--retry-timeouts</c>, timed out) is
 /// run again and its new line supersedes the old. Every line carries
-/// <c>cell</c> (the name), <c>mode</c> (<c>cross</c> or <c>lockstep</c>), <c>meaning</c> (the
+/// <c>cell</c> (the name), <c>mode</c> (<c>cross</c>, <c>lockstep</c> or <c>coverage</c>), <c>meaning</c> (the
 /// <c>--meaning</c> module) and
 /// <c>done</c> (false when the run failed; a timeout is done, and reruns only
 /// with <c>--retry-timeouts</c>), <c>timedOut</c> and <c>commit</c> (the code it ran).

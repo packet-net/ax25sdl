@@ -65,6 +65,35 @@ internal static class GridRecords
             (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0, (string?)o["capped"] ?? "");
     }
 
+    /// <summary>
+    /// A coverage-only cell (<c>--coverage-only</c>): the arms TLC fired on
+    /// the Coverage phase run alone, to merge into the cell's earlier
+    /// cross-check record (its <c>arms</c>). <c>coverageOnly</c> marks it.
+    /// <c>coverageKind</c> and <c>coverageStates</c> are the coverage search's
+    /// own: it runs without the VIEW, so it counts more distinct states than
+    /// the cell's <c>tlcStates</c>.
+    /// </summary>
+    public static JsonObject Coverage(string cell, int index, string meaning, CoverageRow r) => new()
+    {
+        ["cell"] = cell,
+        ["index"] = index,
+        ["mode"] = CoverageOnly.Mode,
+        ["coverageOnly"] = true,
+        ["meaning"] = meaning,
+        ["done"] = r.Kind != "error",
+        ["timedOut"] = r.Kind == "timeout",
+        ["coverageKind"] = r.Kind,
+        ["coverageStates"] = r.States,
+        ["coverageSeconds"] = Round(r.Seconds),
+        ["message"] = r.Message,
+        ["arms"] = Strings(r.Arms),
+        ["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+    };
+
+    /// <summary>A recorded coverage-only cell as the row the run would have made.</summary>
+    public static CoverageRow CoverageRow(JsonObject o) =>
+        new((string?)o["coverageKind"] ?? "", (long?)o["coverageStates"] ?? 0, Set(o["arms"]), (double?)o["coverageSeconds"] ?? 0, (string?)o["message"] ?? "");
+
     /// <summary>A lockstep cell.</summary>
     public static JsonObject Lockstep(string cell, int index, string meaning, int iterate, LockstepRow r) => new()
     {
