@@ -20,7 +20,7 @@ namespace Packet.Sdl.TlaCheck;
 public sealed class ResultsFile : IDisposable
 {
     // Cell names carry + and @, which the default encoder escapes; the file is read by people too.
-    private static readonly JsonSerializerOptions Plain = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    internal static readonly JsonSerializerOptions Plain = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     private readonly FileStream _stream;
     private readonly Lock _gate = new();
     private readonly Dictionary<string, JsonObject> _records = new(StringComparer.Ordinal);
@@ -92,6 +92,15 @@ public sealed class ResultsFile : IDisposable
             return _records.TryGetValue(cell, out var o) && (string?)o["mode"] == mode && (string?)o["meaning"] == meaning
                 && (iterate is null || (int?)o["iterate"] == iterate)
                 && (bool?)o["done"] == true && !(_retryTimeouts && (bool?)o["timedOut"] == true) ? o : null;
+        }
+    }
+
+    /// <summary>The modes of the records already in the file other than <paramref name="mode"/>.</summary>
+    public IReadOnlyList<string> OtherModes(string mode)
+    {
+        lock (_gate)
+        {
+            return _records.Values.Select(o => (string?)o["mode"] ?? "").Where(m => m != mode).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
         }
     }
 

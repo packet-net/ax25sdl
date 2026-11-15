@@ -25,8 +25,7 @@ internal static class GridRecords
     /// </summary>
     public static JsonObject Cross(string cell, int index, string meaning, Row r)
     {
-        var tlcTransitions = r.TlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
-        return new JsonObject
+        var o = new JsonObject
         {
             ["cell"] = cell,
             ["index"] = index,
@@ -47,11 +46,38 @@ internal static class GridRecords
             ["tlcStates"] = r.TlcStates,
             ["explorerSeconds"] = Round(r.ExplorerSeconds),
             ["tlcSeconds"] = Round(r.TlcSeconds),
-            ["arms"] = Strings(r.TlcArms),
-            ["explorerOnly"] = Strings(r.ExplorerArms.Where(a => !tlcTransitions.Contains(a))),
-            ["tlcOnly"] = Strings(tlcTransitions.Where(a => !r.ExplorerArms.Contains(a))),
-            ["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
         };
+        SetArms(o, r.ExplorerArms, r.TlcArms);
+        o["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+        return o;
+    }
+
+    /// <summary>A cross-check record's arm fields: TLC's arms, and the transitions only one tool fired.</summary>
+    private static void SetArms(JsonObject o, IReadOnlySet<string> explorerArms, IReadOnlySet<string> tlcArms)
+    {
+        var tlcTransitions = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
+        o["arms"] = Strings(tlcArms);
+        o["explorerOnly"] = Strings(explorerArms.Where(a => !tlcTransitions.Contains(a)));
+        o["tlcOnly"] = Strings(tlcTransitions.Where(a => !explorerArms.Contains(a)));
+    }
+
+    /// <summary>
+    /// <c>--merge-coverage</c>: a cross-check record with the arms of a
+    /// coverage-only record for the same cell and meaning. The explorer's arms
+    /// are read back from the record (<see cref="Row(JsonObject)"/>), TLC's are
+    /// replaced, and <c>explorerOnly</c> and <c>tlcOnly</c> are recomputed as
+    /// <see cref="Cross"/> computes them; the verdicts are left as they were.
+    /// <c>coverageMerged</c>, <c>coverageSeconds</c> and <c>coverageCommit</c>
+    /// say where the arms came from.
+    /// </summary>
+    public static JsonObject MergeCoverage(JsonObject cross, JsonObject coverage)
+    {
+        var merged = cross.DeepClone().AsObject();
+        SetArms(merged, Row(cross).ExplorerArms, Set(coverage["arms"]));
+        merged["coverageMerged"] = true;
+        merged["coverageSeconds"] = coverage["coverageSeconds"]?.DeepClone();
+        merged["coverageCommit"] = coverage["commit"]?.DeepClone();
+        return merged;
     }
 
     /// <summary>A recorded cross-check cell as the row the run would have made.</summary>

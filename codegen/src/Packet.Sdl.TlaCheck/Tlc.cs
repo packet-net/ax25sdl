@@ -429,7 +429,12 @@ public sealed class Tlc
         if (phase == Phase.Coverage)
         {
             if (DumpPipe.TryCreate(dump)) pipe = DumpPipe.Drain(dump);
-            else File.Delete(dump);
+            else
+            {
+                File.Delete(dump);
+                if (!OperatingSystem.IsWindows() && Interlocked.Exchange(ref _fallbackWarned, 1) == 0)
+                    Console.Error.WriteLine($"warning: could not make a named pipe for the coverage dump; writing it to disk ({DumpFile} in each model directory), which can take tens of GB per cell");
+            }
         }
         HashSet<string> Arms(bool timedOut)
         {
@@ -437,9 +442,11 @@ public sealed class Tlc
             {
                 var reader = pipe;
                 pipe = null;
-                var read = DumpPipe.Finish(dump, reader);
-                // As the file read did: a run cut short reports no arms.
-                return timedOut ? new HashSet<string>(StringComparer.Ordinal) : read;
+                // As the file read did: a run cut short reports no arms (and stays a timeout if the reader failed).
+                if (!timedOut) return DumpPipe.Finish(dump, reader);
+                try { DumpPipe.Finish(dump, reader); }
+                catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                return new HashSet<string>(StringComparer.Ordinal);
             }
             if (!timedOut) return ReadArms(workDir);
             File.Delete(dump);
@@ -473,6 +480,9 @@ public sealed class Tlc
             if (pipe is not null) DumpPipe.Finish(dump, pipe);
         }
     }
+
+    // Set once the file fallback has been reported, so the warning prints once per process.
+    private static int _fallbackWarned;
 
     /// <summary>The file TLC's <c>-dump states</c> writes, in the model directory.</summary>
     private const string DumpFile = "states.dump";

@@ -77,7 +77,13 @@ its expectation fails, even where the two tools agree.
                     phases), for cells whose coverage was cut; with --results
                     each cell's line has mode "coverage", coverageOnly true,
                     the arms TLC fired and coverageSeconds, to merge into the
-                    cell's earlier record (docs/tla.md, "Grid runs")
+                    cell's earlier record (docs/tla.md, "Grid runs"); use a
+                    results file of its own
+  --merge-coverage CROSS COVERAGE OUT
+                    write OUT: the cross-check results file CROSS with the
+                    arms of each cell the --coverage-only results file
+                    COVERAGE read, and explorerOnly and tlcOnly recomputed;
+                    the verdicts are kept. Runs nothing else
 
 A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
@@ -120,6 +126,7 @@ var meaning = Tlc.DefaultMeaning;
 var lockstep = false;
 var iterate = 1;
 var coverageOnly = false;
+string[]? mergeCoverage = null;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -150,7 +157,18 @@ for (var i = 0; i < args.Length; i++)
         case "--lockstep": lockstep = true; break;
         case "--lockstep-iterate": iterate = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--coverage-only": coverageOnly = true; break;
+        case "--merge-coverage": mergeCoverage = [Next(), Next(), Next()]; break;
         default: Console.Error.WriteLine($"unknown option {args[i]}\n\n{usage}"); return 1;
+    }
+}
+
+if (mergeCoverage is not null)
+{
+    try { return CoverageOnly.Merge(mergeCoverage[0], mergeCoverage[1], mergeCoverage[2]); }
+    catch (IOException ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
     }
 }
 

@@ -80,10 +80,14 @@ internal static class DumpPipe
         return reader.GetAwaiter().GetResult();
     }
 
-    /// <summary>Open and close the FIFO for writing without blocking: a no-op when no reader is waiting.</summary>
+    /// <summary>
+    /// Open and close the FIFO for writing without blocking: a no-op when no
+    /// reader is waiting. Close-on-exec, so a TLC started meanwhile for another
+    /// cell cannot inherit this write end and hold the reader open.
+    /// </summary>
     private static void Release(string path)
     {
-        var fd = open(CPath(path), OWrOnly | ONonBlock);
+        var fd = open(CPath(path), OWrOnly | ONonBlock | OCloExec);
         if (fd >= 0) _ = close(fd);
     }
 
@@ -93,6 +97,8 @@ internal static class DumpPipe
     private const int OWrOnly = 1;
 
     private static int ONonBlock => OperatingSystem.IsLinux() ? 0x800 : 0x4;
+
+    private static int OCloExec => OperatingSystem.IsLinux() ? 0x80000 : 0x1000000;
 
     [DllImport("libc", SetLastError = true)]
     private static extern int mkfifo(byte[] path, uint mode);

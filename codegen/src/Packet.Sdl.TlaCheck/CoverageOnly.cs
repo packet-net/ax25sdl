@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Packet.Sdl.TlaCheck;
 
@@ -44,6 +46,11 @@ public static class CoverageOnly
     public static int Run(IReadOnlyList<Scenario> scenarios, Tlc tlc, string work, int parallel, string meaning,
         ResultsFile? resultsFile, IReadOnlyDictionary<string, int> cellIndex)
     {
+        if (resultsFile?.OtherModes(Mode) is { Count: > 0 } other)
+        {
+            Console.Error.WriteLine($"--coverage-only: the results file already holds {string.Join(", ", other)} records; use a separate file and merge it with --merge-coverage");
+            return 1;
+        }
         var results = new ConcurrentDictionary<int, CoverageRow>();
         var skipped = 0;
         var meaningName = Lockstep.MeaningName(meaning);
@@ -85,6 +92,61 @@ public static class CoverageOnly
         sb.Append(CultureInfo.InvariantCulture, $". {arms.Count} distinct arms fired across them; TLC {rows.Sum(r => r.Seconds):0} s in all.\n");
         Console.WriteLine(sb.ToString());
         return read == rows.Count ? 0 : 1;
+    }
+
+    /// <summary>
+    /// <c>--merge-coverage CROSS COVERAGE OUT</c>: write OUT, a copy of the
+    /// cross-check results file CROSS in which every cross-check line of a
+    /// cell that COVERAGE (a <c>--coverage-only</c> results file) records with
+    /// its arms read, for the same meaning, carries those arms
+    /// (<see cref="GridRecords.MergeCoverage"/>). Other lines are copied as
+    /// they are. OUT must not exist.
+    /// </summary>
+    /// <returns>The exit code: 0 once OUT is written, 1 when it is refused.</returns>
+    public static int Merge(string crossPath, string coveragePath, string outPath)
+    {
+        if (File.Exists(outPath))
+        {
+            Console.Error.WriteLine($"{outPath} already exists: name another file");
+            return 1;
+        }
+        // The latest record per cell, as --resume reads them; only one whose arms were read is merged.
+        var coverage = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+        foreach (var line in File.ReadLines(coveragePath))
+            if (Parse(line) is { } o && (string?)o["mode"] == Mode) coverage[(string)o["cell"]!] = o;
+        var usable = coverage.Where(kv => (string?)kv.Value["coverageKind"] is { Length: > 0 } and not ("error" or "timeout"))
+            .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+        var lines = 0;
+        var cells = new HashSet<string>(StringComparer.Ordinal);
+        var sb = new StringBuilder();
+        foreach (var line in File.ReadLines(crossPath))
+        {
+            if (Parse(line) is { } o && (string?)o["mode"] == "cross" && usable.TryGetValue((string)o["cell"]!, out var cov)
+                && (string?)cov["meaning"] == (string?)o["meaning"])
+            {
+                sb.Append(GridRecords.MergeCoverage(o, cov).ToJsonString(ResultsFile.Plain)).Append('\n');
+                lines++;
+                cells.Add((string)o["cell"]!);
+            }
+            else if (line.Trim().Length > 0)
+            {
+                sb.Append(line).Append('\n');
+            }
+        }
+        File.WriteAllText(outPath, sb.ToString());
+        var unmatched = usable.Keys.Where(c => !cells.Contains(c)).Order(StringComparer.Ordinal).ToList();
+        var notRead = coverage.Count - usable.Count;
+        Console.Error.WriteLine($"merged the arms of {cells.Count} cell(s) into {lines} line(s) of {outPath}"
+            + (notRead > 0 ? $"; {notRead} coverage record(s) without arms (timed out or failed) left out" : "")
+            + (unmatched.Count > 0 ? $"; no cross-check line with the same meaning for: {string.Join(", ", unmatched)}" : ""));
+        return 0;
+    }
+
+    private static JsonObject? Parse(string line)
+    {
+        if (line.Trim().Length == 0) return null;
+        try { return JsonNode.Parse(line) is JsonObject o && o["cell"] is not null ? o : null; }
+        catch (JsonException) { return null; }
     }
 
     private static CoverageRow One(Scenario s, Tlc tlc, string work)

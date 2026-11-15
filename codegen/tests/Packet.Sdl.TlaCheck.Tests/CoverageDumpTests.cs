@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Packet.Sdl.TlaCheck.Tests;
 
 /// <summary>
@@ -115,6 +117,78 @@ public class CoverageDumpTests : IDisposable
         CoverageOnly.Refusal(true, gridMode: true, lockstep: false).Should().BeNull();
         CoverageOnly.Refusal(true, gridMode: false, lockstep: false).Should().Contain("needs a grid");
         CoverageOnly.Refusal(true, gridMode: true, lockstep: true).Should().Contain("not with --lockstep");
+    }
+
+    private static HashSet<string> Arms(params string[] a) => a.ToHashSet(StringComparer.Ordinal);
+
+    private static Row Cross(IReadOnlySet<string> explorer, IReadOnlySet<string> tlc) =>
+        new("explorer text", "tlc text", false, "", explorer, tlc, null, "bound", "clean", 1200000, 1500000, 10, 20, "states");
+
+    private static readonly string[] Untimed = ["finished", "commit"];
+
+    // The review of #130: a cut cell was recorded with no TLC arms, so its explorerOnly holds every explorer
+    // transition; replacing arms alone would credit the explorer with TLC's and lose the TLC-only ones.
+    [Fact]
+    public void Merging_coverage_recomputes_the_arm_fields_as_the_record_builder_would()
+    {
+        var explorer = Arms("Connected/a", "Connected/b");
+        var tlc = Arms("Connected/a", "Connected/c", "Sub:p1");
+        var cut = GridRecords.Cross("cell", 7, "Ax25Meaning", Cross(explorer, Arms()));
+        var cov = GridRecords.Coverage("cell", 7, "Ax25Meaning", new CoverageRow("clean", 9, tlc, 3.2, ""));
+        cov["commit"] = "abc";
+
+        var merged = GridRecords.MergeCoverage(cut, cov);
+        var whole = GridRecords.Cross("cell", 7, "Ax25Meaning", Cross(explorer, tlc));
+        foreach (var key in whole.Select(kv => kv.Key).Except(Untimed))
+            JsonNode.DeepEquals(merged[key], whole[key]).Should().BeTrue(key);
+        merged["explorerOnly"]!.AsArray().Select(n => (string)n!).Should().Equal("Connected/b");
+        merged["tlcOnly"]!.AsArray().Select(n => (string)n!).Should().Equal("Connected/c");
+        ((bool?)merged["coverageMerged"]).Should().BeTrue();
+        ((string?)merged["coverageCommit"]).Should().Be("abc");
+        GridRecords.Row(merged).ExplorerArms.Should().BeEquivalentTo(explorer);
+        GridRecords.Row(merged).TlcArms.Should().BeEquivalentTo(tlc);
+    }
+
+    [Fact]
+    public void Merge_coverage_rewrites_a_results_file_into_a_new_one()
+    {
+        string Line(JsonObject o) => o.ToJsonString(ResultsFile.Plain);
+        var cross = Path.Combine(_dir, "cross.jsonl");
+        var coverage = Path.Combine(_dir, "coverage.jsonl");
+        var output = Path.Combine(_dir, "merged.jsonl");
+        File.WriteAllLines(cross,
+        [
+            Line(GridRecords.Cross("cut", 1, "Ax25Meaning", Cross(Arms("S/a"), Arms()))),
+            Line(GridRecords.Cross("other", 2, "Ax25Meaning", Cross(Arms("S/a"), Arms("S/a")))),
+            Line(GridRecords.Cross("timed", 3, "Ax25Meaning", Cross(Arms("S/a"), Arms()))),
+        ]);
+        File.WriteAllLines(coverage,
+        [
+            Line(GridRecords.Coverage("cut", 1, "Ax25Meaning", new CoverageRow("clean", 5, Arms("S/a", "S/b"), 1, ""))),
+            Line(GridRecords.Coverage("timed", 3, "Ax25Meaning", new CoverageRow("timeout", 0, Arms(), 600, "no verdict"))),
+        ]);
+        CoverageOnly.Merge(cross, coverage, output).Should().Be(0);
+        var lines = File.ReadAllLines(output).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        lines.Select(o => (string?)o["cell"]).Should().Equal("cut", "other", "timed");
+        lines[0]["tlcOnly"]!.AsArray().Select(n => (string)n!).Should().Equal("S/b");
+        lines[1]["coverageMerged"].Should().BeNull();
+        lines[2]["coverageMerged"].Should().BeNull();
+        // OUT is never overwritten.
+        CoverageOnly.Merge(cross, coverage, output).Should().Be(1);
+    }
+
+    [Fact]
+    public void A_results_file_reports_records_of_other_modes()
+    {
+        var path = Path.Combine(_dir, "r.jsonl");
+        using (var f = ResultsFile.Open(path, resume: false, retryTimeouts: false, "abc"))
+        {
+            f.OtherModes(CoverageOnly.Mode).Should().BeEmpty();
+            f.Append(GridRecords.Cross("c", 0, "Ax25Meaning", Cross(Arms(), Arms())));
+        }
+        using var again = ResultsFile.Open(path, resume: true, retryTimeouts: false, "abc");
+        again.OtherModes(CoverageOnly.Mode).Should().Equal("cross");
+        again.OtherModes("cross").Should().BeEmpty();
     }
 
     [Fact]
