@@ -25,8 +25,7 @@ internal static class GridRecords
     /// </summary>
     public static JsonObject Cross(string cell, int index, string meaning, Row r)
     {
-        var tlcTransitions = r.TlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
-        return new JsonObject
+        var o = new JsonObject
         {
             ["cell"] = cell,
             ["index"] = index,
@@ -47,11 +46,38 @@ internal static class GridRecords
             ["tlcStates"] = r.TlcStates,
             ["explorerSeconds"] = Round(r.ExplorerSeconds),
             ["tlcSeconds"] = Round(r.TlcSeconds),
-            ["arms"] = Strings(r.TlcArms),
-            ["explorerOnly"] = Strings(r.ExplorerArms.Where(a => !tlcTransitions.Contains(a))),
-            ["tlcOnly"] = Strings(tlcTransitions.Where(a => !r.ExplorerArms.Contains(a))),
-            ["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
         };
+        SetArms(o, r.ExplorerArms, r.TlcArms);
+        o["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+        return o;
+    }
+
+    /// <summary>A cross-check record's arm fields: TLC's arms, and the transitions only one tool fired.</summary>
+    private static void SetArms(JsonObject o, IReadOnlySet<string> explorerArms, IReadOnlySet<string> tlcArms)
+    {
+        var tlcTransitions = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
+        o["arms"] = Strings(tlcArms);
+        o["explorerOnly"] = Strings(explorerArms.Where(a => !tlcTransitions.Contains(a)));
+        o["tlcOnly"] = Strings(tlcTransitions.Where(a => !explorerArms.Contains(a)));
+    }
+
+    /// <summary>
+    /// <c>--merge-coverage</c>: a cross-check record with the arms of a
+    /// coverage-only record for the same cell and meaning. The explorer's arms
+    /// are read back from the record (<see cref="Row(JsonObject)"/>), TLC's are
+    /// replaced, and <c>explorerOnly</c> and <c>tlcOnly</c> are recomputed as
+    /// <see cref="Cross"/> computes them; the verdicts are left as they were.
+    /// <c>coverageMerged</c>, <c>coverageSeconds</c> and <c>coverageCommit</c>
+    /// say where the arms came from.
+    /// </summary>
+    public static JsonObject MergeCoverage(JsonObject cross, JsonObject coverage)
+    {
+        var merged = cross.DeepClone().AsObject();
+        SetArms(merged, Row(cross).ExplorerArms, Set(coverage["arms"]));
+        merged["coverageMerged"] = true;
+        merged["coverageSeconds"] = coverage["coverageSeconds"]?.DeepClone();
+        merged["coverageCommit"] = coverage["commit"]?.DeepClone();
+        return merged;
     }
 
     /// <summary>A recorded cross-check cell as the row the run would have made.</summary>
@@ -64,6 +90,35 @@ internal static class GridRecords
             (string?)o["explorerKind"] ?? "", (string?)o["tlcKind"] ?? "", (long?)o["explorerStates"] ?? 0, (long?)o["tlcStates"] ?? 0,
             (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0, (string?)o["capped"] ?? "");
     }
+
+    /// <summary>
+    /// A coverage-only cell (<c>--coverage-only</c>): the arms TLC fired on
+    /// the Coverage phase run alone, to merge into the cell's earlier
+    /// cross-check record (its <c>arms</c>). <c>coverageOnly</c> marks it.
+    /// <c>coverageKind</c> and <c>coverageStates</c> are the coverage search's
+    /// own: it runs without the VIEW, so it counts more distinct states than
+    /// the cell's <c>tlcStates</c>.
+    /// </summary>
+    public static JsonObject Coverage(string cell, int index, string meaning, CoverageRow r) => new()
+    {
+        ["cell"] = cell,
+        ["index"] = index,
+        ["mode"] = CoverageOnly.Mode,
+        ["coverageOnly"] = true,
+        ["meaning"] = meaning,
+        ["done"] = r.Kind != "error",
+        ["timedOut"] = r.Kind == "timeout",
+        ["coverageKind"] = r.Kind,
+        ["coverageStates"] = r.States,
+        ["coverageSeconds"] = Round(r.Seconds),
+        ["message"] = r.Message,
+        ["arms"] = Strings(r.Arms),
+        ["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+    };
+
+    /// <summary>A recorded coverage-only cell as the row the run would have made.</summary>
+    public static CoverageRow CoverageRow(JsonObject o) =>
+        new((string?)o["coverageKind"] ?? "", (long?)o["coverageStates"] ?? 0, Set(o["arms"]), (double?)o["coverageSeconds"] ?? 0, (string?)o["message"] ?? "");
 
     /// <summary>A lockstep cell.</summary>
     public static JsonObject Lockstep(string cell, int index, string meaning, int iterate, LockstepRow r) => new()

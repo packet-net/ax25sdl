@@ -72,6 +72,18 @@ its expectation fails, even where the two tools agree.
                     with --lockstep, look past each difference found and run
                     the row again, up to N runs, to find the next distinct
                     difference (default 1: the first difference only)
+  --coverage-only   grid runs: run only the Coverage phase of each selected
+                    cell (no explorer, no Safety, Deadlock or liveness
+                    phases), for cells whose coverage was cut; with --results
+                    each cell's line has mode "coverage", coverageOnly true,
+                    the arms TLC fired and coverageSeconds, to merge into the
+                    cell's earlier record (docs/tla.md, "Grid runs"); use a
+                    results file of its own
+  --merge-coverage CROSS COVERAGE OUT
+                    write OUT: the cross-check results file CROSS with the
+                    arms of each cell the --coverage-only results file
+                    COVERAGE read, and explorerOnly and tlcOnly recomputed;
+                    the verdicts are kept. Runs nothing else
 
 A full calibration run (no --only, no --grid) also checks the accounting:
 the rows no scenario fires must be exactly those unfired.txt records as
@@ -113,6 +125,8 @@ var heap = "2g";
 var meaning = Tlc.DefaultMeaning;
 var lockstep = false;
 var iterate = 1;
+var coverageOnly = false;
+string[]? mergeCoverage = null;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -142,7 +156,19 @@ for (var i = 0; i < args.Length; i++)
         case "--meaning": meaning = Next(); break;
         case "--lockstep": lockstep = true; break;
         case "--lockstep-iterate": iterate = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+        case "--coverage-only": coverageOnly = true; break;
+        case "--merge-coverage": mergeCoverage = [Next(), Next(), Next()]; break;
         default: Console.Error.WriteLine($"unknown option {args[i]}\n\n{usage}"); return 1;
+    }
+}
+
+if (mergeCoverage is not null)
+{
+    try { return CoverageOnly.Merge(mergeCoverage[0], mergeCoverage[1], mergeCoverage[2]); }
+    catch (IOException ex)
+    {
+        Console.Error.WriteLine(ex.Message);
+        return 1;
     }
 }
 
@@ -204,6 +230,11 @@ if (!gridMode && (gridWith.Count > 0 || gridCells is not null || resultsPath is 
 if (gridMaxStates < 0 || gridMaxDepth < 0 || timeout < 0)
 {
     Console.Error.WriteLine("--grid-max-states, --grid-max-depth and --timeout take a non-negative number (0: no limit)");
+    return 1;
+}
+if (CoverageOnly.Refusal(coverageOnly, gridMode, lockstep) is { } coverageRefused)
+{
+    Console.Error.WriteLine(coverageRefused);
     return 1;
 }
 if (retryTimeouts && !resume)
@@ -299,6 +330,7 @@ if (resultsPath is not null)
 using var resultsOwner = resultsFile;
 
 if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meaning, gridMode, resultsFile, cellIndex);
+if (coverageOnly) return CoverageOnly.Run(scenarios, tlc, work, parallel, meaning, resultsFile, cellIndex);
 
 var results = new ConcurrentDictionary<int, Row>();
 var skipped = 0;
@@ -439,7 +471,7 @@ Row Compare(Scenario s)
     {
         var cov = tlc.Run(dir, o, Phase.Coverage, depthBound);
         elapsed += cov.Elapsed;
-        tlcArms = Tlc.ReadArms(dir);
+        tlcArms = cov.Arms!.ToHashSet(StringComparer.Ordinal);
     }
 
     var secs = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);

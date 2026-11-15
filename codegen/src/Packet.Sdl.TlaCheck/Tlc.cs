@@ -19,6 +19,7 @@ public sealed record TlcStep(int Number, string Header, IReadOnlyDictionary<stri
 /// <summary>What one TLC run reported.</summary>
 /// <param name="Kind">"clean", "invariant", "deadlock", "temporal", "error" or "timeout".</param>
 /// <param name="Invariant">The violated invariant's name, for <c>invariant</c>.</param>
+/// <param name="Arms">A Coverage run's table arms fired (<see cref="Tlc.ReadArms(TextReader, ISet{string})"/>); empty when it timed out, null for the other phases.</param>
 public sealed record TlcResult(
     string Kind,
     string? Invariant,
@@ -27,7 +28,8 @@ public sealed record TlcResult(
     int Depth,
     IReadOnlyList<TlcStep> Trace,
     TimeSpan Elapsed,
-    string Message);
+    string Message,
+    IReadOnlySet<string>? Arms = null);
 
 /// <summary>Which of the explorer's checks one TLC run stands in for.</summary>
 public enum Phase
@@ -43,7 +45,9 @@ public enum Phase
     /// <summary>
     /// The safety search again without the VIEW, dumping every state, so the
     /// step record of every edge survives and the table arms fired can be read
-    /// off (TwoStation.tla's last.arms). For coverage only; it stops at the
+    /// off (TwoStation.tla's last.arms). The dump goes through a named pipe
+    /// where the platform has them (<see cref="DumpPipe"/>), so it is read as
+    /// it is written and never stored. For coverage only; it stops at the
     /// first violation, as the explorer does.
     /// </summary>
     Coverage,
@@ -419,29 +423,74 @@ public sealed class Tlc
         }
         psi.ArgumentList.Add(phase == Phase.Lockstep ? LockstepRoot : Path.GetFileName(_harness));
 
-        var sw = Stopwatch.StartNew();
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
-        var stdout = p.StandardOutput.ReadToEndAsync();
-        var stderr = p.StandardError.ReadToEndAsync();
-        if (!p.WaitForExit(_timeout))
+        // A Coverage run's dump: a named pipe read as TLC writes it, or (no FIFOs) the file, read after.
+        var dump = Path.Combine(workDir, DumpFile);
+        Task<HashSet<string>>? pipe = null;
+        if (phase == Phase.Coverage)
         {
-            try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            p.WaitForExit();
-            File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), stdout.Result + stderr.Result);
-            Tidy(meta, tmp);
-            if (phase == Phase.Coverage) File.Delete(Path.Combine(workDir, "states.dump"));
-            return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s");
+            if (DumpPipe.TryCreate(dump)) pipe = DumpPipe.Drain(dump);
+            else
+            {
+                File.Delete(dump);
+                if (!OperatingSystem.IsWindows() && Interlocked.Exchange(ref _fallbackWarned, 1) == 0)
+                    Console.Error.WriteLine($"warning: could not make a named pipe for the coverage dump; writing it to disk ({DumpFile} in each model directory), which can take tens of GB per cell");
+            }
         }
-        var text = stdout.Result + stderr.Result;
-        File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
-        Tidy(meta, tmp);
-        return Parse(text, sw.Elapsed);
+        HashSet<string> Arms(bool timedOut)
+        {
+            if (pipe is not null)
+            {
+                var reader = pipe;
+                pipe = null;
+                // As the file read did: a run cut short reports no arms (and stays a timeout if the reader failed).
+                if (!timedOut) return DumpPipe.Finish(dump, reader);
+                try { DumpPipe.Finish(dump, reader); }
+                catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                return new HashSet<string>(StringComparer.Ordinal);
+            }
+            if (!timedOut) return ReadArms(workDir);
+            File.Delete(dump);
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
+            var stdout = p.StandardOutput.ReadToEndAsync();
+            var stderr = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(_timeout))
+            {
+                try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                p.WaitForExit();
+                File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), stdout.Result + stderr.Result);
+                Tidy(meta, tmp);
+                return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s",
+                    phase == Phase.Coverage ? Arms(timedOut: true) : null);
+            }
+            var text = stdout.Result + stderr.Result;
+            File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
+            Tidy(meta, tmp);
+            var result = Parse(text, sw.Elapsed);
+            return phase == Phase.Coverage ? result with { Arms = Arms(timedOut: false) } : result;
+        }
+        finally
+        {
+            // TLC never started, or something threw: the reader still finishes and the pipe goes.
+            if (pipe is not null) DumpPipe.Finish(dump, pipe);
+        }
     }
+
+    // Set once the file fallback has been reported, so the warning prints once per process.
+    private static int _fallbackWarned;
+
+    /// <summary>The file TLC's <c>-dump states</c> writes, in the model directory.</summary>
+    private const string DumpFile = "states.dump";
 
     /// <summary>
     /// TLC's fingerprint and queue files and its extracted standard modules are not read
     /// again once a run is over; on a shared self-hosted runner, kept for every row, they
-    /// fill the disk. (A Coverage run's states.dump is deleted by <see cref="ReadArms"/>.)
+    /// fill the disk. (A Coverage run's dump is a pipe, or, without FIFOs, a file deleted by <see cref="ReadArms(string)"/>.)
     /// </summary>
     private static void Tidy(params string[] dirs)
     {
@@ -452,17 +501,29 @@ public sealed class Tlc
     private static readonly Regex Quoted = new(@"""((?:[^""\\]|\\.)*)""");
 
     /// <summary>
-    /// The table arms (State/transition, Subroutine:path) on any state of a
-    /// Coverage run's dump. The dump of a large cell runs to gigabytes, so it
-    /// is streamed a line at a time and deleted once read.
+    /// The table arms on any state of a Coverage run's dump left as a file
+    /// (where the platform has no FIFOs). The dump of a large cell runs to
+    /// tens of gigabytes, so it is streamed a line at a time and deleted once read.
     /// </summary>
     public static HashSet<string> ReadArms(string workDir)
     {
         var arms = new HashSet<string>(StringComparer.Ordinal);
-        var dump = Path.Combine(workDir, "states.dump");
+        var dump = Path.Combine(workDir, DumpFile);
         if (!File.Exists(dump)) return arms;
+        using (var reader = new StreamReader(dump)) ReadArms(reader, arms);
+        File.Delete(dump);
+        return arms;
+    }
+
+    /// <summary>
+    /// Add to <paramref name="arms"/> the table arms (State/transition,
+    /// Subroutine:path) in the <c>arms |-></c> field of every state of a
+    /// Coverage run's dump, read a line at a time from <paramref name="dump"/>.
+    /// </summary>
+    public static void ReadArms(TextReader dump, ISet<string> arms)
+    {
         StringBuilder? field = null;
-        foreach (var line in File.ReadLines(dump))
+        while (dump.ReadLine() is { } line)
         {
             var at = line.IndexOf("arms |->", StringComparison.Ordinal);
             if (field is null && at < 0) continue;
@@ -476,8 +537,6 @@ public sealed class Tlc
             foreach (Match q in Quoted.Matches(text[open..close])) arms.Add(q.Groups[1].Value);
             field = null;
         }
-        File.Delete(dump);
-        return arms;
     }
 
     private static readonly Regex StatesLine = new(@"^(\d+) states generated, (\d+) distinct states found", RegexOptions.Multiline);
