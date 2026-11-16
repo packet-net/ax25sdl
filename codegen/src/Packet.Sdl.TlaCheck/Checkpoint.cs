@@ -215,7 +215,7 @@ public static class Checkpoint
 
     /// <summary>
     /// The code that makes a cell's explorer result: a hash of the built
-    /// explorer, interpreter and TlaCheck assemblies, so a change to any of
+    /// explorer, interpreter, IR and TlaCheck assemblies, so a change to any of
     /// them, committed or not, runs the explorer again (the build is
     /// deterministic, so the same source gives the same hash).
     /// </summary>

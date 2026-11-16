@@ -34,6 +34,9 @@ public sealed record TlcResult(
     /// <summary>How a resumed cell got this result: "" run from the start, "reused" read back from an earlier run, "recovered" continued from a checkpoint.</summary>
     public string Resumed { get; init; } = "";
 
+    /// <summary>TLC was killed by a signal (SIGKILL, SIGTERM: an out-of-memory kill, a stop) rather than exiting on its own.</summary>
+    public bool Killed { get; init; }
+
     /// <summary>A verdict a resumed cell can read back: not a timeout and not a failure.</summary>
     public bool IsVerdict => Kind is "clean" or "invariant" or "deadlock" or "temporal";
 }
@@ -420,14 +423,29 @@ public sealed class Tlc
             if (phase == Phase.Coverage) reused = reused with { Arms = done.Arms!.ToHashSet(StringComparer.Ordinal) };
             return reused with { Resumed = "reused" };
         }
-        if (plan.Action == PassAction.Recover)
+        for (var attempt = 1; plan.Action == PassAction.Recover; attempt++)
         {
             var recovered = RunTlc(workDir, phase, config, identity, plan);
-            // Only a recovery that itself failed starts the pass again. Once TLC
-            // has recovered, a later failure (TLC killed, out of memory) keeps the
-            // checkpoint, so the next --resume continues from it again.
-            if (recovered.Kind != "error" || RecoveryCompleted(Checkpoint.OutFile(workDir, phase))) return recovered with { Resumed = "recovered" };
-            Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} failed to recover from its checkpoint ({recovered.Message}); running it from the start");
+            if (recovered.Kind != "error") return recovered with { Resumed = "recovered" };
+            var done = RecoveryCompleted(Checkpoint.OutFile(workDir, phase));
+            // Killed (out of memory, a stop), during or after the recovery: the
+            // checkpoint is not at fault, so it stays for the next --resume.
+            if (recovered.Killed) return recovered with { Resumed = done ? "recovered" : "recovery interrupted" };
+            if (!done)
+            {
+                // TLC exited on its own without reading the checkpoint back: it is unusable.
+                Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} failed to recover from its checkpoint ({recovered.Message}); running it from the start");
+                break;
+            }
+            // TLC recovered, then failed on its own. TLC 1.7.4 has been seen to throw at
+            // once after "Recovery completed." and then recover cleanly from the
+            // checkpoint it writes as it stops on an error, so try once more; after
+            // that the checkpoint stays (the failure may be the heap) and the cell
+            // is recorded as failed.
+            if (attempt >= 2) return recovered with { Resumed = "recovered" };
+            plan = Checkpoint.Plan(workDir, phase, identity, _workers);
+            Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} failed after recovering from its checkpoint ({recovered.Message}); "
+                + (plan.Action == PassAction.Recover ? "recovering once more" : "running it from the start"));
         }
         return RunTlc(workDir, phase, config, identity, new PassPlan(PassAction.Fresh));
     }
@@ -504,8 +522,14 @@ public sealed class Tlc
     /// </summary>
     public static void StopAll()
     {
-        _stopping = true;
-        foreach (var p in Running.Keys)
+        List<Process> running;
+        // Under the same lock as starting a TLC, so none starts after this and escapes.
+        lock (StartGate)
+        {
+            _stopping = true;
+            running = Running.Keys.ToList();
+        }
+        foreach (var p in running)
         {
             try
             {
@@ -514,6 +538,24 @@ public sealed class Tlc
             }
             catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
         }
+    }
+
+    private static readonly Lock StartGate = new();
+
+    /// <summary>Start TLC and register it for <see cref="StopAll"/>, or hold for good once TlaCheck is stopping.</summary>
+    private static Process Start(ProcessStartInfo psi)
+    {
+        lock (StartGate)
+        {
+            if (!_stopping)
+            {
+                var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
+                Running[p] = 0;
+                return p;
+            }
+        }
+        Thread.Sleep(Timeout.Infinite);
+        throw new InvalidOperationException("unreachable");
     }
 
     private static void HoldIfStopping()
@@ -587,9 +629,7 @@ public sealed class Tlc
         var sw = Stopwatch.StartNew();
         try
         {
-            HoldIfStopping();
-            using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
-            Running[p] = 0;
+            using var p = Start(psi);
             // Each completed checkpoint records TLC's time so far, so a recovered pass counts the time before it.
             Action? onCheckpoint = !checkpointing ? null : () =>
             {
@@ -618,6 +658,8 @@ public sealed class Tlc
             var text = stdout.Result + stderr.Result;
             File.WriteAllText(Checkpoint.OutFile(workDir, phase), text);
             var result = Parse(text, before + sw.Elapsed);
+            // Exit codes from 128 up are a signal: 137 SIGKILL, 143 SIGTERM (java's own exit on it).
+            if (result.Kind == "error") result = result with { Killed = p.ExitCode >= 128 };
             if (result.Kind == "error" && result.Message.Length == 0)
                 result = result with { Message = $"TLC stopped without a verdict (exit code {p.ExitCode.ToString(CultureInfo.InvariantCulture)})" };
             // A checkpointed pass that gave no verdict (TLC killed, say) keeps its metadir for a resumed run.

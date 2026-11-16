@@ -376,7 +376,7 @@ if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meani
 if (coverageOnly) return CoverageOnly.Run(scenarios, tlc, work, parallel, meaning, resultsFile, cellIndex);
 
 var results = new ConcurrentDictionary<int, Row>();
-var explorerBuild = new Lazy<string>(() => Checkpoint.ExplorerBuild(typeof(Explorer).Assembly, typeof(TableLoader).Assembly, typeof(Tlc).Assembly));
+var explorerBuild = new Lazy<string>(() => Checkpoint.ExplorerBuild(typeof(Explorer).Assembly, typeof(TableLoader).Assembly, typeof(Packet.Sdl.IR.GuardExpression).Assembly, typeof(Tlc).Assembly));
 var skipped = 0;
 void Each(Action<int> body)
 {
