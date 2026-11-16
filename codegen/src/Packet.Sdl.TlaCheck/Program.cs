@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using Packet.Sdl.Explorer;
 using Packet.Sdl.Interpreter;
@@ -64,7 +65,8 @@ its expectation fails, even where the two tools agree.
                     passes it finished are read back, an interrupted pass
                     restarts from its last checkpoint, and the explorer's
                     result is reused (docs/tla.md, "Grid runs"). Keep --work
-                    on a disk that outlives the machine
+                    on a disk that outlives the machine. SIGTERM or Ctrl-C
+                    stops TlaCheck and its TLC runs, keeping their checkpoints
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
@@ -346,6 +348,18 @@ var tlc = new Tlc(jar,
     Resume = resume,
 };
 
+// Stopped by SIGTERM or Ctrl-C: stop the TLC runs too, before anything more is
+// recorded, so their checkpoints stay for --resume (docs/tla.md, "Grid runs").
+void Stop(PosixSignalContext context)
+{
+    context.Cancel = true;
+    Console.Error.WriteLine($"{context.Signal}: stopping TLC and exiting; --resume continues from the TLC checkpoints");
+    Tlc.StopAll();
+    Environment.Exit(context.Signal == PosixSignal.SIGINT ? 130 : 143);
+}
+using var onTerm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, Stop);
+using var onInt = PosixSignalRegistration.Create(PosixSignal.SIGINT, Stop);
+
 ResultsFile? resultsFile = null;
 if (resultsPath is not null)
 {
@@ -362,6 +376,7 @@ if (lockstep) return Lockstep.Run(scenarios, tlc, work, iterate, parallel, meani
 if (coverageOnly) return CoverageOnly.Run(scenarios, tlc, work, parallel, meaning, resultsFile, cellIndex);
 
 var results = new ConcurrentDictionary<int, Row>();
+var explorerBuild = new Lazy<string>(() => Checkpoint.ExplorerBuild(typeof(Explorer).Assembly, typeof(TableLoader).Assembly, typeof(Tlc).Assembly));
 var skipped = 0;
 void Each(Action<int> body)
 {
@@ -438,11 +453,11 @@ Row Compare(Scenario s)
     var dir = Path.Combine(work, s.Name);
     // What a resumed grid cell took from the run before (docs/tla.md, "Grid runs").
     var resumed = new List<string>();
-    var commit = resultsFile?.Commit ?? "unknown";
+    var build = explorerBuild.Value;
     ExplorerSummary? ex = null;
     if (gridMode && Checkpoint.OpenCell(dir, (o with { TablesDir = "" }).ToString(), resume, () => tlc.Prepare(dir, o.TablesDir)))
     {
-        ex = Checkpoint.ReadExplorer(dir, commit);
+        ex = Checkpoint.ReadExplorer(dir, build);
         if (ex is not null) resumed.Add("explorer reused");
     }
     if (ex is null)
@@ -461,7 +476,7 @@ Row Compare(Scenario s)
             run.StatesExplored, run.CounterexampleLength, run.DepthBoundHit, run.StateBoundHit,
             run.FiredTransitions.Order(StringComparer.Ordinal).ToList(),
             exClock.Elapsed.TotalSeconds);
-        if (gridMode) Checkpoint.WriteExplorer(dir, commit, ex);
+        if (gridMode) Checkpoint.WriteExplorer(dir, build, ex);
     }
     var exSeconds = ex.Seconds;
     var exKind = ex.Kind;
@@ -531,6 +546,9 @@ Row Compare(Scenario s)
         var cov = Pass(Phase.Coverage, depthBound);
         elapsed += cov.Elapsed;
         tlcArms = cov.Arms!.ToHashSet(StringComparer.Ordinal);
+        // TLC failed during coverage (killed, out of memory): its arms are a part
+        // only, so a grid cell is recorded as failed, and --resume runs it again.
+        if (gridMode && cov.Kind == "error") (kind, note) = ("error", "coverage pass: " + cov.Message);
     }
 
     var secs = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);

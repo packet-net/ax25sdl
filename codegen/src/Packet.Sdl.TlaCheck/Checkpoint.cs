@@ -145,6 +145,7 @@ public static class Checkpoint
     /// one from a whole checkpoint taken with the same configuration and
     /// workers, or run it from the start.
     /// </summary>
+    /// <param name="config">What the pass depends on besides the modules (<see cref="Tlc.PassIdentity"/>): its configuration and TLC options.</param>
     public static PassPlan Plan(string workDir, Phase phase, string config, int workers)
     {
         if (!Reusable(phase)) return new PassPlan(PassAction.Fresh);
@@ -164,7 +165,7 @@ public static class Checkpoint
         var dirs = Directory.GetDirectories(meta).Where(d => File.Exists(Path.Combine(d, "queue.chkpt"))).Order(StringComparer.Ordinal).ToList();
         if (dirs.Count == 0) return new PassPlan(PassAction.Fresh, "no checkpoint was completed");
         var latest = dirs[^1];
-        if (!Whole(latest)) return new PassPlan(PassAction.Fresh, "it was stopped while TLC was committing a checkpoint");
+        if (!Whole(latest)) return new PassPlan(PassAction.Fresh, "it was stopped while TLC was writing a checkpoint");
         return new PassPlan(PassAction.Recover, Progress: progress, CheckpointDir: latest);
     }
 
@@ -172,22 +173,22 @@ public static class Checkpoint
     // ModelChecker.checkpoint): the queue, each worker's trace, the intern
     // table and the liveness graphs, in that order, each first to X.tmp
     // (begin), then each renamed over X.chkpt (commit), in the same order.
+    // The queue's commit first deletes the queue's disk pools the last
+    // checkpoint still points at, then renames queue.tmp.
     private static readonly Regex CheckpointTemp = new(@"^(queue\.tmp|.+-\d+\.tmp|vars\.tmp|dgraph_\d+\.chkpt\.tmp)$");
 
     /// <summary>
     /// Whether the checkpoint files in <paramref name="dir"/> are one whole
-    /// checkpoint. TLC writes each part to a .tmp file, then renames them
-    /// over the last checkpoint, queue first. With the queue's .tmp still
-    /// there no part was renamed yet, so the last checkpoint stands whole;
-    /// with the queue renamed but another part's .tmp left, the run stopped
-    /// part way through the renames and the parts are from two checkpoints.
+    /// checkpoint: the queue's is there and no part's .tmp is. A .tmp left
+    /// means TLC stopped while writing or committing a checkpoint, and then
+    /// the last one may not stand either: part way through the renames the
+    /// parts are from two checkpoints, and once the queue's commit has begun
+    /// the last checkpoint's queue pools may already be deleted. Such a pass
+    /// runs again from the start; a checkpoint takes seconds to write, so
+    /// this is rare.
     /// </summary>
-    public static bool Whole(string dir)
-    {
-        if (!File.Exists(Path.Combine(dir, "queue.chkpt"))) return false;
-        if (File.Exists(Path.Combine(dir, "queue.tmp"))) return true;
-        return !Directory.GetFiles(dir).Any(f => CheckpointTemp.IsMatch(Path.GetFileName(f)));
-    }
+    public static bool Whole(string dir) =>
+        File.Exists(Path.Combine(dir, "queue.chkpt")) && !Directory.GetFiles(dir).Any(f => CheckpointTemp.IsMatch(Path.GetFileName(f)));
 
     public static string MetaDir(string workDir, Phase phase) => Path.Combine(workDir, "meta_" + phase);
 
@@ -200,17 +201,31 @@ public static class Checkpoint
     public static void WriteProgress(string workDir, Phase phase, PassProgress progress) =>
         WriteAtomic(Path.Combine(MetaDir(workDir, phase), ProgressFile), JsonSerializer.Serialize(progress, Json));
 
-    /// <summary>The explorer's result an earlier run of this cell saved under the same code commit, or null.</summary>
-    public static ExplorerSummary? ReadExplorer(string workDir, string commit)
+    /// <summary>The explorer's result an earlier run of this cell saved under the same <paramref name="build"/>, or null.</summary>
+    public static ExplorerSummary? ReadExplorer(string workDir, string build)
     {
         var saved = Read<SavedExplorer>(Path.Combine(workDir, ExplorerFile));
-        return saved is not null && saved.Commit == commit && commit != "unknown" ? saved.Result : null;
+        return saved is not null && saved.Build == build ? saved.Result : null;
     }
 
-    public static void WriteExplorer(string workDir, string commit, ExplorerSummary result) =>
-        WriteAtomic(Path.Combine(workDir, ExplorerFile), JsonSerializer.Serialize(new SavedExplorer(commit, result), Json));
+    public static void WriteExplorer(string workDir, string build, ExplorerSummary result) =>
+        WriteAtomic(Path.Combine(workDir, ExplorerFile), JsonSerializer.Serialize(new SavedExplorer(build, result), Json));
 
-    private sealed record SavedExplorer(string Commit, ExplorerSummary Result);
+    private sealed record SavedExplorer(string Build, ExplorerSummary Result);
+
+    /// <summary>
+    /// The code that makes a cell's explorer result: a hash of the built
+    /// explorer, interpreter and TlaCheck assemblies, so a change to any of
+    /// them, committed or not, runs the explorer again (the build is
+    /// deterministic, so the same source gives the same hash).
+    /// </summary>
+    public static string ExplorerBuild(params System.Reflection.Assembly[] assemblies)
+    {
+        var sb = new StringBuilder();
+        foreach (var a in assemblies)
+            sb.Append(a.GetName().Name).Append(' ').Append(a.Location.Length > 0 && File.Exists(a.Location) ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(a.Location))) : a.ManifestModule.ModuleVersionId.ToString()).Append('\n');
+        return Hash(sb.ToString());
+    }
 
     private static T? Read<T>(string path) where T : class
     {

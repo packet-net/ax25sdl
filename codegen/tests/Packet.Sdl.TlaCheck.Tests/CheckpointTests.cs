@@ -231,7 +231,7 @@ public class CheckpointTests : IDisposable
         Meta(Phase.Safety, Progress(), [.. WholeCheckpoint, "vars.tmp", "TwoStation-0.tmp"]);
         var plan = Checkpoint.Plan(_dir, Phase.Safety, Config, 1);
         plan.Action.Should().Be(PassAction.Fresh);
-        plan.Why.Should().Contain("committing a checkpoint");
+        plan.Why.Should().Contain("writing a checkpoint");
     }
 
     [Fact]
@@ -246,9 +246,9 @@ public class CheckpointTests : IDisposable
         }
         Files(WholeCheckpoint);
         Checkpoint.Whole(run).Should().BeTrue();
-        // Stopped while writing the next one: the queue's .tmp is still there, so nothing was renamed yet.
+        // Stopped while writing the next one: the queue's commit may already have deleted pools the last one needs.
         Files([.. WholeCheckpoint, "queue.tmp", "TwoStation-0.tmp", "vars.tmp"]);
-        Checkpoint.Whole(run).Should().BeTrue();
+        Checkpoint.Whole(run).Should().BeFalse();
         // The liveness graph not yet renamed, everything before it renamed.
         Files([.. WholeCheckpoint, "dgraph_0.chkpt.tmp"]);
         Checkpoint.Whole(run).Should().BeFalse();
@@ -266,10 +266,6 @@ public class CheckpointTests : IDisposable
     public void A_finished_pass_reads_back_as_the_run_that_wrote_it_reported()
     {
         var o = new ExplorerOptions { TablesDir = _dir };
-        var config = Tlc.Config(o, Phase.Deadlock, false);
-        File.WriteAllText(Checkpoint.OutFile(_dir, Phase.Deadlock), DeadlockOut);
-        var elapsed = TimeSpan.FromSeconds(123.4567);
-        Checkpoint.WriteDone(_dir, Phase.Deadlock, new PassDone(Checkpoint.Hash(config), elapsed.Ticks, null));
         // No java is started: the jar does not exist.
         var tlc = new Tlc(Path.Combine(_dir, "no.jar"), "TwoStation.tla", _dir, Tlc.DefaultMeaning, 1, "1g", TimeSpan.FromSeconds(1))
         {
@@ -277,6 +273,10 @@ public class CheckpointTests : IDisposable
             KeepProgress = true,
             Resume = true,
         };
+        var identity = tlc.PassIdentity(Tlc.Config(o, Phase.Deadlock, false), Phase.Deadlock);
+        File.WriteAllText(Checkpoint.OutFile(_dir, Phase.Deadlock), DeadlockOut);
+        var elapsed = TimeSpan.FromSeconds(123.4567);
+        Checkpoint.WriteDone(_dir, Phase.Deadlock, new PassDone(Checkpoint.Hash(identity), elapsed.Ticks, null));
 
         var reused = tlc.Run(_dir, o, Phase.Deadlock, false);
 
@@ -286,6 +286,51 @@ public class CheckpointTests : IDisposable
         reused.Elapsed.Should().Be(elapsed);
         reused.Kind.Should().Be("deadlock");
         reused.Trace.Should().HaveCount(2);
+    }
+
+    // ─── TLC's command line ──────────────────────────────────────────────
+
+    private Tlc NewTlc(int checkpointMinutes, int workers = 1) =>
+        new(Path.Combine(_dir, "no.jar"), "TwoStation.tla", _dir, Tlc.DefaultMeaning, workers, "1g", TimeSpan.FromSeconds(1)) { CheckpointMinutes = checkpointMinutes };
+
+    private static string Option(List<string> args, string name) => args.IndexOf(name) is var i and >= 0 ? args[i + 1] : "";
+
+    [Fact]
+    public void A_recovered_pass_runs_with_its_recorded_polynomial_even_with_checkpoints_off()
+    {
+        var args = NewTlc(checkpointMinutes: 0).Arguments(Phase.Safety, "meta_Safety", "jtmp", fp: 77, checkpoint: false, recoverDir: "meta_Safety/run");
+        Option(args, "-fp").Should().Be("77");
+        Option(args, "-recover").Should().Be("meta_Safety/run");
+        args.Should().NotContain("-checkpoint");
+        args[^1].Should().Be("TwoStation.tla");
+    }
+
+    [Fact]
+    public void A_checkpointed_pass_runs_with_its_polynomial_and_interval()
+    {
+        var args = NewTlc(checkpointMinutes: 30).Arguments(Phase.Quiescence, "meta_Quiescence", "jtmp", fp: 5, checkpoint: true, recoverDir: null);
+        Option(args, "-fp").Should().Be("5");
+        Option(args, "-checkpoint").Should().Be("30");
+        Option(args, "-lncheck").Should().Be("final");
+        args.Should().NotContain("-recover");
+    }
+
+    [Fact]
+    public void A_pass_without_checkpoints_leaves_the_polynomial_to_TLC()
+    {
+        var args = NewTlc(checkpointMinutes: 0).Arguments(Phase.Coverage, "meta_Coverage", "jtmp", fp: null, checkpoint: false, recoverDir: null);
+        args.Should().NotContain("-fp").And.NotContain("-checkpoint").And.NotContain("-recover");
+        Option(args, "-dump").Should().Be("states");
+    }
+
+    [Fact]
+    public void A_finished_pass_is_tied_to_the_TLC_options_that_bear_on_its_verdict()
+    {
+        var one = NewTlc(30).PassIdentity(Config, Phase.Safety);
+        one.Should().Be(NewTlc(0).PassIdentity(Config, Phase.Safety), "the checkpoint interval does not change a verdict");
+        one.Should().NotBe(NewTlc(30, workers: 3).PassIdentity(Config, Phase.Safety));
+        one.Should().NotBe(NewTlc(30).PassIdentity(Config, Phase.Deadlock), "the deadlock check differs");
+        Checkpoint.Plan(_dir, Phase.Safety, one, 1).Action.Should().Be(PassAction.Fresh);
     }
 
     // ─── The cell's model directory and the explorer's result ────────────
@@ -340,15 +385,21 @@ public class CheckpointTests : IDisposable
     }
 
     [Fact]
-    public void The_explorer_result_is_read_back_only_under_the_same_commit()
+    public void The_explorer_build_hash_follows_the_assemblies()
+    {
+        var a = Checkpoint.ExplorerBuild(typeof(Packet.Sdl.Explorer.Explorer).Assembly, typeof(Tlc).Assembly);
+        a.Should().Be(Checkpoint.ExplorerBuild(typeof(Packet.Sdl.Explorer.Explorer).Assembly, typeof(Tlc).Assembly));
+        a.Should().NotBe(Checkpoint.ExplorerBuild(typeof(Packet.Sdl.Explorer.Explorer).Assembly));
+    }
+
+    [Fact]
+    public void The_explorer_result_is_read_back_only_under_the_same_build()
     {
         Directory.CreateDirectory(Cell);
         var ex = new ExplorerSummary("Deadlock", "A", ["Connected/t03", "Connected/t12"], 1234, 2, false, true, ["Connected/t03"], 5.5);
         Checkpoint.WriteExplorer(Cell, "abc123", ex);
         Checkpoint.ReadExplorer(Cell, "abc123").Should().BeEquivalentTo(ex);
         Checkpoint.ReadExplorer(Cell, "def456").Should().BeNull();
-        Checkpoint.WriteExplorer(Cell, "unknown", ex);
-        Checkpoint.ReadExplorer(Cell, "unknown").Should().BeNull();
     }
 
     [Fact]
