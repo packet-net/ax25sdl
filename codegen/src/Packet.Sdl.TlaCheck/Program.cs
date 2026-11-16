@@ -56,6 +56,15 @@ its expectation fails, even where the two tools agree.
                     with --retry-timeouts)
   --retry-timeouts  with --resume: also rerun the cells recorded as timed out
                     (worth it only with a larger --timeout)
+  --checkpoint-minutes N
+                    grid runs: TLC checkpoints its Safety, Deadlock and
+                    liveness passes every N minutes (default 30; 0 for none),
+                    and a cell's model directory keeps each finished pass's
+                    verdict, so --resume continues an unfinished cell: the
+                    passes it finished are read back, an interrupted pass
+                    restarts from its last checkpoint, and the explorer's
+                    result is reused (docs/tla.md, "Grid runs"). Keep --work
+                    on a disk that outlives the machine
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
@@ -127,6 +136,7 @@ var lockstep = false;
 var iterate = 1;
 var coverageOnly = false;
 string[]? mergeCoverage = null;
+int? checkpointMinutes = null;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -158,6 +168,14 @@ for (var i = 0; i < args.Length; i++)
         case "--lockstep-iterate": iterate = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--coverage-only": coverageOnly = true; break;
         case "--merge-coverage": mergeCoverage = [Next(), Next(), Next()]; break;
+        case "--checkpoint-minutes":
+            try { checkpointMinutes = Checkpoint.ParseMinutes(Next()); }
+            catch (ArgumentException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+            break;
         default: Console.Error.WriteLine($"unknown option {args[i]}\n\n{usage}"); return 1;
     }
 }
@@ -235,6 +253,11 @@ if (gridMaxStates < 0 || gridMaxDepth < 0 || timeout < 0)
 if (CoverageOnly.Refusal(coverageOnly, gridMode, lockstep) is { } coverageRefused)
 {
     Console.Error.WriteLine(coverageRefused);
+    return 1;
+}
+if (Checkpoint.Refusal(checkpointMinutes, gridMode, lockstep, coverageOnly) is { } checkpointRefused)
+{
+    Console.Error.WriteLine(checkpointRefused);
     return 1;
 }
 if (retryTimeouts && !resume)
@@ -315,7 +338,13 @@ var tlc = new Tlc(jar,
     harness,
     tlaDir,
     meaning,
-    workers, heap, timeout == 0 ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(timeout), lockstep);
+    workers, heap, timeout == 0 ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(timeout), lockstep)
+{
+    // Checkpoint and resume are for the cross-check's grid cells (docs/tla.md, "Grid runs").
+    CheckpointMinutes = Checkpoint.Minutes(checkpointMinutes, gridMode, lockstep, coverageOnly),
+    KeepProgress = gridMode && !lockstep && !coverageOnly,
+    Resume = resume,
+};
 
 ResultsFile? resultsFile = null;
 if (resultsPath is not null)
@@ -370,7 +399,7 @@ Each(idx =>
     }
     results[idx] = row;
     var label = gridMode ? GridVerdict.Label(row) : row.Agree ? "agree   " : "DISAGREE";
-    Console.Error.WriteLine($"{label} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}");
+    Console.Error.WriteLine($"{label} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}{(row.Resumed.Length > 0 ? " [resumed: " + row.Resumed + "]" : "")}");
     if (row.Unexpected is { } unexpected) Console.Error.WriteLine($"UNEXPECTED {scenarios[idx].Name}: {unexpected}");
 });
 
@@ -406,35 +435,65 @@ return results.Values.All(r => GridVerdict.Passes(r) && r.Unexpected is null) &&
 Row Compare(Scenario s)
 {
     var o = s.Options;
-    var exClock = System.Diagnostics.Stopwatch.StartNew();
-    var ex = Explorer.Run(o, TableLoader.Load(o.TablesDir));
-    var exSeconds = exClock.Elapsed.TotalSeconds;
-    var exKind = ex.Outcome switch
+    var dir = Path.Combine(work, s.Name);
+    // What a resumed grid cell took from the run before (docs/tla.md, "Grid runs").
+    var resumed = new List<string>();
+    var commit = resultsFile?.Commit ?? "unknown";
+    ExplorerSummary? ex = null;
+    if (gridMode && Checkpoint.OpenCell(dir, (o with { TablesDir = "" }).ToString(), resume, () => tlc.Prepare(dir, o.TablesDir)))
     {
-        Outcome.NoViolation => "clean",
-        Outcome.BoundHit => "bound",
-        _ => ex.Violation!.Kind.ToString(),
-    };
-    var exStation = ex.Violation?.Station?.ToString() ?? "";
-    var exTids = ex.Trace.Select(t => Norm(t.Transition)).ToList();
-    var exText = ex.Outcome switch
+        ex = Checkpoint.ReadExplorer(dir, commit);
+        if (ex is not null) resumed.Add("explorer reused");
+    }
+    if (ex is null)
     {
-        Outcome.NoViolation => $"clean, {ex.StatesExplored} states",
+        var exClock = System.Diagnostics.Stopwatch.StartNew();
+        var run = Explorer.Run(o, TableLoader.Load(o.TablesDir));
+        ex = new ExplorerSummary(
+            run.Outcome switch
+            {
+                Outcome.NoViolation => "clean",
+                Outcome.BoundHit => "bound",
+                _ => run.Violation!.Kind.ToString(),
+            },
+            run.Violation?.Station?.ToString() ?? "",
+            run.Trace.Select(t => Norm(t.Transition)).ToList(),
+            run.StatesExplored, run.CounterexampleLength, run.DepthBoundHit, run.StateBoundHit,
+            run.FiredTransitions.Order(StringComparer.Ordinal).ToList(),
+            exClock.Elapsed.TotalSeconds);
+        if (gridMode) Checkpoint.WriteExplorer(dir, commit, ex);
+    }
+    var exSeconds = ex.Seconds;
+    var exKind = ex.Kind;
+    var exStation = ex.Station;
+    var exTids = ex.Tids;
+    var exFired = ex.Fired.ToHashSet(StringComparer.Ordinal);
+    var exText = exKind switch
+    {
+        "clean" => $"clean, {ex.States} states",
         // A grid cell says which limit it hit; calibration keeps its wording.
-        Outcome.BoundHit when gridMode && !s.DepthBound => $"{(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.StatesExplored} states",
-        Outcome.BoundHit => $"depth bound hit, {ex.StatesExplored} states",
-        _ => $"{exKind}{(exStation.Length > 0 ? " at " + exStation : "")}, {ex.CounterexampleLength} steps"
+        "bound" when gridMode && !s.DepthBound => $"{(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.States} states",
+        "bound" => $"depth bound hit, {ex.States} states",
+        _ => $"{exKind}{(exStation.Length > 0 ? " at " + exStation : "")}, {ex.Length} steps"
             // A violation found after a limit was hit (a deadlock or a loss, found in the part explored).
-            + (gridMode && !s.DepthBound && (ex.DepthBoundHit || ex.StateBoundHit) ? $" ({(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.StatesExplored} states)" : ""),
+            + (gridMode && !s.DepthBound && (ex.DepthBoundHit || ex.StateBoundHit) ? $" ({(ex.DepthBoundHit ? "depth limit" : "state cap")} hit, {ex.States} states)" : ""),
     };
 
-    var dir = Path.Combine(work, s.Name);
-    if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-    tlc.Prepare(dir, o.TablesDir);
+    if (!gridMode)
+    {
+        if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        tlc.Prepare(dir, o.TablesDir);
+    }
+    TlcResult Pass(Phase phase, bool bound)
+    {
+        var r = tlc.Run(dir, o, phase, bound);
+        if (r.Resumed.Length > 0) resumed.Add($"{phase} {r.Resumed}");
+        return r;
+    }
     var depthBound = s.DepthBound;
     var elapsed = TimeSpan.Zero;
 
-    var safety = tlc.Run(dir, o, Phase.Safety, depthBound);
+    var safety = Pass(Phase.Safety, depthBound);
     elapsed += safety.Elapsed;
     var (kind, station, steps, tids, note) = Verdict(safety, Phase.Safety, o, depthBound);
     var states = safety.Distinct;
@@ -447,18 +506,18 @@ Row Compare(Scenario s)
 
     if (kind == "clean" && o.Invariants.HasFlag(Invariants.Deadlock))
     {
-        var dl = tlc.Run(dir, o, Phase.Deadlock, false);
+        var dl = Pass(Phase.Deadlock, false);
         elapsed += dl.Elapsed;
         (kind, station, steps, tids, note) = Verdict(dl, Phase.Deadlock, o, false);
     }
     if (kind == "clean" && o.Invariants.HasFlag(Invariants.Quiescence))
     {
-        var q = tlc.Run(dir, o, Phase.Quiescence, false);
+        var q = Pass(Phase.Quiescence, false);
         elapsed += q.Elapsed;
         (kind, station, steps, tids, note) = Verdict(q, Phase.Quiescence, o, false);
         if (kind == "clean" && o.Invariants.HasFlag(Invariants.SelectiveProgress))
         {
-            var tf = tlc.Run(dir, o, Phase.TimerFree, false);
+            var tf = Pass(Phase.TimerFree, false);
             elapsed += tf.Elapsed;
             (kind, station, steps, tids, note) = Verdict(tf, Phase.TimerFree, o, false);
         }
@@ -469,7 +528,7 @@ Row Compare(Scenario s)
     var tlcArms = new HashSet<string>(StringComparer.Ordinal);
     if (!(gridMode && kind is "timeout" or "error"))
     {
-        var cov = tlc.Run(dir, o, Phase.Coverage, depthBound);
+        var cov = Pass(Phase.Coverage, depthBound);
         elapsed += cov.Elapsed;
         tlcArms = cov.Arms!.ToHashSet(StringComparer.Ordinal);
     }
@@ -491,25 +550,25 @@ Row Compare(Scenario s)
     if (kind != exKind) why.Add($"verdict {exKind} vs {kind}");
     else if (kind is "clean" or "bound")
     {
-        if (states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
+        if (states != ex.States) why.Add($"states {ex.States} vs {states}");
         // On a clean, unbounded run both searched the whole graph, so both
         // fired exactly the same table transitions.
         if (kind == "clean")
         {
             var tlcTransitions = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
-            if (!tlcTransitions.SetEquals(ex.FiredTransitions))
-                why.Add($"transitions fired: {ex.FiredTransitions.Count} by the explorer, {tlcTransitions.Count} by TLC, {ex.FiredTransitions.Except(tlcTransitions).Union(tlcTransitions.Except(ex.FiredTransitions)).Count()} differ");
+            if (!tlcTransitions.SetEquals(exFired))
+                why.Add($"transitions fired: {exFired.Count} by the explorer, {tlcTransitions.Count} by TLC, {exFired.Except(tlcTransitions).Union(tlcTransitions.Except(exFired)).Count()} differ");
         }
     }
     else if (kind is "Quiescence" or "SelectiveProgress")
     {
-        if (safetyClean && states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
+        if (safetyClean && states != ex.States) why.Add($"states {ex.States} vs {states}");
     }
     else
     {
-        if (safetyClean && states != ex.StatesExplored) why.Add($"states {ex.StatesExplored} vs {states}");
+        if (safetyClean && states != ex.States) why.Add($"states {ex.States} vs {states}");
         if (exStation != station) why.Add($"station '{exStation}' vs '{station}'");
-        if (steps != ex.CounterexampleLength) why.Add($"length {ex.CounterexampleLength} vs {steps}");
+        if (steps != ex.Length) why.Add($"length {ex.Length} vs {steps}");
         else if (tids.Count != steps) why.Add($"TLC trace has {tids.Count} steps, expected {steps}");
         else
         {
@@ -520,15 +579,15 @@ Row Compare(Scenario s)
     // The row's own expectation, against the explorer's verdict (where the
     // tools disagree the row fails anyway; on a liveness row the explorer's
     // length is the one the expectation states, TLC's lasso differs).
-    var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.CounterexampleLength, ex.StatesExplored);
+    var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.Length, ex.States);
     if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
     // A grid cell whose explorer search a limit cut short (TLC has none) is
     // capped: whatever the explorer's verdict, only the verdict kinds are
     // compared, and only where the explorer found a violation.
     var capped = GridVerdict.Cap(gridMode, s.DepthBound, ex.DepthBoundHit, ex.StateBoundHit);
     var (agree, whyText) = GridVerdict.Judge(capped, exKind, kind, why);
-    return new Row(exText, tlcText, agree, whyText, ex.FiredTransitions, tlcArms, unexpected,
-        exKind, kind, ex.StatesExplored, states, exSeconds, elapsed.TotalSeconds, capped);
+    return new Row(exText, tlcText, agree, whyText, exFired, tlcArms, unexpected,
+        exKind, kind, ex.States, states, exSeconds, elapsed.TotalSeconds, capped, string.Join("; ", resumed));
 }
 
 static (string Kind, string Station, int Steps, List<string> Tids, string Note) Verdict(TlcResult r, Phase phase, ExplorerOptions o, bool depthBound)
@@ -613,8 +672,9 @@ static string RepoRoot()
 
 /// <param name="ExplorerKind">The explorer's verdict kind (clean, bound, or the invariant).</param>
 /// <param name="TlcKind">TLC's verdict kind; "error" or "timeout" when it gave none.</param>
+/// <param name="Resumed">What a resumed grid cell took from an earlier run ("explorer reused; Safety reused; Quiescence recovered"); empty otherwise.</param>
 internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null,
-    string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0, string Capped = "")
+    string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0, string Capped = "", string Resumed = "")
 {
     /// <summary>A capped cell on which TLC, which has no cap, found a violation the explorer did not: a finding, not noise.</summary>
     public bool CappedFinding => Capped.Length > 0 && GridVerdict.IsViolation(TlcKind) && !GridVerdict.IsViolation(ExplorerKind);
