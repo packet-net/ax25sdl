@@ -636,7 +636,7 @@ public sealed class Tlc
                 try { Checkpoint.WriteProgress(workDir, phase, progress! with { ElapsedTicks = (before + sw.Elapsed).Ticks }); }
                 catch (IOException ex) { Console.Error.WriteLine($"warning: {Path.GetFileName(workDir)} {phase}: could not record a checkpoint's progress: {ex.Message}"); }
             };
-            var stdout = ReadOutput(p.StandardOutput, onCheckpoint);
+            var stdout = ReadOutput(p.StandardOutput, onCheckpoint, Checkpoint.OutFile(workDir, phase));
             var stderr = p.StandardError.ReadToEndAsync();
             var exited = p.WaitForExit(_timeout);
             HoldIfStopping();
@@ -678,38 +678,64 @@ public sealed class Tlc
     }
 
     /// <summary>
-    /// Read TLC's standard output to its end, exactly as written, calling
-    /// <paramref name="onCheckpoint"/> each time TLC reports a checkpoint completed.
+    /// Read TLC's standard output to its end, exactly as written, copying it
+    /// to <paramref name="outFile"/> as it arrives (flushed), so a running
+    /// pass's progress can be read (<c>--progress</c>), and calling
+    /// <paramref name="onCheckpoint"/> each time TLC reports a checkpoint
+    /// completed. Once TLC exits the caller writes the whole output (standard
+    /// output, then standard error) over the file, as before. A partial file
+    /// is never taken for a finished pass: that needs <c>tlc_&lt;Phase&gt;.done</c>,
+    /// written only after a verdict.
     /// </summary>
-    private static Task<string> ReadOutput(StreamReader output, Action? onCheckpoint)
-    {
-        if (onCheckpoint is null) return output.ReadToEndAsync();
-        return Task.Run(async () =>
+    private static Task<string> ReadOutput(StreamReader output, Action? onCheckpoint, string outFile) =>
+        Task.Run(async () =>
         {
             var text = new StringBuilder();
             var buffer = new char[1 << 14];
             // The start of the current line, enough to recognise the one line wanted.
             var line = new StringBuilder();
-            int n;
-            while ((n = await output.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+            StreamWriter? copy = null;
+            try { copy = new StreamWriter(new FileStream(outFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)); }
+            catch (IOException) { }
+            try
             {
-                text.Append(buffer, 0, n);
-                for (var i = 0; i < n; i++)
+                int n;
+                while ((n = await output.ReadAsync(buffer).ConfigureAwait(false)) > 0)
                 {
-                    if (buffer[i] == '\n')
+                    text.Append(buffer, 0, n);
+                    if (copy is not null)
                     {
-                        if (line.ToString().StartsWith(CheckpointDone, StringComparison.Ordinal)) onCheckpoint();
-                        line.Clear();
+                        try
+                        {
+                            copy.Write(buffer, 0, n);
+                            copy.Flush();
+                        }
+                        catch (IOException)
+                        {
+                            copy = null;
+                        }
                     }
-                    else if (line.Length < CheckpointDone.Length)
+                    if (onCheckpoint is null) continue;
+                    for (var i = 0; i < n; i++)
                     {
-                        line.Append(buffer[i]);
+                        if (buffer[i] == '\n')
+                        {
+                            if (line.ToString().StartsWith(CheckpointDone, StringComparison.Ordinal)) onCheckpoint();
+                            line.Clear();
+                        }
+                        else if (line.Length < CheckpointDone.Length)
+                        {
+                            line.Append(buffer[i]);
+                        }
                     }
                 }
             }
+            finally
+            {
+                try { copy?.Dispose(); } catch (IOException) { }
+            }
             return text.ToString();
         });
-    }
 
     /// <summary>TLC's line once a checkpoint is committed (EC.TLC_CHECKPOINT_END).</summary>
     private const string CheckpointDone = "Checkpointing completed";

@@ -67,6 +67,11 @@ its expectation fails, even where the two tools agree.
                     result is reused (docs/tla.md, "Grid runs"). Keep --work
                     on a disk that outlives the machine. SIGTERM or Ctrl-C
                     stops TlaCheck and its TLC runs, keeping their checkpoints
+  --progress        read only: for each cell directory under --work, the TLC
+                    passes finished and their verdicts, the pass in progress,
+                    how long it has run, its latest progress line (distinct
+                    states, queue, new states per minute) and its latest
+                    checkpoint. Runs nothing else; safe while a run goes on
   --parallel N      scenarios run at once (default 1)
   --workers N       TLC workers per run (default 1; >1 loses the shortest-trace guarantee)
   --heap SIZE       TLC heap per run (default 2g)
@@ -139,6 +144,7 @@ var iterate = 1;
 var coverageOnly = false;
 string[]? mergeCoverage = null;
 int? checkpointMinutes = null;
+var progress = false;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -170,6 +176,7 @@ for (var i = 0; i < args.Length; i++)
         case "--lockstep-iterate": iterate = int.Parse(Next(), CultureInfo.InvariantCulture); break;
         case "--coverage-only": coverageOnly = true; break;
         case "--merge-coverage": mergeCoverage = [Next(), Next(), Next()]; break;
+        case "--progress": progress = true; break;
         case "--checkpoint-minutes":
             try { checkpointMinutes = Checkpoint.ParseMinutes(Next()); }
             catch (ArgumentException ex)
@@ -182,6 +189,11 @@ for (var i = 0; i < args.Length; i++)
     }
 }
 
+if (progress)
+{
+    Console.Write(Progress.Report(work, DateTime.Now));
+    return 0;
+}
 if (mergeCoverage is not null)
 {
     try { return CoverageOnly.Merge(mergeCoverage[0], mergeCoverage[1], mergeCoverage[2]); }
