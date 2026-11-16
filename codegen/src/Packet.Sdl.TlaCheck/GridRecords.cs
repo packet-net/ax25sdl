@@ -48,6 +48,8 @@ internal static class GridRecords
             ["tlcSeconds"] = Round(r.TlcSeconds),
         };
         SetArms(o, r.ExplorerArms, r.TlcArms);
+        // Only on a cell that took something from an earlier run, so other records are as before.
+        if (r.Resumed.Length > 0) o["resumed"] = r.Resumed;
         o["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         return o;
     }

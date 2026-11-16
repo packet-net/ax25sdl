@@ -29,7 +29,17 @@ public sealed record TlcResult(
     IReadOnlyList<TlcStep> Trace,
     TimeSpan Elapsed,
     string Message,
-    IReadOnlySet<string>? Arms = null);
+    IReadOnlySet<string>? Arms = null)
+{
+    /// <summary>How a resumed cell got this result: "" run from the start, "reused" read back from an earlier run, "recovered" continued from a checkpoint.</summary>
+    public string Resumed { get; init; } = "";
+
+    /// <summary>TLC was killed by a signal (SIGKILL, SIGTERM: an out-of-memory kill, a stop) rather than exiting on its own.</summary>
+    public bool Killed { get; init; }
+
+    /// <summary>A verdict a resumed cell can read back: not a timeout and not a failure.</summary>
+    public bool IsVerdict => Kind is "clean" or "invariant" or "deadlock" or "temporal";
+}
 
 /// <summary>Which of the explorer's checks one TLC run stands in for.</summary>
 public enum Phase
@@ -94,6 +104,25 @@ public sealed class Tlc
         _heap = heap;
         _timeout = timeout;
     }
+
+    /// <summary>
+    /// Minutes between TLC checkpoints on the Safety, Deadlock and liveness
+    /// passes (TLC's <c>-checkpoint</c>), 0 for none. With checkpoints a pass
+    /// runs with a fingerprint polynomial TlaCheck chooses and records
+    /// (<c>-fp</c>): TLC picks one at random otherwise, and a recovery under
+    /// another polynomial counts states again (docs/tla.md, "Grid runs").
+    /// </summary>
+    public int CheckpointMinutes { get; init; }
+
+    /// <summary>
+    /// Leave in the model directory what a resumed run needs: each finished
+    /// pass's record (<c>tlc_&lt;Phase&gt;.done</c>) and, for an interrupted
+    /// pass, its metadir.
+    /// </summary>
+    public bool KeepProgress { get; init; }
+
+    /// <summary>Read back finished passes and recover interrupted ones from what an earlier run left (<see cref="Checkpoint.Plan"/>).</summary>
+    public bool Resume { get; init; }
 
     /// <summary>
     /// Lay out a model directory: the tables rendered from <paramref name="tablesDir"/>, the
@@ -383,12 +412,178 @@ public sealed class Tlc
 
     public TlcResult Run(string workDir, ExplorerOptions o, Phase phase, bool depthBound, IReadOnlyCollection<string>? known = null)
     {
+        var config = Config(o, phase, depthBound, known);
+        var identity = PassIdentity(config, phase);
+        var plan = Resume && KeepProgress ? Checkpoint.Plan(workDir, phase, identity, _workers) : new PassPlan(PassAction.Fresh);
+        if (plan.Why.Length > 0) Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} runs from the start: {plan.Why}");
+        if (plan.Action == PassAction.Reuse)
+        {
+            var done = plan.Done!;
+            var reused = Parse(File.ReadAllText(Checkpoint.OutFile(workDir, phase)), TimeSpan.FromTicks(done.ElapsedTicks));
+            if (phase == Phase.Coverage) reused = reused with { Arms = done.Arms!.ToHashSet(StringComparer.Ordinal) };
+            return reused with { Resumed = "reused" };
+        }
+        for (var attempt = 1; plan.Action == PassAction.Recover; attempt++)
+        {
+            var recovered = RunTlc(workDir, phase, config, identity, plan);
+            if (recovered.Kind != "error") return recovered with { Resumed = "recovered" };
+            var done = RecoveryCompleted(Checkpoint.OutFile(workDir, phase));
+            // Killed (out of memory, a stop), during or after the recovery: the
+            // checkpoint is not at fault, so it stays for the next --resume.
+            if (recovered.Killed) return recovered with { Resumed = done ? "recovered" : "recovery interrupted" };
+            if (!done)
+            {
+                // TLC exited on its own without reading the checkpoint back: it is unusable.
+                Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} failed to recover from its checkpoint ({recovered.Message}); running it from the start");
+                break;
+            }
+            // TLC recovered, then failed on its own. TLC 1.7.4 has been seen to throw at
+            // once after "Recovery completed." and then recover cleanly from the
+            // checkpoint it writes as it stops on an error, so try once more; after
+            // that the checkpoint stays (the failure may be the heap) and the cell
+            // is recorded as failed.
+            if (attempt >= 2) return recovered with { Resumed = "recovered" };
+            plan = Checkpoint.Plan(workDir, phase, identity, _workers);
+            Console.Error.WriteLine($"resume: {Path.GetFileName(workDir)} {phase} failed after recovering from its checkpoint ({recovered.Message}); "
+                + (plan.Action == PassAction.Recover ? "recovering once more" : "running it from the start"));
+        }
+        return RunTlc(workDir, phase, config, identity, new PassPlan(PassAction.Fresh));
+    }
+
+    /// <summary>TLC's line once it has read a checkpoint back (EC.TLC_CHECKPOINT_RECOVER_END).</summary>
+    private const string RecoveryDone = "Recovery completed.";
+
+    private static bool RecoveryCompleted(string outFile) =>
+        File.Exists(outFile) && File.ReadLines(outFile).Any(l => l.StartsWith(RecoveryDone, StringComparison.Ordinal));
+
+    /// <summary>
+    /// What a pass's verdict depends on besides the model's modules: its
+    /// configuration, the TLC options that change what it checks or reports
+    /// (workers, deadlock, liveness, dump, the root module) and the jar.
+    /// A finished pass or a checkpoint is used again only under the same.
+    /// </summary>
+    internal string PassIdentity(string config, Phase phase)
+    {
+        var jar = new FileInfo(_jar);
+        return config + "\n" + string.Join(' ', ResultArguments(phase)) + "\n" + jar.Name + " " + (jar.Exists ? jar.Length : 0).ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The TLC options that bear on a pass's verdict.</summary>
+    private IEnumerable<string> ResultArguments(Phase phase)
+    {
+        yield return "-workers";
+        yield return Inv(_workers);
+        // The harness's Rest stutter means TLC's deadlock check is exactly the
+        // explorer's; every other phase leaves it to the Deadlock phase.
+        if (phase != Phase.Deadlock) yield return "-deadlock";
+        if (phase == Phase.Coverage)
+        {
+            yield return "-dump";
+            yield return "states";
+        }
+        if (phase is Phase.Quiescence or Phase.TimerFree)
+        {
+            yield return "-lncheck";
+            yield return "final";
+        }
+        yield return phase == Phase.Lockstep ? LockstepRoot : Path.GetFileName(_harness);
+    }
+
+    /// <summary>
+    /// TLC's command line for one pass. <paramref name="fp"/> is the
+    /// fingerprint polynomial, given whenever the pass checkpoints or recovers
+    /// (a recovery under another polynomial counts states again);
+    /// <paramref name="checkpoint"/> turns on TLC's checkpoints.
+    /// </summary>
+    internal List<string> Arguments(Phase phase, string meta, string tmp, int? fp, bool checkpoint, string? recoverDir)
+    {
+        var args = new List<string>
+        {
+            "-XX:+UseParallelGC", "-Xmx" + _heap, "-Djava.io.tmpdir=" + tmp,
+            "-cp", _jar, "tlc2.TLC",
+            "-metadir", meta, "-config", "MC_" + phase + ".cfg", "-nowarning",
+        };
+        if (fp is { } f) args.AddRange(["-fp", Inv(f)]);
+        if (checkpoint) args.AddRange(["-checkpoint", Inv(CheckpointMinutes)]);
+        if (recoverDir is not null) args.AddRange(["-recover", recoverDir]);
+        args.AddRange(ResultArguments(phase));
+        return args;
+    }
+
+    // The TLC processes running now, so a stopped TlaCheck can stop them too (StopAll).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Process, byte> Running = new();
+    private static volatile bool _stopping;
+
+    /// <summary>
+    /// TlaCheck is being stopped (SIGTERM, Ctrl-C): stop every TLC it started
+    /// and hold the threads that ran them, so nothing more is recorded and no
+    /// checkpoint is deleted. TLC's checkpoints are files, so a later
+    /// --resume continues from the last one.
+    /// </summary>
+    public static void StopAll()
+    {
+        List<Process> running;
+        // Under the same lock as starting a TLC, so none starts after this and escapes.
+        lock (StartGate)
+        {
+            _stopping = true;
+            running = Running.Keys.ToList();
+        }
+        foreach (var p in running)
+        {
+            try
+            {
+                p.Kill(entireProcessTree: true);
+                p.WaitForExit(10_000);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        }
+    }
+
+    private static readonly Lock StartGate = new();
+
+    /// <summary>Start TLC and register it for <see cref="StopAll"/>, or hold for good once TlaCheck is stopping.</summary>
+    private static Process Start(ProcessStartInfo psi)
+    {
+        lock (StartGate)
+        {
+            if (!_stopping)
+            {
+                var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
+                Running[p] = 0;
+                return p;
+            }
+        }
+        Thread.Sleep(Timeout.Infinite);
+        throw new InvalidOperationException("unreachable");
+    }
+
+    private static void HoldIfStopping()
+    {
+        if (_stopping) Thread.Sleep(Timeout.Infinite);
+    }
+
+    private TlcResult RunTlc(string workDir, Phase phase, string config, string identity, PassPlan plan)
+    {
         var cfgName = "MC_" + phase + ".cfg";
-        File.WriteAllText(Path.Combine(workDir, cfgName), Config(o, phase, depthBound, known));
-        var meta = Path.Combine(workDir, "meta_" + phase);
-        if (Directory.Exists(meta)) Directory.Delete(meta, recursive: true);
+        File.WriteAllText(Path.Combine(workDir, cfgName), config);
+        var meta = Checkpoint.MetaDir(workDir, phase);
+        var recover = plan.Action == PassAction.Recover;
+        if (!recover && Directory.Exists(meta)) Directory.Delete(meta, recursive: true);
         var tmp = Path.Combine(workDir, "jtmp");
         Directory.CreateDirectory(tmp);
+        var checkpointing = CheckpointMinutes > 0 && Checkpoint.Recoverable(phase);
+        // TLC's time on the pass before this run (up to the checkpoint it resumes from).
+        var before = recover ? TimeSpan.FromTicks(plan.Progress!.ElapsedTicks) : TimeSpan.Zero;
+        // A recovered pass keeps its recorded polynomial even with checkpoints now off.
+        var progress = recover ? plan.Progress!
+            : checkpointing ? new PassProgress(Checkpoint.Hash(identity), Random.Shared.Next(Checkpoint.FpCount), _workers, 0)
+            : null;
+        if (checkpointing)
+        {
+            Directory.CreateDirectory(meta);
+            Checkpoint.WriteProgress(workDir, phase, progress!);
+        }
 
         var psi = new ProcessStartInfo("java")
         {
@@ -399,29 +594,7 @@ public sealed class Tlc
         };
         // TLC extracts its standard modules into java.io.tmpdir; keep them in
         // the model directory rather than the shared /tmp.
-        foreach (var a in new[]
-                 {
-                     "-XX:+UseParallelGC", "-Xmx" + _heap, "-Djava.io.tmpdir=" + tmp,
-                     "-cp", _jar, "tlc2.TLC",
-                     "-workers", Inv(_workers), "-metadir", meta, "-config", cfgName, "-nowarning",
-                 })
-        {
-            psi.ArgumentList.Add(a);
-        }
-        // The harness's Rest stutter means TLC's deadlock check is exactly the
-        // explorer's; every other phase leaves it to the Deadlock phase.
-        if (phase != Phase.Deadlock) psi.ArgumentList.Add("-deadlock");
-        if (phase == Phase.Coverage)
-        {
-            psi.ArgumentList.Add("-dump");
-            psi.ArgumentList.Add("states");
-        }
-        if (phase is Phase.Quiescence or Phase.TimerFree)
-        {
-            psi.ArgumentList.Add("-lncheck");
-            psi.ArgumentList.Add("final");
-        }
-        psi.ArgumentList.Add(phase == Phase.Lockstep ? LockstepRoot : Path.GetFileName(_harness));
+        foreach (var a in Arguments(phase, meta, tmp, progress?.Fp, checkpointing, recover ? plan.CheckpointDir : null)) psi.ArgumentList.Add(a);
 
         // A Coverage run's dump: a named pipe read as TLC writes it, or (no FIFOs) the file, read after.
         var dump = Path.Combine(workDir, DumpFile);
@@ -456,23 +629,46 @@ public sealed class Tlc
         var sw = Stopwatch.StartNew();
         try
         {
-            using var p = Process.Start(psi) ?? throw new InvalidOperationException("could not start java");
-            var stdout = p.StandardOutput.ReadToEndAsync();
+            using var p = Start(psi);
+            // Each completed checkpoint records TLC's time so far, so a recovered pass counts the time before it.
+            Action? onCheckpoint = !checkpointing ? null : () =>
+            {
+                try { Checkpoint.WriteProgress(workDir, phase, progress! with { ElapsedTicks = (before + sw.Elapsed).Ticks }); }
+                catch (IOException ex) { Console.Error.WriteLine($"warning: {Path.GetFileName(workDir)} {phase}: could not record a checkpoint's progress: {ex.Message}"); }
+            };
+            var stdout = ReadOutput(p.StandardOutput, onCheckpoint, Checkpoint.OutFile(workDir, phase));
             var stderr = p.StandardError.ReadToEndAsync();
-            if (!p.WaitForExit(_timeout))
+            var exited = p.WaitForExit(_timeout);
+            HoldIfStopping();
+            if (!exited)
             {
                 try { p.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
                 p.WaitForExit();
-                File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), stdout.Result + stderr.Result);
-                Tidy(meta, tmp);
-                return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s",
+                Running.TryRemove(p, out _);
+                File.WriteAllText(Checkpoint.OutFile(workDir, phase), stdout.Result + stderr.Result);
+                // A checkpointed pass keeps its metadir, so a rerun with a larger --timeout continues it.
+                if (progress is not null && KeepProgress) Tidy(tmp);
+                else Tidy(meta, tmp);
+                return new TlcResult("timeout", null, 0, 0, 0, Array.Empty<TlcStep>(), before + sw.Elapsed, $"no verdict within {_timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} s",
                     phase == Phase.Coverage ? Arms(timedOut: true) : null);
             }
+            p.WaitForExit();
+            Running.TryRemove(p, out _);
+            HoldIfStopping();
             var text = stdout.Result + stderr.Result;
-            File.WriteAllText(Path.Combine(workDir, "tlc_" + phase + ".out"), text);
-            Tidy(meta, tmp);
-            var result = Parse(text, sw.Elapsed);
-            return phase == Phase.Coverage ? result with { Arms = Arms(timedOut: false) } : result;
+            File.WriteAllText(Checkpoint.OutFile(workDir, phase), text);
+            var result = Parse(text, before + sw.Elapsed);
+            // Exit codes from 128 up are a signal: 137 SIGKILL, 143 SIGTERM (java's own exit on it).
+            if (result.Kind == "error") result = result with { Killed = p.ExitCode >= 128 };
+            if (result.Kind == "error" && result.Message.Length == 0)
+                result = result with { Message = $"TLC stopped without a verdict (exit code {p.ExitCode.ToString(CultureInfo.InvariantCulture)})" };
+            // A checkpointed pass that gave no verdict (TLC killed, say) keeps its metadir for a resumed run.
+            if (progress is not null && KeepProgress && !result.IsVerdict) Tidy(tmp);
+            else Tidy(meta, tmp);
+            if (phase == Phase.Coverage) result = result with { Arms = Arms(timedOut: false) };
+            if (KeepProgress && result.IsVerdict && Checkpoint.Reusable(phase))
+                Checkpoint.WriteDone(workDir, phase, new PassDone(Checkpoint.Hash(identity), result.Elapsed.Ticks, result.Arms?.Order(StringComparer.Ordinal).ToList()));
+            return result;
         }
         finally
         {
@@ -480,6 +676,69 @@ public sealed class Tlc
             if (pipe is not null) DumpPipe.Finish(dump, pipe);
         }
     }
+
+    /// <summary>
+    /// Read TLC's standard output to its end, exactly as written, copying it
+    /// to <paramref name="outFile"/> as it arrives (flushed), so a running
+    /// pass's progress can be read (<c>--progress</c>), and calling
+    /// <paramref name="onCheckpoint"/> each time TLC reports a checkpoint
+    /// completed. Once TLC exits the caller writes the whole output (standard
+    /// output, then standard error) over the file, as before. A partial file
+    /// is never taken for a finished pass: that needs <c>tlc_&lt;Phase&gt;.done</c>,
+    /// written only after a verdict.
+    /// </summary>
+    private static Task<string> ReadOutput(StreamReader output, Action? onCheckpoint, string outFile) =>
+        Task.Run(async () =>
+        {
+            var text = new StringBuilder();
+            var buffer = new char[1 << 14];
+            // The start of the current line, enough to recognise the one line wanted.
+            var line = new StringBuilder();
+            StreamWriter? copy = null;
+            try { copy = new StreamWriter(new FileStream(outFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)); }
+            catch (IOException) { }
+            try
+            {
+                int n;
+                while ((n = await output.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+                {
+                    text.Append(buffer, 0, n);
+                    if (copy is not null)
+                    {
+                        try
+                        {
+                            copy.Write(buffer, 0, n);
+                            copy.Flush();
+                        }
+                        catch (IOException)
+                        {
+                            copy = null;
+                        }
+                    }
+                    if (onCheckpoint is null) continue;
+                    for (var i = 0; i < n; i++)
+                    {
+                        if (buffer[i] == '\n')
+                        {
+                            if (line.ToString().StartsWith(CheckpointDone, StringComparison.Ordinal)) onCheckpoint();
+                            line.Clear();
+                        }
+                        else if (line.Length < CheckpointDone.Length)
+                        {
+                            line.Append(buffer[i]);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                try { copy?.Dispose(); } catch (IOException) { }
+            }
+            return text.ToString();
+        });
+
+    /// <summary>TLC's line once a checkpoint is committed (EC.TLC_CHECKPOINT_END).</summary>
+    private const string CheckpointDone = "Checkpointing completed";
 
     // Set once the file fallback has been reported, so the warning prints once per process.
     private static int _fallbackWarned;
@@ -489,7 +748,7 @@ public sealed class Tlc
 
     /// <summary>
     /// TLC's fingerprint and queue files and its extracted standard modules are not read
-    /// again once a run is over; on a shared self-hosted runner, kept for every row, they
+    /// again once a run is over (a checkpointed pass that timed out keeps its metadir); on a shared self-hosted runner, kept for every row, they
     /// fill the disk. (A Coverage run's dump is a pipe, or, without FIFOs, a file deleted by <see cref="ReadArms(string)"/>.)
     /// </summary>
     private static void Tidy(params string[] dirs)
