@@ -94,7 +94,40 @@ public class GridVerdictTests
     {
         GridVerdict.SkipsCoverage(capped).Should().Be(skipped);
         GridVerdict.SkipsCoverage(GridVerdict.Cap(true, false, depthBoundHit: capped == "depth", stateBoundHit: capped == "states")).Should().Be(skipped);
+    }
+
+    // Calibration rows and rows that rely on the depth bound are never capped, so they run Coverage.
+    [Fact]
+    public void Coverage_is_not_skipped_for_calibration_or_depth_bound_rows()
+    {
         GridVerdict.SkipsCoverage(GridVerdict.Cap(false, false, true, true)).Should().BeFalse();
+        GridVerdict.SkipsCoverage(GridVerdict.Cap(true, depthBoundRow: true, true, true)).Should().BeFalse();
+    }
+
+    // A skipped cell's leftover Coverage files (from a killed pass or an older build) are removed,
+    // so --progress no longer shows the finished cell as in progress.
+    [Fact]
+    public void Dropping_the_coverage_pass_clears_its_leftovers_and_progress()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tlacheck-drop-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "meta_Coverage"));
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "tlc_Coverage.out"), "TLC2 Version\n");
+            File.WriteAllText(Path.Combine(dir, "tlc_Coverage.done"), "{}");
+            File.WriteAllText(Path.Combine(dir, "MC_Coverage.cfg"), "");
+            File.WriteAllText(Path.Combine(dir, "states.dump"), "");
+            File.WriteAllText(Path.Combine(dir, "meta_Coverage", "x"), "");
+            File.WriteAllText(Path.Combine(dir, "tlc_Safety.out"), "TLC2 Version\n");
+            File.WriteAllText(Path.Combine(dir, "tlc_Safety.done"), "{}");
+            File.WriteAllText(Path.Combine(dir, "MC_Safety.cfg"), "");
+
+            Tlc.DropPass(dir, Phase.Coverage);
+
+            Directory.GetFileSystemEntries(dir).Select(Path.GetFileName).Should().BeEquivalentTo(["tlc_Safety.out", "tlc_Safety.done", "MC_Safety.cfg"]);
+            Progress.Cell(dir, DateTime.Now).Should().Contain("in progress: none");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
     }
 
     // The record of a skipped cell says so, reads back as the same row (so a

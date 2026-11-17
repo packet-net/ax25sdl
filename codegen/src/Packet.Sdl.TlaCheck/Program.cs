@@ -574,6 +574,11 @@ Row Compare(Scenario s)
         // only, so a grid cell is recorded as failed, and --resume runs it again.
         if (gridMode && cov.Kind == "error") (kind, note) = ("error", "coverage pass: " + cov.Message);
     }
+    else if (coverageSkipped && gridMode)
+    {
+        // A pass an earlier run began (killed mid-way, or an older build): drop its leftovers so --progress does not show it in progress.
+        Tlc.DropPass(dir, Phase.Coverage);
+    }
 
     var secs = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
     var tlcText = kind switch

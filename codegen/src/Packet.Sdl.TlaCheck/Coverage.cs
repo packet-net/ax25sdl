@@ -116,7 +116,7 @@ public static class Coverage
         sb.Append(CultureInfo.InvariantCulture, $"  transitions: TLC {tlcT} of {transitions.Count}, explorer {exT} of {transitions.Count}{(tlcT == exT && transitions.All(a => tlc.Contains(a.Key) == ex.Contains(a.Key)) ? " (the same set)" : " (the sets differ)")}\n");
         sb.Append(CultureInfo.InvariantCulture, $"  subroutine paths: TLC {tlcP} of {paths.Count} (the explorer does not report paths)\n");
         if (coverageSkipped > 0)
-            sb.Append(CultureInfo.InvariantCulture, $"  coverage skipped on {coverageSkipped} capped cell(s): the arms they fire are not counted\n");
+            sb.Append(CultureInfo.InvariantCulture, $"  coverage skipped on {coverageSkipped} capped cell(s): TLC's arms on them are not counted\n");
         sb.Append("Never fired, by state and input:\n");
         foreach (var g in arms.Where(a => !tlc.Contains(a.Key) && !ex.Contains(a.Key)).GroupBy(a => a.Where))
         {

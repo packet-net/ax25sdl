@@ -80,6 +80,8 @@ internal static class GridRecords
     {
         var merged = cross.DeepClone().AsObject();
         SetArms(merged, Row(cross).ExplorerArms, Set(coverage["arms"]));
+        // The arms are real now, so the cell is no longer one whose Coverage was skipped.
+        merged.Remove("coverageSkipped");
         merged["coverageMerged"] = true;
         merged["coverageSeconds"] = coverage["coverageSeconds"]?.DeepClone();
         merged["coverageCommit"] = coverage["commit"]?.DeepClone();
@@ -210,7 +212,7 @@ internal static class GridRecords
         }
         var coverageSkipped = rows.Count(r => r.CoverageSkipped);
         if (coverageSkipped > 0)
-            sb.Append(CultureInfo.InvariantCulture, $"Coverage skipped on {coverageSkipped} capped cell(s): their arms were not read and are not in the coverage report (--coverage-only is worth running only for uncapped cells).\n");
+            sb.Append(CultureInfo.InvariantCulture, $"Coverage skipped on {coverageSkipped} capped cell(s): TLC's arms were not read and are not in the coverage report (--coverage-only is worth running only for uncapped cells).\n");
         var largest = rows.OrderByDescending(r => r.TlcStates).FirstOrDefault();
         sb.Append(CultureInfo.InvariantCulture, $"Time: explorer {rows.Sum(r => r.ExplorerSeconds):0} s, TLC {rows.Sum(r => r.TlcSeconds):0} s in all; largest cell {largest?.TlcStates ?? 0} distinct states.\n");
         return sb.ToString();
