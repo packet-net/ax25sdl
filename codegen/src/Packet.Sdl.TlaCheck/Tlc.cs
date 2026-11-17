@@ -747,6 +747,19 @@ public sealed class Tlc
     private const string DumpFile = "states.dump";
 
     /// <summary>
+    /// Removes what a pass left in a model directory: its output and done files, its
+    /// config, its metadir (many GB from a killed pass) and, for Coverage, the dump (a
+    /// pipe or a file). A cell whose pass is no longer run (a capped cell's Coverage)
+    /// would otherwise show as that pass "in progress" in <c>--progress</c> for good.
+    /// </summary>
+    public static void DropPass(string workDir, Phase phase)
+    {
+        foreach (var f in new[] { Checkpoint.OutFile(workDir, phase), Checkpoint.DoneFile(workDir, phase), Path.Combine(workDir, "MC_" + phase + ".cfg") }.Concat(phase == Phase.Coverage ? [Path.Combine(workDir, DumpFile)] : []))
+            if (File.Exists(f)) File.Delete(f);
+        Tidy(Checkpoint.MetaDir(workDir, phase));
+    }
+
+    /// <summary>
     /// TLC's fingerprint and queue files and its extracted standard modules are not read
     /// again once a run is over (a checkpointed pass that timed out keeps its metadir); on a shared self-hosted runner, kept for every row, they
     /// fill the disk. (A Coverage run's dump is a pipe, or, without FIFOs, a file deleted by <see cref="ReadArms(string)"/>.)

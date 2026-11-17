@@ -94,7 +94,8 @@ its expectation fails, even where the two tools agree.
                     each cell's line has mode "coverage", coverageOnly true,
                     the arms TLC fired and coverageSeconds, to merge into the
                     cell's earlier record (docs/tla.md, "Grid runs"); use a
-                    results file of its own
+                    results file of its own; only worth running for uncapped
+                    cells, as a cross-check run skips a capped cell's coverage
   --merge-coverage CROSS COVERAGE OUT
                     write OUT: the cross-check results file CROSS with the
                     arms of each cell the --coverage-only results file
@@ -113,7 +114,10 @@ whatever the explorer's verdict: the state counts and counterexamples are not
 compared, only the verdict kinds where the explorer found a violation (a
 reachable state, so TLC must report the same kind). It does not count as a
 disagreement unless TLC then reports clean or another kind; one where TLC
-found a violation the explorer did not is flagged.
+found a violation the explorer did not is flagged. A capped cell's Coverage
+pass is not run (its arms are never compared, so it cannot change the result;
+on the largest cells it is the slowest pass): the record says coverageSkipped
+and the report counts the cells skipped.
 
 exit code: 0 every row agrees and meets its expectation (and the accounting
 holds), 1 some row disagrees, misses its expectation, a run failed, or the
@@ -426,7 +430,7 @@ Each(idx =>
     }
     results[idx] = row;
     var label = gridMode ? GridVerdict.Label(row) : row.Agree ? "agree   " : "DISAGREE";
-    Console.Error.WriteLine($"{label} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}{(row.Resumed.Length > 0 ? " [resumed: " + row.Resumed + "]" : "")}");
+    Console.Error.WriteLine($"{label} {scenarios[idx].Name}: explorer {row.Explorer}; TLC {row.Tlc}{(row.Why.Length > 0 ? " (" + row.Why + ")" : "")}{(row.Resumed.Length > 0 ? " [resumed: " + row.Resumed + "]" : "")}{(row.CoverageSkipped ? " [coverage skipped: capped]" : "")}");
     if (row.Unexpected is { } unexpected) Console.Error.WriteLine($"UNEXPECTED {scenarios[idx].Name}: {unexpected}");
 });
 
@@ -437,11 +441,11 @@ for (var idx = 0; idx < scenarios.Count; idx++)
     var s = scenarios[idx];
     var r = results[idx];
     var expected = s.Expect is null ? "" : r.Unexpected is null ? "yes" : "**no**: " + r.Unexpected;
-    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Capped.Length > 0 ? (r.Why.Length > 0 ? "capped; **verdicts differ**: " + r.Why : r.CappedFinding ? "capped, not compared; **TLC found a violation**" : "capped, not compared") : r.Agree ? "yes" : "**no**: " + r.Why)} | {expected} |\n");
+    sb.Append(CultureInfo.InvariantCulture, $"| {s.Name} | {s.Defect} | {Tables(s.Tables)} | {r.Explorer} | {r.Tlc} | {(r.Capped.Length > 0 ? (r.Why.Length > 0 ? "capped; **verdicts differ**: " + r.Why : r.CappedFinding ? "capped, not compared; **TLC found a violation**" : "capped, not compared") + (r.CoverageSkipped ? ", coverage skipped" : "") : r.Agree ? "yes" : "**no**: " + r.Why)} | {expected} |\n");
 }
 Console.WriteLine(sb.ToString());
 var currentRuns = scenarios.Select((s, i) => (s, results[i])).Where(x => x.s.Tables == TableSetKind.Current).Select(x => (x.Item2.ExplorerArms, x.Item2.TlcArms)).ToList();
-Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current), currentRuns));
+Console.WriteLine(Coverage.Report(Dir(TableSetKind.Current), currentRuns, results.Values.Count(r => r.CoverageSkipped)));
 // The accounting check (unfired.txt) needs the whole calibration suite: a
 // subset or the grid fires less, so it is skipped then.
 var accounted = true;
@@ -550,10 +554,18 @@ Row Compare(Scenario s)
         }
     }
 
+    // A grid cell whose explorer search a limit cut short (TLC has none) is
+    // capped: whatever the explorer's verdict, only the verdict kinds are
+    // compared, and only where the explorer found a violation. Its fired arms
+    // are never compared either, so its Coverage pass cannot change the result
+    // and is not run (packet-net/ax25sdl#112).
+    var capped = GridVerdict.Cap(gridMode, s.DepthBound, ex.DepthBoundHit, ex.StateBoundHit);
+    var coverageSkipped = GridVerdict.SkipsCoverage(capped);
+
     // Coverage: rerun the safety search without the VIEW and read the arms fired.
     // On a grid cell that gave no verdict it would only time out (or fail) again.
     var tlcArms = new HashSet<string>(StringComparer.Ordinal);
-    if (!(gridMode && kind is "timeout" or "error"))
+    if (!coverageSkipped && !(gridMode && kind is "timeout" or "error"))
     {
         var cov = Pass(Phase.Coverage, depthBound);
         elapsed += cov.Elapsed;
@@ -561,6 +573,11 @@ Row Compare(Scenario s)
         // TLC failed during coverage (killed, out of memory): its arms are a part
         // only, so a grid cell is recorded as failed, and --resume runs it again.
         if (gridMode && cov.Kind == "error") (kind, note) = ("error", "coverage pass: " + cov.Message);
+    }
+    else if (coverageSkipped && gridMode)
+    {
+        // A pass an earlier run began (killed mid-way, or an older build): drop its leftovers so --progress does not show it in progress.
+        Tlc.DropPass(dir, Phase.Coverage);
     }
 
     var secs = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -611,13 +628,9 @@ Row Compare(Scenario s)
     // length is the one the expectation states, TLC's lasso differs).
     var unexpected = s.Expect?.Mismatch(exKind, exStation, ex.Length, ex.States);
     if (unexpected is null && s.Expect is not null && kind != exKind) unexpected = s.Expect.Mismatch(kind, station, steps, states);
-    // A grid cell whose explorer search a limit cut short (TLC has none) is
-    // capped: whatever the explorer's verdict, only the verdict kinds are
-    // compared, and only where the explorer found a violation.
-    var capped = GridVerdict.Cap(gridMode, s.DepthBound, ex.DepthBoundHit, ex.StateBoundHit);
     var (agree, whyText) = GridVerdict.Judge(capped, exKind, kind, why);
     return new Row(exText, tlcText, agree, whyText, exFired, tlcArms, unexpected,
-        exKind, kind, ex.States, states, exSeconds, elapsed.TotalSeconds, capped, string.Join("; ", resumed));
+        exKind, kind, ex.States, states, exSeconds, elapsed.TotalSeconds, capped, string.Join("; ", resumed), coverageSkipped);
 }
 
 static (string Kind, string Station, int Steps, List<string> Tids, string Note) Verdict(TlcResult r, Phase phase, ExplorerOptions o, bool depthBound)
@@ -702,9 +715,10 @@ static string RepoRoot()
 
 /// <param name="ExplorerKind">The explorer's verdict kind (clean, bound, or the invariant).</param>
 /// <param name="TlcKind">TLC's verdict kind; "error" or "timeout" when it gave none.</param>
+/// <param name="CoverageSkipped">The cell is capped, so its Coverage pass was not run and its TLC arms are empty.</param>
 /// <param name="Resumed">What a resumed grid cell took from an earlier run ("explorer reused; Safety reused; Quiescence recovered"); empty otherwise.</param>
 internal sealed record Row(string Explorer, string Tlc, bool Agree, string Why, IReadOnlySet<string> ExplorerArms, IReadOnlySet<string> TlcArms, string? Unexpected = null,
-    string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0, string Capped = "", string Resumed = "")
+    string ExplorerKind = "", string TlcKind = "", long ExplorerStates = 0, long TlcStates = 0, double ExplorerSeconds = 0, double TlcSeconds = 0, string Capped = "", string Resumed = "", bool CoverageSkipped = false)
 {
     /// <summary>A capped cell on which TLC, which has no cap, found a violation the explorer did not: a finding, not noise.</summary>
     public bool CappedFinding => Capped.Length > 0 && GridVerdict.IsViolation(TlcKind) && !GridVerdict.IsViolation(ExplorerKind);

@@ -21,6 +21,15 @@ internal static class GridVerdict
     public static string Cap(bool gridCell, bool depthBoundRow, bool depthBoundHit, bool stateBoundHit) =>
         !gridCell || depthBoundRow ? "" : depthBoundHit ? "depth" : stateBoundHit ? "states" : "";
 
+    /// <summary>
+    /// Whether a cell's Coverage pass is not run. A capped cell is judged on
+    /// verdict kind only and its fired arms are never compared, so Coverage
+    /// cannot change its result; on the largest cells it explores more than
+    /// Safety and cannot checkpoint (packet-net/ax25sdl#112). <c>--coverage-only</c>
+    /// is not affected: it has no explorer result.
+    /// </summary>
+    public static bool SkipsCoverage(string capped) => capped.Length > 0;
+
     /// <summary>A verdict kind that names a violation (not clean, a bound, a timeout or a failure).</summary>
     public static bool IsViolation(string kind) => kind is not ("clean" or "bound" or "error" or "timeout" or "");
 
