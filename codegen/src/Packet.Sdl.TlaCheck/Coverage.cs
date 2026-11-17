@@ -97,7 +97,7 @@ public static class Coverage
         return (unknown.Count == 0 && firedButListed.Count == 0 && unlisted.Count == 0, sb.ToString());
     }
 
-    public static string Report(string currentDir, IReadOnlyList<(IReadOnlySet<string> Explorer, IReadOnlySet<string> Tlc)> runs)
+    public static string Report(string currentDir, IReadOnlyList<(IReadOnlySet<string> Explorer, IReadOnlySet<string> Tlc)> runs, int coverageSkipped = 0)
     {
         var arms = Inventory(currentDir);
         var transitions = arms.Where(a => a.Key.Contains('/', StringComparison.Ordinal)).ToList();
@@ -115,6 +115,8 @@ public static class Coverage
         sb.Append(CultureInfo.InvariantCulture, $"Arm coverage over the current tables, across the {runs.Count} scenario(s) run on them: {all} of {arms.Count} rows fired ({Pct(all, arms.Count)}%).\n");
         sb.Append(CultureInfo.InvariantCulture, $"  transitions: TLC {tlcT} of {transitions.Count}, explorer {exT} of {transitions.Count}{(tlcT == exT && transitions.All(a => tlc.Contains(a.Key) == ex.Contains(a.Key)) ? " (the same set)" : " (the sets differ)")}\n");
         sb.Append(CultureInfo.InvariantCulture, $"  subroutine paths: TLC {tlcP} of {paths.Count} (the explorer does not report paths)\n");
+        if (coverageSkipped > 0)
+            sb.Append(CultureInfo.InvariantCulture, $"  coverage skipped on {coverageSkipped} capped cell(s): the arms they fire are not counted\n");
         sb.Append("Never fired, by state and input:\n");
         foreach (var g in arms.Where(a => !tlc.Contains(a.Key) && !ex.Contains(a.Key)).GroupBy(a => a.Where))
         {

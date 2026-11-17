@@ -83,6 +83,47 @@ public class GridVerdictTests
         GridVerdict.Passes(r).Should().BeTrue();
     }
 
+    // A capped cell's arms are never compared, so its Coverage pass is not run
+    // (packet-net/ax25sdl#112); an uncapped cell, and a calibration row (never
+    // capped), still run it.
+    [Theory]
+    [InlineData("states", true)]
+    [InlineData("depth", true)]
+    [InlineData("", false)]
+    public void Coverage_is_skipped_exactly_for_a_capped_cell(string capped, bool skipped)
+    {
+        GridVerdict.SkipsCoverage(capped).Should().Be(skipped);
+        GridVerdict.SkipsCoverage(GridVerdict.Cap(true, false, depthBoundHit: capped == "depth", stateBoundHit: capped == "states")).Should().Be(skipped);
+        GridVerdict.SkipsCoverage(GridVerdict.Cap(false, false, true, true)).Should().BeFalse();
+    }
+
+    // The record of a skipped cell says so, reads back as the same row (so a
+    // --resume that finds it finished prints the same report), and the summary
+    // and coverage report count it. A cell that ran Coverage has no such field.
+    [Fact]
+    public void A_skipped_cell_is_recorded_read_back_and_counted()
+    {
+        var none = new HashSet<string>();
+        var explorerArms = new HashSet<string> { "Connected/t01_x" };
+        var skippedRow = new Row("bound, 1200000 states", "clean, 71000000 states", false, "", explorerArms, none, null, "bound", "clean", 1_200_000, 71_000_000, 1, 2, "states", "", true);
+        var ranRow = skippedRow with { Capped = "", Agree = true, CoverageSkipped = false };
+
+        var record = GridRecords.Cross("g-capped", 1, "Ax25Meaning", skippedRow);
+        ((bool?)record["coverageSkipped"]).Should().BeTrue();
+        record["arms"]!.AsArray().Should().BeEmpty();
+        GridRecords.Cross("g-ran", 2, "Ax25Meaning", ranRow).ContainsKey("coverageSkipped").Should().BeFalse();
+
+        var back = GridRecords.Row(record);
+        back.CoverageSkipped.Should().BeTrue();
+        back.Capped.Should().Be("states");
+        back.ExplorerArms.Should().BeEquivalentTo(explorerArms);
+        GridVerdict.Passes(back).Should().BeTrue();
+
+        GridRecords.Summary([("g-capped", back), ("g-ran", ranRow)], 0).Should().Contain("Coverage skipped on 1 capped cell(s)");
+        GridRecords.Summary([("g-ran", ranRow)], 0).Should().NotContain("Coverage skipped");
+        Coverage.Report(CurrentDir, [(explorerArms, none)], coverageSkipped: 1).Should().Contain("coverage skipped on 1 capped cell(s)");
+    }
+
     [Fact]
     public void An_uncapped_cell_is_compared_in_full()
     {

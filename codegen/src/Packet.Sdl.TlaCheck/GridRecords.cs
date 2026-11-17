@@ -50,6 +50,10 @@ internal static class GridRecords
         SetArms(o, r.ExplorerArms, r.TlcArms);
         // Only on a cell that took something from an earlier run, so other records are as before.
         if (r.Resumed.Length > 0) o["resumed"] = r.Resumed;
+        // Only on a capped cell, whose Coverage pass is not run: "arms" is then empty and
+        // "explorerOnly" holds every transition the explorer fired, as on a cell cut by a
+        // timeout, and --merge-coverage can still fill the arms in.
+        if (r.CoverageSkipped) o["coverageSkipped"] = true;
         o["finished"] = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         return o;
     }
@@ -90,7 +94,7 @@ internal static class GridRecords
         var explorerArms = tlcArms.Where(a => a.Contains('/', StringComparison.Ordinal) && !tlcOnly.Contains(a)).Concat(Set(o["explorerOnly"])).ToHashSet(StringComparer.Ordinal);
         return new Row((string?)o["explorer"] ?? "", (string?)o["tlc"] ?? "", (bool?)o["agree"] ?? false, (string?)o["why"] ?? "", explorerArms, tlcArms, null,
             (string?)o["explorerKind"] ?? "", (string?)o["tlcKind"] ?? "", (long?)o["explorerStates"] ?? 0, (long?)o["tlcStates"] ?? 0,
-            (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0, (string?)o["capped"] ?? "");
+            (double?)o["explorerSeconds"] ?? 0, (double?)o["tlcSeconds"] ?? 0, (string?)o["capped"] ?? "", "", (bool?)o["coverageSkipped"] ?? false);
     }
 
     /// <summary>
@@ -204,6 +208,9 @@ internal static class GridRecords
             foreach (var (name, r) in cells.Where(c => c.Row.CappedFinding))
                 sb.Append(CultureInfo.InvariantCulture, $"FINDING to look at: {name} is capped in the explorer, and TLC found {r.Tlc}\n");
         }
+        var coverageSkipped = rows.Count(r => r.CoverageSkipped);
+        if (coverageSkipped > 0)
+            sb.Append(CultureInfo.InvariantCulture, $"Coverage skipped on {coverageSkipped} capped cell(s): their arms were not read and are not in the coverage report (--coverage-only is worth running only for uncapped cells).\n");
         var largest = rows.OrderByDescending(r => r.TlcStates).FirstOrDefault();
         sb.Append(CultureInfo.InvariantCulture, $"Time: explorer {rows.Sum(r => r.ExplorerSeconds):0} s, TLC {rows.Sum(r => r.TlcSeconds):0} s in all; largest cell {largest?.TlcStates ?? 0} distinct states.\n");
         return sb.ToString();
