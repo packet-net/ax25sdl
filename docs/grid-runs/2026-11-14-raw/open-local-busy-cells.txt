@@ -1,7 +1,4 @@
-g-ab2-ba3-b1-k4-nosrej-dup@local-busy=both
 g-ab3-ba2-b1-k4-nosrej-drop+dup@local-busy=both
-g-ab3-ba3-b0-k4-nosrej-drop@local-busy=both
-g-ab3-ba3-b0-k4-nosrej-dup@local-busy=both
 g-ab3-ba3-b0-k4-nosrej-drop+dup@local-busy=both
 g-ab3-ba3-b1-k4-nosrej-drop@local-busy=both
 g-ab3-ba3-b1-k4-nosrej-dup@local-busy=both
