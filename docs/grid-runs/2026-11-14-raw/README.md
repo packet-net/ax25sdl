@@ -14,7 +14,7 @@ Raw output of the runs that finished the 13 November leftovers and the uncapped 
 - `*.md`: the same results as TlaCheck prints them.
 - `coverage-only*.jsonl`: `--coverage-only` reruns (#130) for cells whose Coverage pass was cut (below). Fold them in with `--merge-coverage`.
 - `coverage-cut-*.log`: every cell whose Coverage pass was stopped. The Coverage pass of the build in use then wrote its whole state dump to disk, 50 to 70 GB per large cell, and filled the disks. Stopping it keeps the verdict from the first three passes; only the list of rows fired is partial until a coverage-only rerun replaces it.
-- `open-local-busy-cells.txt`: the local-busy cells with no verdict yet (5 of the original 17 on 26 November; the other 12 finished on local machines and a lent box, all capped with the same verdict as the explorer).
+- `open-local-busy-cells.txt`: the local-busy cells with no verdict yet (4 of the original 17 on 27 November; the other 13 finished on local machines and a lent box, all capped with the same verdict as the explorer).
 
 ## State at the end, 23:40 UTC on 16 November
 
