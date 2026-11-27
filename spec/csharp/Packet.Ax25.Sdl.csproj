@@ -18,7 +18,7 @@
     <Authors>Tom Fanning (M0LTE)</Authors>
     <Copyright>Copyright (c) Tom Fanning and Packet.NET contributors</Copyright>
     <PackageTags>ax25;amateur-radio;packet-radio;sdl;state-machine;codegen</PackageTags>
-    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/m0lte/ax25sdl</PackageProjectUrl>
     <RepositoryUrl>https://github.com/m0lte/ax25sdl</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
