@@ -24,8 +24,8 @@
     <Company>Packet.NET</Company>
     <Copyright>Copyright (c) 2026 Tom Fanning and ax25sdl contributors. Generated tables derive from packethacking/ax25spec; see NOTICE.md.</Copyright>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/m0lte/packet.net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/m0lte/packet.net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/packet-net/ax25sdl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/packet-net/ax25sdl</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
     <PackageReadmeFile Condition="Exists('$(MSBuildProjectDirectory)/README.md')">README.md</PackageReadmeFile>
