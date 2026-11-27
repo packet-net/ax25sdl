@@ -22,7 +22,8 @@
     }
   },
   "files": [
-    "dist/**"
+    "dist/**",
+    "NOTICE.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",

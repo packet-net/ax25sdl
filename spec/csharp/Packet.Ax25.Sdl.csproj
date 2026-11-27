@@ -16,7 +16,7 @@
     <Title>Packet.Ax25.Sdl — AX.25 v2.2 SDL state machines for .NET</Title>
     <Description>Generated AX.25 v2.2 link-layer state machine transitions, events, and subroutines, ready to walk via a session-driver runtime. The transitions come from human-authored YAML transcriptions of the canonical AX.25 v2.2 SDL figures (figc4.1 through figc4.7). Source: github.com/m0lte/ax25sdl.</Description>
     <Authors>Tom Fanning (M0LTE)</Authors>
-    <Copyright>Copyright (c) Tom Fanning and Packet.NET contributors</Copyright>
+    <Copyright>Copyright (c) 2026 Tom Fanning and ax25sdl contributors. Generated tables derive from packethacking/ax25spec; see NOTICE.md.</Copyright>
     <PackageTags>ax25;amateur-radio;packet-radio;sdl;state-machine;codegen</PackageTags>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/m0lte/ax25sdl</PackageProjectUrl>
@@ -33,6 +33,7 @@
     <!-- Ship the repo's top-level README inside the nupkg so the nuget.org
          landing page documents what consumers get. -->
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\NOTICE.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
