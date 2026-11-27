@@ -84,4 +84,4 @@ Extracted from `packet.net` (then `m0lte/packet.net`) on 2026-05-17 — the tran
 
 ## License
 
-[BSD-2-Clause](LICENSE). Spec text and figures derive from the AX.25 v2.2 specification; the transcription discipline that turns figures into machine-checkable YAML is documented in [`docs/sdl-transcription-runbook.md`](docs/sdl-transcription-runbook.md).
+The tooling is [BSD-2-Clause](LICENSE). The generated state tables derive from [packethacking/ax25spec](https://github.com/packethacking/ax25spec) and, through it, the AX.25 v2.2 specification; see [NOTICE.md](NOTICE.md). The transcription discipline that turns figures into machine-checkable YAML is documented in [`docs/sdl-transcription-runbook.md`](docs/sdl-transcription-runbook.md).

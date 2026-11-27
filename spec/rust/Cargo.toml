@@ -37,7 +37,7 @@ documentation = "https://docs.rs/ax25sdl"
 readme = "README.md"
 keywords = ["ax25", "ham-radio", "sdl", "packet-radio", "no_std"]
 categories = ["no-std", "embedded", "network-programming", "parsing"]
-include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE", "NOTICE.md"]
 
 [features]
 # `std` is on by default so host `cargo test` / `cargo build` Just Work. An

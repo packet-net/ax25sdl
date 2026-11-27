@@ -51,4 +51,4 @@ Each state page is a `pub static` (e.g. `DATA_LINK_CONNECTED: StatePage`); the f
 
 ## License
 
-[BSD-2-Clause](LICENSE). Spec text and figures derive from the AX.25 v2.2 specification.
+The tooling is [BSD-2-Clause](LICENSE). The state tables derive from [packethacking/ax25spec](https://github.com/packethacking/ax25spec) and, through it, the AX.25 v2.2 specification; see [NOTICE.md](NOTICE.md).
