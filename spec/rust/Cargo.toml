@@ -26,7 +26,7 @@
 # bump as the breaking signal.
 [package]
 name = "ax25sdl"
-version = "0.10.0"
+version = "0.10.1"
 edition = "2021"
 rust-version = "1.70"
 description = "Generated AX.25 v2.2 SDL state-machine tables (figc4.x) as no_std-capable Rust data."
